@@ -113,17 +113,16 @@ class JournalCursorTest {
 
     JournalCursor<String> cursor = journal.read();
 
-    Thread consumer =
-        Thread.ofVirtual()
-            .start(
-                () -> {
-                  pollStarted.countDown();
-                  pollResult.set(cursor.poll(Duration.ofSeconds(30)));
-                });
+    Thread.ofVirtual()
+        .start(
+            () -> {
+              pollStarted.countDown();
+              pollResult.set(cursor.poll(Duration.ofSeconds(30)));
+            });
 
     assertThat(pollStarted.await(5, TimeUnit.SECONDS)).isTrue();
     // Give poll time to enter the wait
-    Thread.sleep(100);
+    await().pollDelay(Duration.ofMillis(100)).atMost(Duration.ofSeconds(1)).until(() -> true);
 
     cursor.close();
 
@@ -285,7 +284,7 @@ class JournalCursorTest {
       // Slow consumer — small delay between polls to exercise backpressure
       while (cursor.isOpen()) {
         cursor.poll(Duration.ofSeconds(5)).ifPresent(entry -> received.add(entry.data()));
-        Thread.sleep(1);
+        await().pollDelay(Duration.ofMillis(1)).atMost(Duration.ofSeconds(1)).until(() -> true);
       }
 
       producer.join(10000);

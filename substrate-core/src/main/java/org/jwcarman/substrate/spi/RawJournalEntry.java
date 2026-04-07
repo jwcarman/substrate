@@ -16,5 +16,43 @@
 package org.jwcarman.substrate.spi;
 
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.Objects;
 
-public record RawJournalEntry(String id, String key, byte[] data, Instant timestamp) {}
+public record RawJournalEntry(String id, String key, byte[] data, Instant timestamp) {
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof RawJournalEntry that)) {
+      return false;
+    }
+    return Objects.equals(id, that.id)
+        && Objects.equals(key, that.key)
+        && Arrays.equals(data, that.data)
+        && Objects.equals(timestamp, that.timestamp);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = Objects.hash(id, key, timestamp);
+    result = 31 * result + Arrays.hashCode(data);
+    return result;
+  }
+
+  @Override
+  public String toString() {
+    return "RawJournalEntry["
+        + "id="
+        + id
+        + ", key="
+        + key
+        + ", data="
+        + Arrays.toString(data)
+        + ", timestamp="
+        + timestamp
+        + ']';
+  }
+}

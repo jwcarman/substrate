@@ -66,8 +66,8 @@ class NatsJournalSpiTest {
     when(jetStream.publish(any(NatsMessage.class))).thenThrow(new IOException("write failed"));
 
     NatsJournalSpi journal = createJournal();
-    assertThatThrownBy(
-            () -> journal.append("substrate:journal:test", "data".getBytes(StandardCharsets.UTF_8)))
+    byte[] data = "data".getBytes(StandardCharsets.UTF_8);
+    assertThatThrownBy(() -> journal.append("substrate:journal:test", data))
         .isInstanceOf(UncheckedIOException.class);
   }
 

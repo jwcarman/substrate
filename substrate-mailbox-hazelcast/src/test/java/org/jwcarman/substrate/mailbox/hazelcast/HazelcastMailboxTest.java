@@ -16,7 +16,6 @@
 package org.jwcarman.substrate.mailbox.hazelcast;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -54,10 +53,10 @@ class HazelcastMailboxTest {
 
     verify(map)
         .put(
-            eq("test-key"),
-            eq("test-value".getBytes(StandardCharsets.UTF_8)),
-            eq(Duration.ofMinutes(5).toMillis()),
-            eq(TimeUnit.MILLISECONDS));
+            "test-key",
+            "test-value".getBytes(StandardCharsets.UTF_8),
+            Duration.ofMinutes(5).toMillis(),
+            TimeUnit.MILLISECONDS);
   }
 
   @Test

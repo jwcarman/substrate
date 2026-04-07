@@ -179,7 +179,8 @@ class InMemoryJournalSpiTest {
 
     journal.complete(KEY);
 
-    assertThrows(IllegalStateException.class, () -> journal.append(KEY, "data2".getBytes(UTF_8)));
+    byte[] data2 = "data2".getBytes(UTF_8);
+    assertThrows(IllegalStateException.class, () -> journal.append(KEY, data2));
   }
 
   @Test

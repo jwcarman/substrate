@@ -36,6 +36,9 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
   private static final String FIELD_ENTRY_ID = "entry_id";
   private static final String FIELD_DATA = "data";
   private static final String FIELD_TIMESTAMP = "timestamp";
+  private static final String SELECT = "SELECT ";
+  private static final String FROM = " FROM ";
+  private static final String WHERE = " WHERE ";
   private static final ByteBuffer COMPLETED_DATA = ByteBuffer.wrap("__COMPLETED__".getBytes());
 
   private final CqlSession session;
@@ -85,15 +88,15 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
 
     this.readAfterStatement =
         session.prepare(
-            "SELECT "
+            SELECT
                 + FIELD_ENTRY_ID
                 + ", "
                 + FIELD_DATA
                 + ", "
                 + FIELD_TIMESTAMP
-                + " FROM "
+                + FROM
                 + tableName
-                + " WHERE "
+                + WHERE
                 + FIELD_KEY
                 + " = ? AND "
                 + FIELD_ENTRY_ID
@@ -103,22 +106,21 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
 
     this.readLastStatement =
         session.prepare(
-            "SELECT "
+            SELECT
                 + FIELD_ENTRY_ID
                 + ", "
                 + FIELD_DATA
                 + ", "
                 + FIELD_TIMESTAMP
-                + " FROM "
+                + FROM
                 + tableName
-                + " WHERE "
+                + WHERE
                 + FIELD_KEY
                 + " = ? ORDER BY "
                 + FIELD_ENTRY_ID
                 + " DESC LIMIT ?");
 
-    this.deleteStatement =
-        session.prepare("DELETE FROM " + tableName + " WHERE " + FIELD_KEY + " = ?");
+    this.deleteStatement = session.prepare("DELETE FROM " + tableName + WHERE + FIELD_KEY + " = ?");
   }
 
   public void createSchema() {
@@ -218,8 +220,7 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
   @Override
   public boolean isComplete(String key) {
     ResultSet rs =
-        session.execute(
-            "SELECT " + FIELD_DATA + " FROM " + tableName + " WHERE " + FIELD_KEY + " = ?", key);
+        session.execute(SELECT + FIELD_DATA + FROM + tableName + WHERE + FIELD_KEY + " = ?", key);
     for (Row row : rs) {
       if (COMPLETED_DATA.equals(row.getByteBuffer(FIELD_DATA))) {
         return true;

@@ -234,10 +234,14 @@ class SubstrateAutoConfigurationTest {
     }
 
     @Override
-    public void complete(String key) {}
+    public void complete(String key) {
+      // no-op stub for testing
+    }
 
     @Override
-    public void delete(String key) {}
+    public void delete(String key) {
+      // no-op stub for testing
+    }
 
     @Override
     public boolean isComplete(String key) {
@@ -253,7 +257,9 @@ class SubstrateAutoConfigurationTest {
   static class StubMailboxSpi implements MailboxSpi {
 
     @Override
-    public void deliver(String key, byte[] value) {}
+    public void deliver(String key, byte[] value) {
+      // no-op stub for testing
+    }
 
     @Override
     public Optional<byte[]> get(String key) {
@@ -261,7 +267,9 @@ class SubstrateAutoConfigurationTest {
     }
 
     @Override
-    public void delete(String key) {}
+    public void delete(String key) {
+      // no-op stub for testing
+    }
 
     @Override
     public String mailboxKey(String name) {
@@ -272,11 +280,15 @@ class SubstrateAutoConfigurationTest {
   static class StubNotifier implements Notifier {
 
     @Override
-    public void notify(String key, String payload) {}
+    public void notify(String key, String payload) {
+      // no-op stub for testing
+    }
 
     @Override
     public NotifierSubscription subscribe(NotificationHandler handler) {
-      return () -> {};
+      return () -> {
+        // no-op stub for testing
+      };
     }
   }
 }

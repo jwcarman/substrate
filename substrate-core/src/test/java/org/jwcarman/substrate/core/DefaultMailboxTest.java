@@ -75,8 +75,7 @@ class DefaultMailboxTest {
 
     Optional<String> result = mailbox.poll(Duration.ofSeconds(1));
 
-    assertThat(result).isPresent();
-    assertThat(result.get()).isEqualTo("hello");
+    assertThat(result).contains("hello");
   }
 
   @Test
@@ -99,8 +98,7 @@ class DefaultMailboxTest {
         .untilAsserted(
             () -> {
               assertThat(result.get()).isNotNull();
-              assertThat(result.get()).isPresent();
-              assertThat(result.get().get()).isEqualTo("world");
+              assertThat(result.get()).contains("world");
             });
   }
 

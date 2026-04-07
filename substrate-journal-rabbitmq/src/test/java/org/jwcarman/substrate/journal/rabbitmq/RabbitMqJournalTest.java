@@ -96,8 +96,8 @@ class RabbitMqJournalSpiTest {
         .when(producer)
         .send(any(Message.class), any(ConfirmationHandler.class));
 
-    assertThatThrownBy(
-            () -> journal.append("substrate:journal:test", "data".getBytes(StandardCharsets.UTF_8)))
+    byte[] data = "data".getBytes(StandardCharsets.UTF_8);
+    assertThatThrownBy(() -> journal.append("substrate:journal:test", data))
         .isInstanceOf(StreamException.class);
   }
 

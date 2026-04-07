@@ -111,7 +111,6 @@ public class RabbitMqJournalSpi extends AbstractJournalSpi implements AutoClosea
 
   @Override
   public boolean isComplete(String key) {
-    List<RawJournalEntry> entries = consumeAll(key);
     // consumeAll filters out COMPLETED markers, so check the raw stream
     String streamName = toStreamName(key);
     if (!streamExists(streamName)) {

@@ -64,8 +64,9 @@ public class DefaultMailbox<T> implements Mailbox<T> {
                     return;
                   }
 
-                  semaphore.tryAcquire(READER_POLL_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-                  semaphore.drainPermits();
+                  if (semaphore.tryAcquire(READER_POLL_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)) {
+                    semaphore.drainPermits();
+                  }
                 }
               } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
@@ -86,10 +87,8 @@ public class DefaultMailbox<T> implements Mailbox<T> {
       return Optional.of(value);
     } catch (TimeoutException _) {
       return Optional.empty();
-    } catch (InterruptedException _) {
+    } catch (InterruptedException | java.util.concurrent.ExecutionException _) {
       Thread.currentThread().interrupt();
-      return Optional.empty();
-    } catch (java.util.concurrent.ExecutionException _) {
       return Optional.empty();
     }
   }
