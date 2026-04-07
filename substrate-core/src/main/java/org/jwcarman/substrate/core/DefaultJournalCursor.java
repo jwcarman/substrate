@@ -41,6 +41,7 @@ class DefaultJournalCursor<T> implements JournalCursor<T> {
   private final AtomicBoolean open = new AtomicBoolean(true);
   private final LinkedBlockingQueue<QueueItem<T>> queue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
   private final Semaphore semaphore = new Semaphore(0);
+  private final Thread readerThread;
 
   private volatile String lastId;
 
@@ -71,39 +72,40 @@ class DefaultJournalCursor<T> implements JournalCursor<T> {
           }
         });
 
-    Thread.ofVirtual()
-        .start(
-            () -> {
-              String readerId = readerStartId;
-              try {
-                while (open.get()) {
-                  List<RawJournalEntry> entries;
-                  if (readerId != null) {
-                    entries = journalSpi.readAfter(key, readerId);
-                  } else {
-                    entries = journalSpi.readLast(key, Integer.MAX_VALUE);
-                  }
+    readerThread =
+        Thread.ofVirtual()
+            .start(
+                () -> {
+                  String readerId = readerStartId;
+                  try {
+                    while (open.get()) {
+                      List<RawJournalEntry> entries;
+                      if (readerId != null) {
+                        entries = journalSpi.readAfter(key, readerId);
+                      } else {
+                        entries = journalSpi.readLast(key, Integer.MAX_VALUE);
+                      }
 
-                  for (RawJournalEntry raw : entries) {
-                    JournalEntry<T> decoded =
-                        new JournalEntry<>(
-                            raw.id(), raw.key(), codec.decode(raw.data()), raw.timestamp());
-                    queue.put(new QueueItem.Entry<>(decoded));
-                    readerId = raw.id();
-                  }
+                      for (RawJournalEntry raw : entries) {
+                        JournalEntry<T> decoded =
+                            new JournalEntry<>(
+                                raw.id(), raw.key(), codec.decode(raw.data()), raw.timestamp());
+                        queue.put(new QueueItem.Entry<>(decoded));
+                        readerId = raw.id();
+                      }
 
-                  if (journalSpi.isComplete(key) && entries.isEmpty()) {
-                    queue.put(new QueueItem.Complete<>());
-                    return;
-                  }
+                      if (journalSpi.isComplete(key) && entries.isEmpty()) {
+                        queue.put(new QueueItem.Complete<>());
+                        return;
+                      }
 
-                  semaphore.tryAcquire(READER_POLL_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-                  semaphore.drainPermits();
-                }
-              } catch (InterruptedException _) {
-                Thread.currentThread().interrupt();
-              }
-            });
+                      semaphore.tryAcquire(READER_POLL_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+                      semaphore.drainPermits();
+                    }
+                  } catch (InterruptedException _) {
+                    Thread.currentThread().interrupt();
+                  }
+                });
   }
 
   DefaultJournalCursor(
@@ -152,8 +154,8 @@ class DefaultJournalCursor<T> implements JournalCursor<T> {
   @Override
   public void close() {
     open.set(false);
-    // Wake the reader thread so it exits its loop
-    semaphore.release();
+    // Interrupt unblocks the reader thread from put() or tryAcquire()
+    readerThread.interrupt();
     // Wake the consumer if it's blocked on queue.poll()
     queue.offer(new QueueItem.Complete<>());
   }
