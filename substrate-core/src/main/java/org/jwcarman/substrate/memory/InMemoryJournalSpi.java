@@ -89,6 +89,11 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
+  public boolean isCompleted(String key) {
+    return completed.contains(key);
+  }
+
+  @Override
   public void delete(String key) {
     journals.remove(key);
     completed.remove(key);

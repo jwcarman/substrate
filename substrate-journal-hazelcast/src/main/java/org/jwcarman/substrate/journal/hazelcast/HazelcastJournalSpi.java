@@ -127,6 +127,12 @@ public class HazelcastJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
+  public boolean isCompleted(String key) {
+    IMap<String, Boolean> completedMap = hazelcast.getMap(COMPLETED_MAP_NAME);
+    return Boolean.TRUE.equals(completedMap.get(key));
+  }
+
+  @Override
   public void delete(String key) {
     Ringbuffer<String> ringbuffer = hazelcast.getRingbuffer(key);
     ringbuffer.destroy();

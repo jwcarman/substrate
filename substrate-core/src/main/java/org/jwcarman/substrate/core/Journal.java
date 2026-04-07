@@ -32,4 +32,8 @@ public interface Journal<T> {
   void delete();
 
   String key();
+
+  Subscription subscribe(JournalSubscriber<T> subscriber);
+
+  Subscription subscribe(String afterId, JournalSubscriber<T> subscriber);
 }

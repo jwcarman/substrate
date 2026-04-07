@@ -132,6 +132,13 @@ public class MongoDbJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
+  public boolean isCompleted(String key) {
+    Query query =
+        new Query(Criteria.where(FIELD_KEY).is(key).and(FIELD_ENTRY_ID).is(COMPLETED_ENTRY_ID));
+    return mongoTemplate.exists(query, collectionName);
+  }
+
+  @Override
   public void delete(String key) {
     Query query = new Query(Criteria.where(FIELD_KEY).is(key));
     mongoTemplate.remove(query, collectionName);

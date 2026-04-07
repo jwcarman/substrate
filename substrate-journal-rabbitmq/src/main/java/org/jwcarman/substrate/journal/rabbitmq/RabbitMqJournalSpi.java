@@ -111,6 +111,42 @@ public class RabbitMqJournalSpi extends AbstractJournalSpi implements AutoClosea
   }
 
   @Override
+  public boolean isCompleted(String key) {
+    List<JournalEntry> entries = consumeAll(key);
+    // consumeAll filters out COMPLETED markers, so check the raw stream
+    String streamName = toStreamName(key);
+    if (!streamExists(streamName)) {
+      return false;
+    }
+    BlockingQueue<Boolean> result = new LinkedBlockingQueue<>();
+    Consumer consumer;
+    try {
+      consumer =
+          environment.consumerBuilder().stream(streamName)
+              .offset(OffsetSpecification.first())
+              .messageHandler(
+                  (ctx, msg) -> {
+                    var props = msg.getApplicationProperties();
+                    if (props != null && COMPLETED_MARKER.equals(props.get(FIELD_ENTRY_ID))) {
+                      result.add(Boolean.TRUE);
+                    }
+                  })
+              .build();
+    } catch (StreamException _) {
+      return false;
+    }
+    try {
+      Boolean found = result.poll(CONSUME_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+      return found != null && found;
+    } catch (InterruptedException _) {
+      Thread.currentThread().interrupt();
+      return false;
+    } finally {
+      consumer.close();
+    }
+  }
+
+  @Override
   public void delete(String key) {
     String streamName = toStreamName(key);
     Producer producer = producers.remove(streamName);

@@ -18,23 +18,27 @@ package org.jwcarman.substrate.core;
 import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.codec.spi.TypeRef;
 import org.jwcarman.substrate.spi.JournalSpi;
+import org.jwcarman.substrate.spi.Notifier;
 
 public class JournalFactory {
 
   private final JournalSpi journalSpi;
   private final CodecFactory codecFactory;
+  private final Notifier notifier;
 
-  public JournalFactory(JournalSpi journalSpi, CodecFactory codecFactory) {
+  public JournalFactory(JournalSpi journalSpi, CodecFactory codecFactory, Notifier notifier) {
     this.journalSpi = journalSpi;
     this.codecFactory = codecFactory;
+    this.notifier = notifier;
   }
 
   public <T> Journal<T> create(String name, Class<T> type) {
-    return new DefaultJournal<>(journalSpi, journalSpi.journalKey(name), codecFactory.create(type));
+    return new DefaultJournal<>(
+        journalSpi, journalSpi.journalKey(name), codecFactory.create(type), notifier);
   }
 
   public <T> Journal<T> create(String name, TypeRef<T> typeRef) {
     return new DefaultJournal<>(
-        journalSpi, journalSpi.journalKey(name), codecFactory.create(typeRef));
+        journalSpi, journalSpi.journalKey(name), codecFactory.create(typeRef), notifier);
   }
 }

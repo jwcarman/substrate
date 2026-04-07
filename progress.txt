@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-07T14:44:00Z
-ITERATION: 14
-SPEC_COMPLETED: 013-byte-array-spis-and-codec.md
-WHAT_WAS_DONE: Converted all SPI data parameters from String to byte[], made core API generic (Journal<T>, Mailbox<T>) with Codec integration, updated all 14 backend implementations and their tests
-VERIFICATION: ./mvnw verify — BUILD SUCCESS (all 22 modules pass); ./mvnw spotless:check — PASS
+LAST_RUN: 2026-04-07T15:00:00Z
+ITERATION: 15
+SPEC_COMPLETED: 014-journal-subscribers.md
+WHAT_WAS_DONE: Added reactive subscription model to Journal<T> with JournalSubscriber<T>, Subscription, and StreamJournalSubscriber<T>; integrated Notifier into DefaultJournal for wake-up signals on append/complete; added isCompleted to JournalSpi with implementations in all 9 backends
+VERIFICATION: ./mvnw verify — BUILD SUCCESS (all modules pass); ./mvnw spotless:check — PASS
 STATUS: MORE_WORK
-NEXT_SPEC: 014-journal-subscribers.md
-NOTES: codec-core 1.0.0-SNAPSHOT used instead of spec's 0.1.0 (only version available in local Maven repo). Notifier remains String-based as specified. Mailbox backends now use notifier as pure signal and fetch byte[] values from backend storage on notification. Redis and Hazelcast use Base64 encoding for byte[] data in String-typed storage. codec-jackson added as test-scoped dependency in substrate-core for round-trip tests.
+NEXT_SPEC: 015-simplify-spis.md
+NOTES: Added boolean isCompleted(String key) to JournalSpi interface (not a default method — all 9 backend implementations updated). DefaultJournal now requires a Notifier constructor parameter. JournalFactory and SubstrateAutoConfiguration updated to inject Notifier. The reader thread uses Object monitor wait/notify with an AtomicBoolean flag to avoid lost signals. For the tail-only subscribe case, the current last entry ID is snapshotted before starting the reader thread. StreamJournalSubscriber uses a bounded LinkedBlockingQueue (default 1024) with a polling spliterator that terminates when closed or completed.

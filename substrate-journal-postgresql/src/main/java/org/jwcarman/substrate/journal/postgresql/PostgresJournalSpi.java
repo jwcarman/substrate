@@ -96,6 +96,14 @@ public class PostgresJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
+  public boolean isCompleted(String key) {
+    Integer count =
+        jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM substrate_journal_completed WHERE key = ?", Integer.class, key);
+    return count != null && count > 0;
+  }
+
+  @Override
   public void delete(String key) {
     jdbcTemplate.update("DELETE FROM substrate_journal_entries WHERE key = ?", key);
     jdbcTemplate.update("DELETE FROM substrate_journal_completed WHERE key = ?", key);

@@ -68,9 +68,10 @@ public class SubstrateAutoConfiguration {
   }
 
   @Bean
-  @ConditionalOnBean({JournalSpi.class, CodecFactory.class})
-  public JournalFactory journalFactory(JournalSpi journalSpi, CodecFactory codecFactory) {
-    return new JournalFactory(journalSpi, codecFactory);
+  @ConditionalOnBean({JournalSpi.class, CodecFactory.class, Notifier.class})
+  public JournalFactory journalFactory(
+      JournalSpi journalSpi, CodecFactory codecFactory, Notifier notifier) {
+    return new JournalFactory(journalSpi, codecFactory, notifier);
   }
 
   @Bean

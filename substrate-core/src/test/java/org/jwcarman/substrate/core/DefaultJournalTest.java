@@ -30,6 +30,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.spi.JournalEntry;
 import org.jwcarman.substrate.spi.JournalSpi;
+import org.jwcarman.substrate.spi.Notifier;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -40,6 +41,7 @@ class DefaultJournalTest {
 
   @Mock private JournalSpi spi;
   @Mock private Codec<String> codec;
+  @Mock private Notifier notifier;
   private DefaultJournal<String> journal;
 
   @BeforeEach
@@ -50,7 +52,7 @@ class DefaultJournalTest {
     lenient()
         .when(codec.decode(any(byte[].class)))
         .thenAnswer(inv -> new String((byte[]) inv.getArgument(0), UTF_8));
-    journal = new DefaultJournal<>(spi, KEY, codec);
+    journal = new DefaultJournal<>(spi, KEY, codec, notifier);
   }
 
   @Test
@@ -66,6 +68,7 @@ class DefaultJournalTest {
 
     assertEquals("entry-1", id);
     verify(spi).append(KEY, "data".getBytes(UTF_8));
+    verify(notifier).notify(KEY, "entry-1");
   }
 
   @Test
@@ -77,6 +80,7 @@ class DefaultJournalTest {
 
     assertEquals("entry-2", id);
     verify(spi).append(KEY, "data".getBytes(UTF_8), ttl);
+    verify(notifier).notify(KEY, "entry-2");
   }
 
   @Test
@@ -107,6 +111,7 @@ class DefaultJournalTest {
     journal.complete();
 
     verify(spi).complete(KEY);
+    verify(notifier).notify(KEY, "__COMPLETED__");
   }
 
   @Test

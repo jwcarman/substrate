@@ -156,6 +156,18 @@ public class NatsJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
+  public boolean isCompleted(String key) {
+    try {
+      ensureCompletedBucketExists();
+      var kv = connection.keyValue(COMPLETED_BUCKET);
+      var entry = kv.get(key.replace(':', '.'));
+      return entry != null;
+    } catch (IOException | JetStreamApiException _) {
+      return false;
+    }
+  }
+
+  @Override
   public void delete(String key) {
     String subject = toSubject(key);
     try {

@@ -29,6 +29,7 @@ import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.codec.spi.TypeRef;
 import org.jwcarman.substrate.memory.InMemoryJournalSpi;
+import org.jwcarman.substrate.memory.InMemoryNotifier;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -43,7 +44,7 @@ class JournalFactoryTest {
   void createReturnsBoundJournalWithPrefixedKey() {
     InMemoryJournalSpi spi = new InMemoryJournalSpi();
     when(codecFactory.create(String.class)).thenReturn(stringCodec);
-    JournalFactory factory = new JournalFactory(spi, codecFactory);
+    JournalFactory factory = new JournalFactory(spi, codecFactory, new InMemoryNotifier());
 
     Journal<String> journal = factory.create("my-stream", String.class);
 
@@ -58,7 +59,7 @@ class JournalFactoryTest {
         .thenAnswer(inv -> ((String) inv.getArgument(0)).getBytes(UTF_8));
     when(stringCodec.decode(any(byte[].class)))
         .thenAnswer(inv -> new String((byte[]) inv.getArgument(0), UTF_8));
-    JournalFactory factory = new JournalFactory(spi, codecFactory);
+    JournalFactory factory = new JournalFactory(spi, codecFactory, new InMemoryNotifier());
 
     Journal<String> journal = factory.create("test", String.class);
     String id = journal.append("hello");
@@ -75,7 +76,7 @@ class JournalFactoryTest {
     lenient()
         .when(listCodec.encode(any()))
         .thenAnswer(inv -> inv.getArgument(0).toString().getBytes(UTF_8));
-    JournalFactory factory = new JournalFactory(spi, codecFactory);
+    JournalFactory factory = new JournalFactory(spi, codecFactory, new InMemoryNotifier());
 
     Journal<List<String>> journal = factory.create("typed-stream", typeRef);
 

@@ -13,25 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.substrate.spi;
+package org.jwcarman.substrate.core;
 
-import java.time.Duration;
-import java.util.stream.Stream;
+@FunctionalInterface
+public interface JournalSubscriber<T> {
+  void onEntry(TypedJournalEntry<T> entry);
 
-public interface JournalSpi {
-  String append(String key, byte[] data);
-
-  String append(String key, byte[] data, Duration ttl);
-
-  Stream<JournalEntry> readAfter(String key, String afterId);
-
-  Stream<JournalEntry> readLast(String key, int count);
-
-  void complete(String key);
-
-  void delete(String key);
-
-  boolean isCompleted(String key);
-
-  String journalKey(String name);
+  default void onComplete() {}
 }

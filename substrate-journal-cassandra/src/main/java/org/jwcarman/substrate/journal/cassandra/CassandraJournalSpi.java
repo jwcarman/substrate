@@ -217,6 +217,19 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
+  public boolean isCompleted(String key) {
+    ResultSet rs =
+        session.execute(
+            "SELECT " + FIELD_DATA + " FROM " + tableName + " WHERE " + FIELD_KEY + " = ?", key);
+    for (Row row : rs) {
+      if (COMPLETED_DATA.equals(row.getByteBuffer(FIELD_DATA))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @Override
   public void delete(String key) {
     session.execute(deleteStatement.bind(key));
   }

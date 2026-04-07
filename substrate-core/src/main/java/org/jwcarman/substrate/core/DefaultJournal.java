@@ -16,30 +16,42 @@
 package org.jwcarman.substrate.core;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 import org.jwcarman.codec.spi.Codec;
+import org.jwcarman.substrate.spi.JournalEntry;
 import org.jwcarman.substrate.spi.JournalSpi;
+import org.jwcarman.substrate.spi.Notifier;
 
 public class DefaultJournal<T> implements Journal<T> {
 
   private final JournalSpi journalSpi;
   private final String key;
   private final Codec<T> codec;
+  private final Notifier notifier;
 
-  public DefaultJournal(JournalSpi journalSpi, String key, Codec<T> codec) {
+  public DefaultJournal(JournalSpi journalSpi, String key, Codec<T> codec, Notifier notifier) {
     this.journalSpi = journalSpi;
     this.key = key;
     this.codec = codec;
+    this.notifier = notifier;
   }
 
   @Override
   public String append(T data) {
-    return journalSpi.append(key, codec.encode(data));
+    byte[] bytes = codec.encode(data);
+    String entryId = journalSpi.append(key, bytes);
+    notifier.notify(key, entryId);
+    return entryId;
   }
 
   @Override
   public String append(T data, Duration ttl) {
-    return journalSpi.append(key, codec.encode(data), ttl);
+    byte[] bytes = codec.encode(data);
+    String entryId = journalSpi.append(key, bytes, ttl);
+    notifier.notify(key, entryId);
+    return entryId;
   }
 
   @Override
@@ -55,6 +67,7 @@ public class DefaultJournal<T> implements Journal<T> {
   @Override
   public void complete() {
     journalSpi.complete(key);
+    notifier.notify(key, "__COMPLETED__");
   }
 
   @Override
@@ -67,7 +80,76 @@ public class DefaultJournal<T> implements Journal<T> {
     return key;
   }
 
-  private TypedJournalEntry<T> toTyped(org.jwcarman.substrate.spi.JournalEntry entry) {
+  @Override
+  public Subscription subscribe(JournalSubscriber<T> subscriber) {
+    // Snapshot the current tail so we only receive new entries
+    List<JournalEntry> lastEntries = journalSpi.readLast(key, 1).toList();
+    String tailId = lastEntries.isEmpty() ? null : lastEntries.getLast().id();
+    return startSubscription(tailId, subscriber);
+  }
+
+  @Override
+  public Subscription subscribe(String afterId, JournalSubscriber<T> subscriber) {
+    return startSubscription(afterId, subscriber);
+  }
+
+  private Subscription startSubscription(String initialCursor, JournalSubscriber<T> subscriber) {
+    Object monitor = new Object();
+    AtomicBoolean woken = new AtomicBoolean(false);
+
+    // Register notifier BEFORE starting the reader to avoid missing signals
+    notifier.subscribe(
+        (notifiedKey, payload) -> {
+          if (key.equals(notifiedKey)) {
+            synchronized (monitor) {
+              woken.set(true);
+              monitor.notifyAll();
+            }
+          }
+        });
+
+    Thread readerThread =
+        Thread.ofVirtual()
+            .name("journal-subscriber-" + key)
+            .start(() -> runReaderLoop(initialCursor, subscriber, monitor, woken));
+
+    return () -> readerThread.interrupt();
+  }
+
+  private void runReaderLoop(
+      String initialCursor, JournalSubscriber<T> subscriber, Object monitor, AtomicBoolean woken) {
+    String cursor = initialCursor;
+    try {
+      while (!Thread.currentThread().isInterrupted()) {
+        List<JournalEntry> entries;
+        if (cursor != null) {
+          entries = journalSpi.readAfter(key, cursor).toList();
+        } else {
+          entries = journalSpi.readLast(key, Integer.MAX_VALUE).toList();
+        }
+
+        for (JournalEntry entry : entries) {
+          subscriber.onEntry(toTyped(entry));
+          cursor = entry.id();
+        }
+
+        if (journalSpi.isCompleted(key)) {
+          subscriber.onComplete();
+          return;
+        }
+
+        synchronized (monitor) {
+          while (!woken.compareAndSet(true, false)) {
+            monitor.wait();
+          }
+        }
+      }
+    } catch (InterruptedException _) {
+      Thread.currentThread().interrupt();
+    }
+  }
+
+  private TypedJournalEntry<T> toTyped(JournalEntry entry) {
     return new TypedJournalEntry<>(
         entry.id(), entry.key(), codec.decode(entry.data()), entry.timestamp());
   }

@@ -96,6 +96,11 @@ public class RedisJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
+  public boolean isCompleted(String key) {
+    return commands.get(key + COMPLETED_SUFFIX) != null;
+  }
+
+  @Override
   public void delete(String key) {
     commands.del(key, key + COMPLETED_SUFFIX);
   }

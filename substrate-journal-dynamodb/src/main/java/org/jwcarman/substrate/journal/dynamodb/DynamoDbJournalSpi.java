@@ -173,6 +173,23 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
+  public boolean isCompleted(String key) {
+    QueryResponse response =
+        client.query(
+            QueryRequest.builder()
+                .tableName(tableName)
+                .keyConditionExpression("#k = :k AND " + FIELD_ENTRY_ID + " = :eid")
+                .expressionAttributeNames(Map.of("#k", FIELD_KEY))
+                .expressionAttributeValues(
+                    Map.of(
+                        ":k", AttributeValue.builder().s(key).build(),
+                        ":eid", AttributeValue.builder().s(COMPLETED_ENTRY_ID).build()))
+                .limit(1)
+                .build());
+    return !response.items().isEmpty();
+  }
+
+  @Override
   public void delete(String key) {
     Map<String, AttributeValue> exclusiveStartKey = null;
 

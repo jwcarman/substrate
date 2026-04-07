@@ -239,6 +239,11 @@ class SubstrateAutoConfigurationTest {
     public void delete(String key) {}
 
     @Override
+    public boolean isCompleted(String key) {
+      return false;
+    }
+
+    @Override
     public String journalKey(String name) {
       return "stub:" + name;
     }
