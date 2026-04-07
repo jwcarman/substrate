@@ -65,8 +65,7 @@ class HazelcastMailboxTest {
 
     Optional<byte[]> result = mailbox.get("test-key");
 
-    assertThat(result).isPresent();
-    assertThat(result.get()).isEqualTo("existing-value".getBytes(StandardCharsets.UTF_8));
+    assertThat(result).contains("existing-value".getBytes(StandardCharsets.UTF_8));
   }
 
   @Test

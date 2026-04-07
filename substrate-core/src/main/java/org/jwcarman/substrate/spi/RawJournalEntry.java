@@ -26,13 +26,15 @@ public record RawJournalEntry(String id, String key, byte[] data, Instant timest
     if (this == o) {
       return true;
     }
-    if (!(o instanceof RawJournalEntry that)) {
+    if (!(o
+        instanceof
+        RawJournalEntry(String thatId, String thatKey, byte[] thatData, Instant thatTimestamp))) {
       return false;
     }
-    return Objects.equals(id, that.id)
-        && Objects.equals(key, that.key)
-        && Arrays.equals(data, that.data)
-        && Objects.equals(timestamp, that.timestamp);
+    return Objects.equals(id, thatId)
+        && Objects.equals(key, thatKey)
+        && Arrays.equals(data, thatData)
+        && Objects.equals(timestamp, thatTimestamp);
   }
 
   @Override

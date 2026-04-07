@@ -169,6 +169,8 @@ class DefaultJournalCursor<T> implements JournalCursor<T> {
     // Clear queue to ensure the Complete sentinel can be offered (fixes full-queue case)
     queue.clear();
     // Wake the consumer if it's blocked on queue.poll()
-    boolean _ = queue.offer(new QueueItem.Complete<>());
+    if (!queue.offer(new QueueItem.Complete<>())) {
+      throw new IllegalStateException("Failed to offer Complete sentinel to empty queue");
+    }
   }
 }

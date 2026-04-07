@@ -65,8 +65,7 @@ class DefaultMailboxTest {
   void deliverStoresValueAndNotifies() {
     mailbox.deliver("hello");
 
-    assertThat(spi.get(KEY)).isPresent();
-    assertThat(spi.get(KEY).get()).isEqualTo("hello".getBytes(UTF_8));
+    assertThat(spi.get(KEY)).contains("hello".getBytes(UTF_8));
   }
 
   @Test

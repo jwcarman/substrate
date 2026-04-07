@@ -89,8 +89,7 @@ class DynamoDbMailboxTest {
 
     Optional<byte[]> result = mailbox.get("substrate:mailbox:test");
 
-    assertThat(result).isPresent();
-    assertThat(result.get()).isEqualTo("existing-value".getBytes(StandardCharsets.UTF_8));
+    assertThat(result).contains("existing-value".getBytes(StandardCharsets.UTF_8));
   }
 
   @Test

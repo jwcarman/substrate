@@ -68,8 +68,7 @@ class RedisMailboxIT {
 
     Optional<byte[]> result = mailbox.get(key);
 
-    assertThat(result).isPresent();
-    assertThat(result.get()).isEqualTo("hello".getBytes(StandardCharsets.UTF_8));
+    assertThat(result).contains("hello".getBytes(StandardCharsets.UTF_8));
   }
 
   @Test
