@@ -108,6 +108,7 @@
         <module>substrate-journal-rabbitmq</module>
         <module>substrate-notifier-rabbitmq</module>
         <module>substrate-notifier-sns</module>
+        <module>substrate-jackson</module>
     </modules>
 
     <dependencies>

@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-07T05:56:27Z
-ITERATION: 10
-SPEC_COMPLETED: 010-sns-sqs-backend.md
-WHAT_WAS_DONE: Implemented substrate-notifier-sns module with AWS SNS/SQS-backed Notifier using ephemeral SQS queues for fan-out, virtual thread SQS polling, manual SNS JSON envelope parsing, and batch message deletion
-VERIFICATION: ./mvnw spotless:check — passed; ./mvnw verify — BUILD SUCCESS (all 22 modules pass; notifier-sns: 11 unit tests + 3 IT tests)
+LAST_RUN: 2026-04-07T13:37:00Z
+ITERATION: 11
+SPEC_COMPLETED: 011-substrate-jackson.md
+WHAT_WAS_DONE: Implemented substrate-jackson module with typed JacksonJournal<T> and JacksonMailbox<T> wrappers using Jackson 3 (tools.jackson) serialization, factory classes with Class<T> and TypeReference<T> support, and Spring Boot auto-configuration
+VERIFICATION: ./mvnw spotless:check — passed; ./mvnw verify — BUILD SUCCESS (all 23 modules pass; substrate-jackson: 22 unit tests — 8 journal, 4 mailbox, 2 journal factory, 2 mailbox factory, 6 auto-config)
 STATUS: DONE
 NEXT_SPEC: none
-NOTES: Module uses AWS SDK v2 (sns + sqs) with BOM version 2.42.29 matching substrate-journal-dynamodb. SnsNotifier implements SmartLifecycle with virtual thread poller. Ephemeral SQS queue created per instance with IAM policy allowing SNS to send. Properties: topicArn (required, no default), autoCreateTopic (false), sqsMessageRetention (1m), sqsWaitTimeSeconds (20). Auto-config creates default SnsClient/SqsClient beans if missing. Testcontainers uses localstack:3.8 with sns+sqs services. Module added to parent POM and BOM.
+NOTES: Existing scaffolded code used Jackson 2 (com.fasterxml.jackson) packages — rewrote to Jackson 3 (tools.jackson) which Spring Boot 4.0.5 ships (jackson-bom 3.1.0). Jackson 3's JacksonException is unchecked (extends RuntimeException), so no try/catch wrapping needed — cleaner API. Maven dependency changed from com.fasterxml.jackson.core:jackson-databind to tools.jackson.core:jackson-databind. ObjectMapper.constructType() used directly instead of getTypeFactory().constructType(). Module added to parent POM and BOM. InMemoryJournal/InMemoryMailbox have no-arg constructors (no Notifier param needed for tests).
