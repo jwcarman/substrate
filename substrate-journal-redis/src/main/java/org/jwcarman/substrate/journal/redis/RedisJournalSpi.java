@@ -28,7 +28,6 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 import org.jwcarman.substrate.spi.AbstractJournalSpi;
 import org.jwcarman.substrate.spi.RawJournalEntry;
 
@@ -74,20 +73,20 @@ public class RedisJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<RawJournalEntry> readAfter(String key, String afterId) {
+  public List<RawJournalEntry> readAfter(String key, String afterId) {
     List<StreamMessage<String, String>> messages =
         commands.xread(XReadArgs.Builder.count(READ_BATCH_SIZE), StreamOffset.from(key, afterId));
     if (messages == null || messages.isEmpty()) {
-      return Stream.empty();
+      return List.of();
     }
-    return messages.stream().map(msg -> toJournalEntry(key, msg));
+    return messages.stream().map(msg -> toJournalEntry(key, msg)).toList();
   }
 
   @Override
-  public Stream<RawJournalEntry> readLast(String key, int count) {
+  public List<RawJournalEntry> readLast(String key, int count) {
     List<StreamMessage<String, String>> messages =
         commands.xrevrange(key, Range.unbounded(), Limit.create(0, count));
-    return messages.reversed().stream().map(msg -> toJournalEntry(key, msg));
+    return messages.reversed().stream().map(msg -> toJournalEntry(key, msg)).toList();
   }
 
   @Override

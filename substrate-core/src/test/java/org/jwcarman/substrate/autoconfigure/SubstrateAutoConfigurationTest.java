@@ -18,8 +18,8 @@ package org.jwcarman.substrate.autoconfigure;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.codec.jackson.JacksonCodecFactory;
@@ -223,13 +223,13 @@ class SubstrateAutoConfigurationTest {
     }
 
     @Override
-    public Stream<RawJournalEntry> readAfter(String key, String afterId) {
-      return Stream.empty();
+    public List<RawJournalEntry> readAfter(String key, String afterId) {
+      return List.of();
     }
 
     @Override
-    public Stream<RawJournalEntry> readLast(String key, int count) {
-      return Stream.empty();
+    public List<RawJournalEntry> readLast(String key, int count) {
+      return List.of();
     }
 
     @Override

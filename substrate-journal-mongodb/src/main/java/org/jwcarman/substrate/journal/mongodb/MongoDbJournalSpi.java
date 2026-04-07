@@ -20,7 +20,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.stream.Stream;
 import org.bson.Document;
 import org.bson.types.Binary;
 import org.jwcarman.substrate.spi.AbstractJournalSpi;
@@ -88,7 +87,7 @@ public class MongoDbJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<RawJournalEntry> readAfter(String key, String afterId) {
+  public List<RawJournalEntry> readAfter(String key, String afterId) {
     Query query =
         new Query(Criteria.where(FIELD_KEY).is(key).and(FIELD_ENTRY_ID).gt(afterId))
             .with(Sort.by(Sort.Direction.ASC, FIELD_ENTRY_ID));
@@ -96,11 +95,12 @@ public class MongoDbJournalSpi extends AbstractJournalSpi {
     List<Document> docs = mongoTemplate.find(query, Document.class, collectionName);
     return docs.stream()
         .filter(doc -> !COMPLETED_ENTRY_ID.equals(doc.getString(FIELD_ENTRY_ID)))
-        .map(this::mapDocument);
+        .map(this::mapDocument)
+        .toList();
   }
 
   @Override
-  public Stream<RawJournalEntry> readLast(String key, int count) {
+  public List<RawJournalEntry> readLast(String key, int count) {
     // Request extra to account for possible COMPLETED marker
     Query query =
         new Query(Criteria.where(FIELD_KEY).is(key))
@@ -118,7 +118,7 @@ public class MongoDbJournalSpi extends AbstractJournalSpi {
     if (entries.size() > count) {
       entries = entries.subList(0, count);
     }
-    return entries.reversed().stream();
+    return entries.reversed();
   }
 
   @Override

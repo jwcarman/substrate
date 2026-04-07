@@ -17,8 +17,6 @@ package org.jwcarman.substrate.core;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Stream;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.spi.JournalSpi;
 import org.jwcarman.substrate.spi.Notifier;
@@ -55,16 +53,6 @@ public class DefaultJournal<T> implements Journal<T> {
   }
 
   @Override
-  public Stream<JournalEntry<T>> readAfter(String afterId) {
-    return journalSpi.readAfter(key, afterId).map(this::toTyped);
-  }
-
-  @Override
-  public Stream<JournalEntry<T>> readLast(int count) {
-    return journalSpi.readLast(key, count).map(this::toTyped);
-  }
-
-  @Override
   public void complete() {
     journalSpi.complete(key);
     notifier.notify(key, "__COMPLETED__");
@@ -76,79 +64,28 @@ public class DefaultJournal<T> implements Journal<T> {
   }
 
   @Override
+  public JournalCursor<T> read() {
+    List<RawJournalEntry> lastEntries = journalSpi.readLast(key, 1);
+    String tailId = lastEntries.isEmpty() ? null : lastEntries.getLast().id();
+    return new DefaultJournalCursor<>(journalSpi, key, codec, notifier, tailId);
+  }
+
+  @Override
+  public JournalCursor<T> readAfter(String afterId) {
+    return new DefaultJournalCursor<>(journalSpi, key, codec, notifier, afterId);
+  }
+
+  @Override
+  public JournalCursor<T> readLast(int count) {
+    List<RawJournalEntry> entries = journalSpi.readLast(key, count);
+    DefaultJournalCursor<T> cursor =
+        new DefaultJournalCursor<>(journalSpi, key, codec, notifier, null);
+    cursor.preload(entries);
+    return cursor;
+  }
+
+  @Override
   public String key() {
     return key;
-  }
-
-  @Override
-  public Subscription subscribe(JournalSubscriber<T> subscriber) {
-    List<RawJournalEntry> lastEntries = journalSpi.readLast(key, 1).toList();
-    String tailId = lastEntries.isEmpty() ? null : lastEntries.getLast().id();
-    return startSubscription(tailId, subscriber);
-  }
-
-  @Override
-  public Subscription subscribe(String afterId, JournalSubscriber<T> subscriber) {
-    return startSubscription(afterId, subscriber);
-  }
-
-  private Subscription startSubscription(String initialCursor, JournalSubscriber<T> subscriber) {
-    Object monitor = new Object();
-    AtomicBoolean woken = new AtomicBoolean(false);
-
-    notifier.subscribe(
-        (notifiedKey, payload) -> {
-          if (key.equals(notifiedKey)) {
-            synchronized (monitor) {
-              woken.set(true);
-              monitor.notifyAll();
-            }
-          }
-        });
-
-    Thread readerThread =
-        Thread.ofVirtual()
-            .name("journal-subscriber-" + key)
-            .start(() -> runReaderLoop(initialCursor, subscriber, monitor, woken));
-
-    return () -> readerThread.interrupt();
-  }
-
-  private void runReaderLoop(
-      String initialCursor, JournalSubscriber<T> subscriber, Object monitor, AtomicBoolean woken) {
-    String cursor = initialCursor;
-    try {
-      while (!Thread.currentThread().isInterrupted()) {
-        List<RawJournalEntry> entries;
-        if (cursor != null) {
-          entries = journalSpi.readAfter(key, cursor).toList();
-        } else {
-          entries = journalSpi.readLast(key, Integer.MAX_VALUE).toList();
-        }
-
-        for (RawJournalEntry entry : entries) {
-          subscriber.onEntry(toTyped(entry));
-          cursor = entry.id();
-        }
-
-        if (journalSpi.isComplete(key)) {
-          subscriber.onComplete();
-          return;
-        }
-
-        synchronized (monitor) {
-          while (!woken.compareAndSet(true, false)) {
-            monitor.wait();
-          }
-        }
-      }
-    } catch (InterruptedException _) {
-      Thread.currentThread().interrupt();
-    }
-  }
-
-  private JournalEntry<T> toTyped(RawJournalEntry entry) {
-    return new JournalEntry<>(
-        entry.id(), entry.key(), codec.decode(entry.data()), entry.timestamp());
   }
 }

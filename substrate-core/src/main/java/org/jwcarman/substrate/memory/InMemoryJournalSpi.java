@@ -24,7 +24,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Stream;
 import org.jwcarman.substrate.spi.AbstractJournalSpi;
 import org.jwcarman.substrate.spi.RawJournalEntry;
 
@@ -63,24 +62,24 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<RawJournalEntry> readAfter(String key, String afterId) {
+  public List<RawJournalEntry> readAfter(String key, String afterId) {
     BoundedEntryList list = journals.get(key);
     if (list == null) {
-      return Stream.empty();
+      return List.of();
     }
     long cursor = parseId(afterId);
-    return list.snapshot().stream().filter(e -> parseId(e.id()) > cursor);
+    return list.snapshot().stream().filter(e -> parseId(e.id()) > cursor).toList();
   }
 
   @Override
-  public Stream<RawJournalEntry> readLast(String key, int count) {
+  public List<RawJournalEntry> readLast(String key, int count) {
     BoundedEntryList list = journals.get(key);
     if (list == null) {
-      return Stream.empty();
+      return List.of();
     }
     List<RawJournalEntry> snapshot = list.snapshot();
     int start = Math.max(0, snapshot.size() - count);
-    return snapshot.subList(start, snapshot.size()).stream();
+    return List.copyOf(snapshot.subList(start, snapshot.size()));
   }
 
   @Override

@@ -105,7 +105,7 @@ class DynamoDbJournalSpiTest {
     when(client.query(any(QueryRequest.class)))
         .thenReturn(QueryResponse.builder().items(List.of()).build());
 
-    journal.readAfter("substrate:journal:test", "00000000-0000-0000-0000-000000000000").toList();
+    journal.readAfter("substrate:journal:test", "00000000-0000-0000-0000-000000000000");
 
     ArgumentCaptor<QueryRequest> captor = ArgumentCaptor.forClass(QueryRequest.class);
     verify(client).query(captor.capture());
@@ -121,7 +121,7 @@ class DynamoDbJournalSpiTest {
     when(client.query(any(QueryRequest.class)))
         .thenReturn(QueryResponse.builder().items(List.of()).build());
 
-    journal.readLast("substrate:journal:test", 5).toList();
+    journal.readLast("substrate:journal:test", 5);
 
     ArgumentCaptor<QueryRequest> captor = ArgumentCaptor.forClass(QueryRequest.class);
     verify(client).query(captor.capture());

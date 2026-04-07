@@ -16,12 +16,12 @@
 package org.jwcarman.substrate.core;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
-import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeoutException;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.codec.spi.Codec;
@@ -58,54 +58,57 @@ class DefaultMailboxTest {
 
   @Test
   void keyReturnsTheBoundKey() {
-    assertEquals(KEY, mailbox.key());
+    assertThat(mailbox.key()).isEqualTo(KEY);
   }
 
   @Test
   void deliverStoresValueAndNotifies() {
     mailbox.deliver("hello");
 
-    assertTrue(spi.get(KEY).isPresent());
-    assertArrayEquals("hello".getBytes(UTF_8), spi.get(KEY).get());
+    assertThat(spi.get(KEY)).isPresent();
+    assertThat(spi.get(KEY).get()).isEqualTo("hello".getBytes(UTF_8));
   }
 
   @Test
-  void awaitReturnsImmediatelyIfAlreadyDelivered() {
+  void pollReturnsImmediatelyIfAlreadyDelivered() {
     mailbox.deliver("hello");
 
-    CompletableFuture<String> result = mailbox.await(Duration.ofSeconds(1));
+    Optional<String> result = mailbox.poll(Duration.ofSeconds(1));
 
-    assertTrue(result.isDone());
-    assertEquals("hello", result.join());
+    assertThat(result).isPresent();
+    assertThat(result.get()).isEqualTo("hello");
   }
 
   @Test
-  void awaitCompletesWhenValueDeliveredLater() {
-    CompletableFuture<String> result = mailbox.await(Duration.ofSeconds(5));
+  void pollReturnsValueWhenDeliveredLater() {
+    AtomicReference<Optional<String>> result = new AtomicReference<>();
 
-    assertFalse(result.isDone());
+    Thread.ofVirtual()
+        .start(
+            () -> {
+              result.set(mailbox.poll(Duration.ofSeconds(5)));
+            });
+
+    // Give poll time to enter the wait
+    await().pollDelay(Duration.ofMillis(50)).atMost(Duration.ofSeconds(1)).until(() -> true);
 
     mailbox.deliver("world");
 
-    await().atMost(Duration.ofSeconds(2)).until(result::isDone);
-    assertEquals("world", result.join());
+    await()
+        .atMost(Duration.ofSeconds(5))
+        .untilAsserted(
+            () -> {
+              assertThat(result.get()).isNotNull();
+              assertThat(result.get()).isPresent();
+              assertThat(result.get().get()).isEqualTo("world");
+            });
   }
 
   @Test
-  void awaitTimesOut() {
-    CompletableFuture<String> result = mailbox.await(Duration.ofMillis(50));
+  void pollReturnsEmptyOnTimeout() {
+    Optional<String> result = mailbox.poll(Duration.ofMillis(50));
 
-    await()
-        .atMost(Duration.ofSeconds(2))
-        .until(
-            () -> {
-              if (!result.isDone()) return false;
-              return result.isCompletedExceptionally();
-            });
-
-    assertTrue(result.isCompletedExceptionally());
-    assertInstanceOf(
-        TimeoutException.class, assertThrows(Exception.class, result::join).getCause());
+    assertThat(result).isEmpty();
   }
 
   @Test
@@ -114,6 +117,6 @@ class DefaultMailboxTest {
 
     mailbox.delete();
 
-    assertTrue(spi.get(KEY).isEmpty());
+    assertThat(spi.get(KEY)).isEmpty();
   }
 }

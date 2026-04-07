@@ -86,7 +86,7 @@ class NatsJournalSpiIT {
     String id2 = journal.append(key, "payload2".getBytes(StandardCharsets.UTF_8));
     String id3 = journal.append(key, "payload3".getBytes(StandardCharsets.UTF_8));
 
-    List<RawJournalEntry> entries = journal.readAfter(key, id1).toList();
+    List<RawJournalEntry> entries = journal.readAfter(key, id1);
 
     assertThat(entries).hasSize(2);
     assertThat(entries.get(0).id()).isEqualTo(id2);
@@ -98,7 +98,7 @@ class NatsJournalSpiIT {
   @Test
   void readAfterReturnsEmptyForUnknownKey() {
     String key = journal.journalKey("nonexistent-" + System.nanoTime());
-    List<RawJournalEntry> entries = journal.readAfter(key, "0").toList();
+    List<RawJournalEntry> entries = journal.readAfter(key, "0");
     assertThat(entries).isEmpty();
   }
 
@@ -110,7 +110,7 @@ class NatsJournalSpiIT {
     journal.append(key, "third".getBytes(StandardCharsets.UTF_8));
     journal.append(key, "fourth".getBytes(StandardCharsets.UTF_8));
 
-    List<RawJournalEntry> entries = journal.readLast(key, 2).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 2);
 
     assertThat(entries).hasSize(2);
     assertThat(new String(entries.get(0).data(), StandardCharsets.UTF_8)).isEqualTo("third");
@@ -120,7 +120,7 @@ class NatsJournalSpiIT {
   @Test
   void readLastReturnsEmptyForUnknownKey() {
     String key = journal.journalKey("nonexistent-" + System.nanoTime());
-    List<RawJournalEntry> entries = journal.readLast(key, 5).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 5);
     assertThat(entries).isEmpty();
   }
 
@@ -130,7 +130,7 @@ class NatsJournalSpiIT {
     journal.append(key, "one".getBytes(StandardCharsets.UTF_8));
     journal.append(key, "two".getBytes(StandardCharsets.UTF_8));
 
-    List<RawJournalEntry> entries = journal.readLast(key, 100).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 100);
 
     assertThat(entries).hasSize(2);
     assertThat(new String(entries.get(0).data(), StandardCharsets.UTF_8)).isEqualTo("one");
@@ -145,7 +145,7 @@ class NatsJournalSpiIT {
 
     journal.delete(key);
 
-    List<RawJournalEntry> entries = journal.readLast(key, 100).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 100);
     assertThat(entries).isEmpty();
   }
 
@@ -158,8 +158,8 @@ class NatsJournalSpiIT {
 
     journal.delete(key1);
 
-    assertThat(journal.readLast(key1, 100).toList()).isEmpty();
-    assertThat(journal.readLast(key2, 100).toList()).hasSize(1);
+    assertThat(journal.readLast(key1, 100)).isEmpty();
+    assertThat(journal.readLast(key2, 100)).hasSize(1);
   }
 
   @Test
@@ -167,7 +167,7 @@ class NatsJournalSpiIT {
     String key = journal.journalKey("time-" + System.nanoTime());
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
 
-    List<RawJournalEntry> entries = journal.readLast(key, 1).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 1);
     assertThat(entries).hasSize(1);
     assertThat(entries.getFirst().timestamp()).isNotNull();
   }

@@ -92,7 +92,7 @@ class CassandraJournalSpiTest {
   void readAfterExecutesQuery() {
     when(resultSet.iterator()).thenReturn(List.<Row>of().iterator());
 
-    journal.readAfter("substrate:journal:test", "e5e3e100-1c9c-11b2-808b-8b3a28b5a162").toList();
+    journal.readAfter("substrate:journal:test", "e5e3e100-1c9c-11b2-808b-8b3a28b5a162");
 
     verify(session, atLeast(1)).execute(any(BoundStatement.class));
   }
@@ -101,7 +101,7 @@ class CassandraJournalSpiTest {
   void readLastExecutesQuery() {
     when(resultSet.iterator()).thenReturn(List.<Row>of().iterator());
 
-    journal.readLast("substrate:journal:test", 5).toList();
+    journal.readLast("substrate:journal:test", 5);
 
     verify(session, atLeast(1)).execute(any(BoundStatement.class));
   }

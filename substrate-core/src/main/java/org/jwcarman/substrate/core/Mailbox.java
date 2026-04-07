@@ -16,12 +16,12 @@
 package org.jwcarman.substrate.core;
 
 import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
+import java.util.Optional;
 
 public interface Mailbox<T> {
   void deliver(T value);
 
-  CompletableFuture<T> await(Duration timeout);
+  Optional<T> poll(Duration timeout);
 
   void delete();
 

@@ -67,7 +67,7 @@ class MailboxFactoryTest {
     Mailbox<String> mailbox = factory.create("test", String.class);
     mailbox.deliver("hello");
 
-    assertEquals("hello", mailbox.await(Duration.ofSeconds(1)).join());
+    assertEquals("hello", mailbox.poll(Duration.ofSeconds(1)).orElseThrow());
   }
 
   @Test

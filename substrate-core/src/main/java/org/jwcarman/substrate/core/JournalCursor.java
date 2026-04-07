@@ -15,11 +15,16 @@
  */
 package org.jwcarman.substrate.core;
 
-public interface Subscription extends AutoCloseable {
-  void cancel();
+import java.time.Duration;
+import java.util.Optional;
+
+public interface JournalCursor<T> extends AutoCloseable {
+  Optional<JournalEntry<T>> poll(Duration timeout);
+
+  boolean isOpen();
+
+  String lastId();
 
   @Override
-  default void close() {
-    cancel();
-  }
+  void close();
 }

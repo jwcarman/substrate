@@ -21,7 +21,6 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Stream;
 import org.jwcarman.substrate.spi.AbstractJournalSpi;
 import org.jwcarman.substrate.spi.RawJournalEntry;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -63,20 +62,18 @@ public class PostgresJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<RawJournalEntry> readAfter(String key, String afterId) {
+  public List<RawJournalEntry> readAfter(String key, String afterId) {
     long cursor = Long.parseLong(afterId);
-    List<RawJournalEntry> entries =
-        jdbcTemplate.query(
-            "SELECT id, key, data, timestamp FROM substrate_journal_entries"
-                + " WHERE key = ? AND id > ? ORDER BY id",
-            this::mapRow,
-            key,
-            cursor);
-    return entries.stream();
+    return jdbcTemplate.query(
+        "SELECT id, key, data, timestamp FROM substrate_journal_entries"
+            + " WHERE key = ? AND id > ? ORDER BY id",
+        this::mapRow,
+        key,
+        cursor);
   }
 
   @Override
-  public Stream<RawJournalEntry> readLast(String key, int count) {
+  public List<RawJournalEntry> readLast(String key, int count) {
     List<RawJournalEntry> entries =
         jdbcTemplate.query(
             "SELECT id, key, data, timestamp FROM substrate_journal_entries"
@@ -85,7 +82,7 @@ public class PostgresJournalSpi extends AbstractJournalSpi {
             key,
             count);
     Collections.reverse(entries);
-    return entries.stream();
+    return entries;
   }
 
   @Override

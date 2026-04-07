@@ -33,7 +33,6 @@ import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -123,8 +122,7 @@ class RedisJournalSpiTest {
     when(commands.xread(any(XReadArgs.class), any(XReadArgs.StreamOffset[].class)))
         .thenReturn(List.of(msg1, msg2));
 
-    Stream<RawJournalEntry> result = journal.readAfter("substrate:journal:test", "1-0");
-    List<RawJournalEntry> entries = result.toList();
+    List<RawJournalEntry> entries = journal.readAfter("substrate:journal:test", "1-0");
 
     assertThat(entries).hasSize(2);
     assertThat(entries.get(0).id()).isEqualTo("2-0");
@@ -139,9 +137,9 @@ class RedisJournalSpiTest {
     when(commands.xread(any(XReadArgs.class), any(XReadArgs.StreamOffset[].class)))
         .thenReturn(null);
 
-    Stream<RawJournalEntry> result = journal.readAfter("substrate:journal:test", "0-0");
+    List<RawJournalEntry> result = journal.readAfter("substrate:journal:test", "0-0");
 
-    assertThat(result.toList()).isEmpty();
+    assertThat(result).isEmpty();
   }
 
   @Test
@@ -149,9 +147,9 @@ class RedisJournalSpiTest {
     when(commands.xread(any(XReadArgs.class), any(XReadArgs.StreamOffset[].class)))
         .thenReturn(List.of());
 
-    Stream<RawJournalEntry> result = journal.readAfter("substrate:journal:test", "0-0");
+    List<RawJournalEntry> result = journal.readAfter("substrate:journal:test", "0-0");
 
-    assertThat(result.toList()).isEmpty();
+    assertThat(result).isEmpty();
   }
 
   @Test
@@ -178,8 +176,7 @@ class RedisJournalSpiTest {
     when(commands.xrevrange(eq("substrate:journal:test"), any(Range.class), any(Limit.class)))
         .thenReturn(List.of(msg2, msg1));
 
-    Stream<RawJournalEntry> result = journal.readLast("substrate:journal:test", 2);
-    List<RawJournalEntry> entries = result.toList();
+    List<RawJournalEntry> entries = journal.readLast("substrate:journal:test", 2);
 
     assertThat(entries).hasSize(2);
     assertThat(entries.get(0).id()).isEqualTo("1-0");
@@ -220,7 +217,7 @@ class RedisJournalSpiTest {
     when(commands.xread(any(XReadArgs.class), any(XReadArgs.StreamOffset[].class)))
         .thenReturn(List.of(msg));
 
-    List<RawJournalEntry> entries = journal.readAfter("substrate:journal:test", "0-0").toList();
+    List<RawJournalEntry> entries = journal.readAfter("substrate:journal:test", "0-0");
 
     assertThat(entries).hasSize(1);
     assertThat(entries.getFirst().timestamp()).isNotNull();

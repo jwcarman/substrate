@@ -17,7 +17,7 @@ package org.jwcarman.substrate.core;
 
 import java.time.Duration;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.spi.MailboxSpi;
@@ -44,26 +44,37 @@ public class DefaultMailbox<T> implements Mailbox<T> {
   }
 
   @Override
-  public CompletableFuture<T> await(Duration timeout) {
+  public Optional<T> poll(Duration timeout) {
     // Check if value is already delivered
     Optional<byte[]> existing = mailboxSpi.get(key);
     if (existing.isPresent()) {
-      return CompletableFuture.completedFuture(codec.decode(existing.get()));
+      return Optional.of(codec.decode(existing.get()));
     }
 
-    CompletableFuture<T> future = new CompletableFuture<>();
+    Semaphore semaphore = new Semaphore(0);
 
     notifier.subscribe(
         (notifiedKey, payload) -> {
-          if (key.equals(notifiedKey) && !future.isDone()) {
-            mailboxSpi.get(key).ifPresent(bytes -> future.complete(codec.decode(bytes)));
+          if (key.equals(notifiedKey)) {
+            semaphore.release();
           }
         });
 
     // Double-check in case deliver() was called between our get and subscribe
-    mailboxSpi.get(key).ifPresent(bytes -> future.complete(codec.decode(bytes)));
+    existing = mailboxSpi.get(key);
+    if (existing.isPresent()) {
+      return Optional.of(codec.decode(existing.get()));
+    }
 
-    return future.orTimeout(timeout.toMillis(), TimeUnit.MILLISECONDS);
+    try {
+      if (semaphore.tryAcquire(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
+        return mailboxSpi.get(key).map(codec::decode);
+      }
+    } catch (InterruptedException _) {
+      Thread.currentThread().interrupt();
+    }
+
+    return Optional.empty();
   }
 
   @Override

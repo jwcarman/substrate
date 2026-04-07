@@ -22,7 +22,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 import org.jwcarman.substrate.spi.AbstractJournalSpi;
 import org.jwcarman.substrate.spi.RawJournalEntry;
 import software.amazon.awssdk.core.SdkBytes;
@@ -100,7 +99,7 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<RawJournalEntry> readAfter(String key, String afterId) {
+  public List<RawJournalEntry> readAfter(String key, String afterId) {
     List<RawJournalEntry> entries = new ArrayList<>();
     Map<String, AttributeValue> exclusiveStartKey = null;
 
@@ -130,11 +129,11 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
           response.lastEvaluatedKey().isEmpty() ? null : response.lastEvaluatedKey();
     } while (exclusiveStartKey != null);
 
-    return entries.stream();
+    return entries;
   }
 
   @Override
-  public Stream<RawJournalEntry> readLast(String key, int count) {
+  public List<RawJournalEntry> readLast(String key, int count) {
     // Request count + 1 to account for possible COMPLETED marker
     QueryResponse response =
         client.query(
@@ -159,7 +158,7 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
       entries = entries.subList(0, count);
     }
     Collections.reverse(entries);
-    return entries.stream();
+    return entries;
   }
 
   @Override

@@ -34,7 +34,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Stream;
 import org.jwcarman.substrate.spi.AbstractJournalSpi;
 import org.jwcarman.substrate.spi.RawJournalEntry;
 
@@ -79,15 +78,15 @@ public class RabbitMqJournalSpi extends AbstractJournalSpi implements AutoClosea
   }
 
   @Override
-  public Stream<RawJournalEntry> readAfter(String key, String afterId) {
-    return consumeAll(key).stream().filter(entry -> entry.id().compareTo(afterId) > 0);
+  public List<RawJournalEntry> readAfter(String key, String afterId) {
+    return consumeAll(key).stream().filter(entry -> entry.id().compareTo(afterId) > 0).toList();
   }
 
   @Override
-  public Stream<RawJournalEntry> readLast(String key, int count) {
+  public List<RawJournalEntry> readLast(String key, int count) {
     List<RawJournalEntry> all = consumeAll(key);
     int start = Math.max(0, all.size() - count);
-    return all.subList(start, all.size()).stream();
+    return List.copyOf(all.subList(start, all.size()));
   }
 
   @Override

@@ -50,7 +50,7 @@ class InMemoryJournalSpiTest {
     String id2 = journal.append(KEY, "data2".getBytes(UTF_8));
     String id3 = journal.append(KEY, "data3".getBytes(UTF_8));
 
-    List<RawJournalEntry> entries = journal.readAfter(KEY, id1).toList();
+    List<RawJournalEntry> entries = journal.readAfter(KEY, id1);
 
     assertEquals(2, entries.size());
     assertEquals(id2, entries.get(0).id());
@@ -62,14 +62,14 @@ class InMemoryJournalSpiTest {
     journal.append(KEY, "data1".getBytes(UTF_8));
     journal.append(KEY, "data2".getBytes(UTF_8));
 
-    List<RawJournalEntry> entries = journal.readAfter(KEY, "0-0").toList();
+    List<RawJournalEntry> entries = journal.readAfter(KEY, "0-0");
 
     assertEquals(2, entries.size());
   }
 
   @Test
   void readAfterOnNonExistentKeyReturnsEmpty() {
-    List<RawJournalEntry> entries = journal.readAfter("nonexistent", "0-0").toList();
+    List<RawJournalEntry> entries = journal.readAfter("nonexistent", "0-0");
 
     assertTrue(entries.isEmpty());
   }
@@ -81,7 +81,7 @@ class InMemoryJournalSpiTest {
     journal.append(KEY, "data3".getBytes(UTF_8));
     journal.append(KEY, "data4".getBytes(UTF_8));
 
-    List<RawJournalEntry> entries = journal.readLast(KEY, 2).toList();
+    List<RawJournalEntry> entries = journal.readLast(KEY, 2);
 
     assertEquals(2, entries.size());
     assertArrayEquals("data3".getBytes(UTF_8), entries.get(0).data());
@@ -93,14 +93,14 @@ class InMemoryJournalSpiTest {
     journal.append(KEY, "data1".getBytes(UTF_8));
     journal.append(KEY, "data2".getBytes(UTF_8));
 
-    List<RawJournalEntry> entries = journal.readLast(KEY, 10).toList();
+    List<RawJournalEntry> entries = journal.readLast(KEY, 10);
 
     assertEquals(2, entries.size());
   }
 
   @Test
   void readLastOnNonExistentKeyReturnsEmpty() {
-    List<RawJournalEntry> entries = journal.readLast("nonexistent", 5).toList();
+    List<RawJournalEntry> entries = journal.readLast("nonexistent", 5);
 
     assertTrue(entries.isEmpty());
   }
@@ -115,7 +115,7 @@ class InMemoryJournalSpiTest {
     smallJournal.append(KEY, "data4".getBytes(UTF_8));
     smallJournal.append(KEY, "data5".getBytes(UTF_8));
 
-    List<RawJournalEntry> entries = smallJournal.readAfter(KEY, "0-0").toList();
+    List<RawJournalEntry> entries = smallJournal.readAfter(KEY, "0-0");
 
     assertEquals(3, entries.size());
     assertArrayEquals("data3".getBytes(UTF_8), entries.get(0).data());
@@ -129,7 +129,7 @@ class InMemoryJournalSpiTest {
 
     journal.delete(KEY);
 
-    List<RawJournalEntry> entries = journal.readAfter(KEY, "0-0").toList();
+    List<RawJournalEntry> entries = journal.readAfter(KEY, "0-0");
     assertTrue(entries.isEmpty());
   }
 
@@ -137,7 +137,7 @@ class InMemoryJournalSpiTest {
   void appendPreservesEntryFields() {
     String id = journal.append(KEY, "myData".getBytes(UTF_8));
 
-    List<RawJournalEntry> entries = journal.readAfter(KEY, "0-0").toList();
+    List<RawJournalEntry> entries = journal.readAfter(KEY, "0-0");
 
     assertEquals(1, entries.size());
     RawJournalEntry stored = entries.getFirst();
@@ -151,7 +151,7 @@ class InMemoryJournalSpiTest {
   void readAfterHandlesIdWithoutDash() {
     journal.append(KEY, "data1".getBytes(UTF_8));
 
-    List<RawJournalEntry> entries = journal.readAfter(KEY, "0").toList();
+    List<RawJournalEntry> entries = journal.readAfter(KEY, "0");
 
     assertEquals(1, entries.size());
   }
@@ -164,13 +164,13 @@ class InMemoryJournalSpiTest {
     journal.append(key1, "data1".getBytes(UTF_8));
     journal.append(key2, "data2".getBytes(UTF_8));
 
-    assertEquals(1, journal.readAfter(key1, "0-0").toList().size());
-    assertEquals(1, journal.readAfter(key2, "0-0").toList().size());
+    assertEquals(1, journal.readAfter(key1, "0-0").size());
+    assertEquals(1, journal.readAfter(key2, "0-0").size());
 
     journal.delete(key1);
 
-    assertTrue(journal.readAfter(key1, "0-0").toList().isEmpty());
-    assertEquals(1, journal.readAfter(key2, "0-0").toList().size());
+    assertTrue(journal.readAfter(key1, "0-0").isEmpty());
+    assertEquals(1, journal.readAfter(key2, "0-0").size());
   }
 
   @Test

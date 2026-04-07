@@ -16,24 +16,21 @@
 package org.jwcarman.substrate.core;
 
 import java.time.Duration;
-import java.util.stream.Stream;
 
 public interface Journal<T> {
   String append(T data);
 
   String append(T data, Duration ttl);
 
-  Stream<JournalEntry<T>> readAfter(String afterId);
-
-  Stream<JournalEntry<T>> readLast(int count);
-
   void complete();
 
   void delete();
 
+  JournalCursor<T> read();
+
+  JournalCursor<T> readAfter(String afterId);
+
+  JournalCursor<T> readLast(int count);
+
   String key();
-
-  Subscription subscribe(JournalSubscriber<T> subscriber);
-
-  Subscription subscribe(String afterId, JournalSubscriber<T> subscriber);
 }

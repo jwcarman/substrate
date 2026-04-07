@@ -23,7 +23,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
-import java.util.stream.Stream;
 import org.jwcarman.substrate.spi.AbstractJournalSpi;
 import org.jwcarman.substrate.spi.RawJournalEntry;
 import tools.jackson.databind.ObjectMapper;
@@ -58,13 +57,13 @@ public class HazelcastJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<RawJournalEntry> readAfter(String key, String afterId) {
+  public List<RawJournalEntry> readAfter(String key, String afterId) {
     Ringbuffer<String> ringbuffer = hazelcast.getRingbuffer(key);
     long startSequence = Long.parseLong(afterId) + 1;
     long tailSequence = ringbuffer.tailSequence();
 
     if (startSequence > tailSequence || tailSequence == -1) {
-      return Stream.empty();
+      return List.of();
     }
 
     long headSequence = ringbuffer.headSequence();
@@ -72,7 +71,7 @@ public class HazelcastJournalSpi extends AbstractJournalSpi {
     int count = (int) Math.min(tailSequence - readFrom + 1, batchSize);
 
     if (count <= 0) {
-      return Stream.empty();
+      return List.of();
     }
 
     try {
@@ -83,19 +82,19 @@ public class HazelcastJournalSpi extends AbstractJournalSpi {
         String json = resultSet.get(i);
         entries.add(deserialize(json, key, String.valueOf(readFrom + i)));
       }
-      return entries.stream();
+      return entries;
     } catch (Exception _) {
-      return Stream.empty();
+      return List.of();
     }
   }
 
   @Override
-  public Stream<RawJournalEntry> readLast(String key, int count) {
+  public List<RawJournalEntry> readLast(String key, int count) {
     Ringbuffer<String> ringbuffer = hazelcast.getRingbuffer(key);
     long tailSequence = ringbuffer.tailSequence();
 
     if (tailSequence == -1) {
-      return Stream.empty();
+      return List.of();
     }
 
     long headSequence = ringbuffer.headSequence();
@@ -103,7 +102,7 @@ public class HazelcastJournalSpi extends AbstractJournalSpi {
     int readCount = (int) (tailSequence - startSequence + 1);
 
     if (readCount <= 0) {
-      return Stream.empty();
+      return List.of();
     }
 
     try {
@@ -114,9 +113,9 @@ public class HazelcastJournalSpi extends AbstractJournalSpi {
         String json = resultSet.get(i);
         entries.add(deserialize(json, key, String.valueOf(startSequence + i)));
       }
-      return entries.stream();
+      return entries;
     } catch (Exception _) {
-      return Stream.empty();
+      return List.of();
     }
   }
 

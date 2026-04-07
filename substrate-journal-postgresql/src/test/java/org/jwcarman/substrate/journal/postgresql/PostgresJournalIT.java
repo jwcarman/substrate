@@ -62,7 +62,7 @@ class PostgresJournalSpiIT {
     String id2 = journal.append(key, "second".getBytes(StandardCharsets.UTF_8));
     String id3 = journal.append(key, "third".getBytes(StandardCharsets.UTF_8));
 
-    List<RawJournalEntry> entries = journal.readAfter(key, id1).toList();
+    List<RawJournalEntry> entries = journal.readAfter(key, id1);
 
     assertThat(entries).hasSize(2);
     assertThat(entries.get(0).id()).isEqualTo(id2);
@@ -80,7 +80,7 @@ class PostgresJournalSpiIT {
     journal.append(key, "b".getBytes(StandardCharsets.UTF_8));
     journal.append(key, "c".getBytes(StandardCharsets.UTF_8));
 
-    List<RawJournalEntry> entries = journal.readLast(key, 2).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 2);
 
     assertThat(entries).hasSize(2);
     assertThat(new String(entries.get(0).data(), StandardCharsets.UTF_8)).isEqualTo("b");
@@ -89,7 +89,7 @@ class PostgresJournalSpiIT {
 
   @Test
   void readAfterReturnsEmptyForNonexistentStream() {
-    List<RawJournalEntry> entries = journal.readAfter("nonexistent:key", "0").toList();
+    List<RawJournalEntry> entries = journal.readAfter("nonexistent:key", "0");
     assertThat(entries).isEmpty();
   }
 
@@ -99,7 +99,7 @@ class PostgresJournalSpiIT {
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
     journal.delete(key);
 
-    List<RawJournalEntry> entries = journal.readLast(key, 100).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 100);
     assertThat(entries).isEmpty();
   }
 
@@ -137,8 +137,8 @@ class PostgresJournalSpiIT {
 
     journal.delete(stream1);
 
-    assertThat(journal.readLast(stream1, 100).toList()).isEmpty();
-    assertThat(journal.readLast(stream2, 100).toList()).hasSize(1);
+    assertThat(journal.readLast(stream1, 100)).isEmpty();
+    assertThat(journal.readLast(stream2, 100)).hasSize(1);
   }
 
   @Test
@@ -166,7 +166,7 @@ class PostgresJournalSpiIT {
     }
 
     // All 10 events exist because trim only fires every 100 appends
-    List<RawJournalEntry> allEntries = smallJournal.readLast(key, 100).toList();
+    List<RawJournalEntry> allEntries = smallJournal.readLast(key, 100);
     assertThat(allEntries).hasSize(10);
   }
 

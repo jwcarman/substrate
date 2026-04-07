@@ -22,15 +22,13 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 import java.time.Duration;
-import java.time.Instant;
-import java.util.stream.Stream;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.spi.JournalSpi;
 import org.jwcarman.substrate.spi.Notifier;
-import org.jwcarman.substrate.spi.RawJournalEntry;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -84,29 +82,6 @@ class DefaultJournalTest {
   }
 
   @Test
-  void readAfterDelegatesToSpiWithBoundKey() {
-    RawJournalEntry entry = new RawJournalEntry("1", KEY, "data".getBytes(UTF_8), Instant.now());
-    when(spi.readAfter(KEY, "0")).thenReturn(Stream.of(entry));
-
-    var entries = journal.readAfter("0").toList();
-
-    assertEquals(1, entries.size());
-    assertEquals("data", entries.getFirst().data());
-    verify(spi).readAfter(KEY, "0");
-  }
-
-  @Test
-  void readLastDelegatesToSpiWithBoundKey() {
-    RawJournalEntry entry = new RawJournalEntry("1", KEY, "data".getBytes(UTF_8), Instant.now());
-    when(spi.readLast(KEY, 5)).thenReturn(Stream.of(entry));
-
-    var entries = journal.readLast(5).toList();
-
-    assertEquals(1, entries.size());
-    verify(spi).readLast(KEY, 5);
-  }
-
-  @Test
   void completeDelegatesToSpiWithBoundKey() {
     journal.complete();
 
@@ -119,5 +94,25 @@ class DefaultJournalTest {
     journal.delete();
 
     verify(spi).delete(KEY);
+  }
+
+  @Test
+  void readReturnsCursorFromTail() {
+    when(spi.readLast(KEY, 1)).thenReturn(List.of());
+
+    JournalCursor<String> cursor = journal.read();
+
+    assertNotNull(cursor);
+    assertTrue(cursor.isOpen());
+    cursor.close();
+  }
+
+  @Test
+  void readAfterReturnsCursor() {
+    JournalCursor<String> cursor = journal.readAfter("entry-1");
+
+    assertNotNull(cursor);
+    assertTrue(cursor.isOpen());
+    cursor.close();
   }
 }

@@ -16,16 +16,16 @@
 package org.jwcarman.substrate.spi;
 
 import java.time.Duration;
-import java.util.stream.Stream;
+import java.util.List;
 
 public interface JournalSpi {
   String append(String key, byte[] data);
 
   String append(String key, byte[] data, Duration ttl);
 
-  Stream<RawJournalEntry> readAfter(String key, String afterId);
+  List<RawJournalEntry> readAfter(String key, String afterId);
 
-  Stream<RawJournalEntry> readLast(String key, int count);
+  List<RawJournalEntry> readLast(String key, int count);
 
   void complete(String key);
 

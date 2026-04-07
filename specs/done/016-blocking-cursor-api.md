@@ -101,11 +101,12 @@ Internal class in `org.jwcarman.substrate.core`:
   3. If entries found, buffer them, return next entry
   4. If no entries and `journalSpi.isComplete(key)`, set `isOpen()` to false,
      return empty
-  5. If no entries and not complete, wait on monitor for Notifier signal up to
-     `timeout`. On wake-up, go to step 2. On timeout, return empty.
-- The Notifier handler (registered at cursor creation) signals a condition/monitor
+  5. If no entries and not complete, call `semaphore.tryAcquire(timeout)` to wait for a Notifier nudge.
+     On wake-up, go to step 2. On timeout, return empty.
+- The Notifier handler (registered at cursor creation) calls `semaphore.release()`
   when this journal's key is notified
-- `close()` sets `isOpen()` to false, signals the condition, unregisters from Notifier
+- `close()` sets `isOpen()` to false, calls `semaphore.release()` to unblock any
+  waiting poll, unregisters from Notifier
 
 ### Mailbox<T> — poll-based, consistent with JournalCursor
 
@@ -121,8 +122,9 @@ public interface Mailbox<T> {
 - `poll(Duration timeout)` blocks up to `timeout` waiting for a value to be delivered.
   Returns `Optional.of(value)` if delivered, `Optional.empty()` on timeout.
   Same semantics as `JournalCursor.poll()` — no exceptions for timeouts, no futures.
-- Implementation: check `mailboxSpi.get()` → if empty, wait for Notifier signal up
-  to `timeout` → check again on wake-up → return value or empty on timeout
+- Implementation: check `mailboxSpi.get()` → if empty, `semaphore.tryAcquire(timeout)` to wait
+  for Notifier nudge → check `mailboxSpi.get()` again on wake-up → return value
+  or empty on timeout
 
 ### JournalEntry<T> and RawJournalEntry
 
@@ -228,9 +230,12 @@ if (response.isPresent()) {
 
 ## Implementation notes
 
-- The cursor's blocking `hasNext()` uses `Object.wait()`/`notify()` (or a
-  `Lock`/`Condition`) with the Notifier handler calling `notify()` when entries
-  arrive. Virtual threads handle the blocking efficiently.
+- The cursor and mailbox use a `Semaphore(0)` for the nudge mechanism.
+  `poll()` calls `semaphore.tryAcquire(timeout)` to wait for a nudge, and the
+  Notifier handler calls `semaphore.release()` to signal. Semaphores are
+  virtual-thread safe (no pinning) unlike `synchronized`/`Object.wait()`.
+  Multiple nudges before a poll just stack up permits — `tryAcquire` drains
+  one and the subsequent `readAfter` picks up all available entries.
 - The Notifier handler filters by key — only wake up for THIS journal's key.
 - The cursor maintains an internal buffer from `journalSpi.readAfter()`. It drains
   the buffer before going back to the SPI. This batches reads efficiently.

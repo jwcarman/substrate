@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
+import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -65,7 +66,9 @@ class JournalFactoryTest {
     String id = journal.append("hello");
 
     assertNotNull(id);
-    assertEquals(1, journal.readAfter("0-0").toList().size());
+    try (JournalCursor<String> cursor = journal.readAfter("0-0")) {
+      assertTrue(cursor.poll(Duration.ofSeconds(1)).isPresent());
+    }
   }
 
   @Test

@@ -93,7 +93,7 @@ class CassandraJournalSpiIT {
     String id2 = journal.append(key, "payload2".getBytes(StandardCharsets.UTF_8));
     String id3 = journal.append(key, "payload3".getBytes(StandardCharsets.UTF_8));
 
-    List<RawJournalEntry> entries = journal.readAfter(key, id1).toList();
+    List<RawJournalEntry> entries = journal.readAfter(key, id1);
 
     assertThat(entries).hasSize(2);
     assertThat(entries.get(0).id()).isEqualTo(id2);
@@ -106,7 +106,7 @@ class CassandraJournalSpiIT {
   void readAfterReturnsEmptyForUnknownKey() {
     String key = journal.journalKey("nonexistent");
     UUID dummyUuid = com.datastax.oss.driver.api.core.uuid.Uuids.timeBased();
-    List<RawJournalEntry> entries = journal.readAfter(key, dummyUuid.toString()).toList();
+    List<RawJournalEntry> entries = journal.readAfter(key, dummyUuid.toString());
     assertThat(entries).isEmpty();
   }
 
@@ -118,7 +118,7 @@ class CassandraJournalSpiIT {
     journal.append(key, "third".getBytes(StandardCharsets.UTF_8));
     journal.append(key, "fourth".getBytes(StandardCharsets.UTF_8));
 
-    List<RawJournalEntry> entries = journal.readLast(key, 2).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 2);
 
     assertThat(entries).hasSize(2);
     assertThat(new String(entries.get(0).data(), StandardCharsets.UTF_8)).isEqualTo("third");
@@ -128,7 +128,7 @@ class CassandraJournalSpiIT {
   @Test
   void readLastReturnsEmptyForUnknownKey() {
     String key = journal.journalKey("nonexistent");
-    List<RawJournalEntry> entries = journal.readLast(key, 5).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 5);
     assertThat(entries).isEmpty();
   }
 
@@ -138,7 +138,7 @@ class CassandraJournalSpiIT {
     journal.append(key, "one".getBytes(StandardCharsets.UTF_8));
     journal.append(key, "two".getBytes(StandardCharsets.UTF_8));
 
-    List<RawJournalEntry> entries = journal.readLast(key, 100).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 100);
 
     assertThat(entries).hasSize(2);
     assertThat(new String(entries.get(0).data(), StandardCharsets.UTF_8)).isEqualTo("one");
@@ -152,7 +152,7 @@ class CassandraJournalSpiIT {
     journal.complete(key);
 
     // Completion marker should not appear in readLast
-    List<RawJournalEntry> entries = journal.readLast(key, 100).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 100);
     assertThat(entries).hasSize(1);
     assertThat(new String(entries.getFirst().data(), StandardCharsets.UTF_8)).isEqualTo("data");
   }
@@ -163,7 +163,7 @@ class CassandraJournalSpiIT {
     String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8));
     journal.complete(key);
 
-    List<RawJournalEntry> entries = journal.readAfter(key, id1).toList();
+    List<RawJournalEntry> entries = journal.readAfter(key, id1);
     assertThat(entries).isEmpty();
   }
 
@@ -175,7 +175,7 @@ class CassandraJournalSpiIT {
 
     journal.delete(key);
 
-    List<RawJournalEntry> entries = journal.readLast(key, 100).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 100);
     assertThat(entries).isEmpty();
   }
 
@@ -188,8 +188,8 @@ class CassandraJournalSpiIT {
 
     journal.delete(key1);
 
-    assertThat(journal.readLast(key1, 100).toList()).isEmpty();
-    assertThat(journal.readLast(key2, 100).toList()).hasSize(1);
+    assertThat(journal.readLast(key1, 100)).isEmpty();
+    assertThat(journal.readLast(key2, 100)).hasSize(1);
   }
 
   @Test
@@ -197,7 +197,7 @@ class CassandraJournalSpiIT {
     String key = journal.journalKey("time");
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
 
-    List<RawJournalEntry> entries = journal.readLast(key, 1).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 1);
     assertThat(entries).hasSize(1);
     assertThat(entries.getFirst().timestamp()).isNotNull();
   }
@@ -212,7 +212,7 @@ class CassandraJournalSpiIT {
     String id = ttlJournal.append(key, "ttl-event".getBytes(StandardCharsets.UTF_8));
     assertThat(id).isNotEmpty();
 
-    List<RawJournalEntry> entries = ttlJournal.readLast(key, 1).toList();
+    List<RawJournalEntry> entries = ttlJournal.readLast(key, 1);
     assertThat(entries).hasSize(1);
     assertThat(new String(entries.getFirst().data(), StandardCharsets.UTF_8))
         .isEqualTo("ttl-event");
@@ -225,7 +225,7 @@ class CassandraJournalSpiIT {
         journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofMinutes(10));
 
     assertThat(id).isNotEmpty();
-    List<RawJournalEntry> entries = journal.readLast(key, 1).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 1);
     assertThat(entries).hasSize(1);
   }
 

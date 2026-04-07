@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Stream;
 import org.jwcarman.substrate.spi.AbstractJournalSpi;
 import org.jwcarman.substrate.spi.RawJournalEntry;
 
@@ -169,7 +168,7 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<RawJournalEntry> readAfter(String key, String afterId) {
+  public List<RawJournalEntry> readAfter(String key, String afterId) {
     UUID afterUuid = UUID.fromString(afterId);
     ResultSet rs = session.execute(readAfterStatement.bind(key, afterUuid));
 
@@ -179,11 +178,11 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
         entries.add(mapRow(key, row));
       }
     }
-    return entries.stream();
+    return entries;
   }
 
   @Override
-  public Stream<RawJournalEntry> readLast(String key, int count) {
+  public List<RawJournalEntry> readLast(String key, int count) {
     // Request extra to account for possible completion marker
     ResultSet rs = session.execute(readLastStatement.bind(key, count + 1));
 
@@ -198,7 +197,7 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
       entries = entries.subList(0, count);
     }
     Collections.reverse(entries);
-    return entries.stream();
+    return entries;
   }
 
   @Override

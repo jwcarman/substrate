@@ -39,7 +39,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Stream;
 import org.jwcarman.substrate.spi.AbstractJournalSpi;
 import org.jwcarman.substrate.spi.RawJournalEntry;
 
@@ -98,7 +97,7 @@ public class NatsJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<RawJournalEntry> readAfter(String key, String afterId) {
+  public List<RawJournalEntry> readAfter(String key, String afterId) {
     long startSeq = Long.parseLong(afterId) + 1;
     String subject = toSubject(key);
 
@@ -106,29 +105,29 @@ public class NatsJournalSpi extends AbstractJournalSpi {
       StreamInfo info = jsm.getStreamInfo(streamName);
       long lastSeq = info.getStreamState().getLastSequence();
       if (startSeq > lastSeq) {
-        return Stream.empty();
+        return List.of();
       }
       return fetchMessages(subject, DeliverPolicy.ByStartSequence, startSeq, key);
     } catch (IOException | JetStreamApiException _) {
-      return Stream.empty();
+      return List.of();
     }
   }
 
   @Override
-  public Stream<RawJournalEntry> readLast(String key, int count) {
+  public List<RawJournalEntry> readLast(String key, int count) {
     String subject = toSubject(key);
 
     try {
       long subjectMessageCount = getSubjectMessageCount(subject);
       if (subjectMessageCount == 0) {
-        return Stream.empty();
+        return List.of();
       }
 
       List<RawJournalEntry> allEntries = fetchAllForSubject(subject, key);
       int start = Math.max(0, allEntries.size() - count);
-      return allEntries.subList(start, allEntries.size()).stream();
+      return List.copyOf(allEntries.subList(start, allEntries.size()));
     } catch (IOException | JetStreamApiException _) {
-      return Stream.empty();
+      return List.of();
     }
   }
 
@@ -210,7 +209,7 @@ public class NatsJournalSpi extends AbstractJournalSpi {
     return SUBJECT_PREFIX + key.replace(':', '.');
   }
 
-  private Stream<RawJournalEntry> fetchMessages(
+  private List<RawJournalEntry> fetchMessages(
       String subject, DeliverPolicy deliverPolicy, long startSeq, String key) {
     try {
       ConsumerConfiguration.Builder ccBuilder =
@@ -235,9 +234,9 @@ public class NatsJournalSpi extends AbstractJournalSpi {
       } finally {
         sub.unsubscribe();
       }
-      return entries.stream();
+      return entries;
     } catch (IOException | JetStreamApiException _) {
-      return Stream.empty();
+      return List.of();
     }
   }
 

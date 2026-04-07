@@ -76,7 +76,7 @@ class MongoDbJournalSpiIT {
     String id2 = journal.append(key, "payload2".getBytes(StandardCharsets.UTF_8));
     String id3 = journal.append(key, "payload3".getBytes(StandardCharsets.UTF_8));
 
-    List<RawJournalEntry> entries = journal.readAfter(key, id1).toList();
+    List<RawJournalEntry> entries = journal.readAfter(key, id1);
 
     assertThat(entries).hasSize(2);
     assertThat(entries.get(0).id()).isEqualTo(id2);
@@ -88,8 +88,7 @@ class MongoDbJournalSpiIT {
   @Test
   void readAfterReturnsEmptyForUnknownKey() {
     String key = journal.journalKey("nonexistent");
-    List<RawJournalEntry> entries =
-        journal.readAfter(key, "00000000-0000-0000-0000-000000000000").toList();
+    List<RawJournalEntry> entries = journal.readAfter(key, "00000000-0000-0000-0000-000000000000");
     assertThat(entries).isEmpty();
   }
 
@@ -101,7 +100,7 @@ class MongoDbJournalSpiIT {
     journal.append(key, "third".getBytes(StandardCharsets.UTF_8));
     journal.append(key, "fourth".getBytes(StandardCharsets.UTF_8));
 
-    List<RawJournalEntry> entries = journal.readLast(key, 2).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 2);
 
     assertThat(entries).hasSize(2);
     assertThat(new String(entries.get(0).data(), StandardCharsets.UTF_8)).isEqualTo("third");
@@ -111,7 +110,7 @@ class MongoDbJournalSpiIT {
   @Test
   void readLastReturnsEmptyForUnknownKey() {
     String key = journal.journalKey("nonexistent");
-    List<RawJournalEntry> entries = journal.readLast(key, 5).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 5);
     assertThat(entries).isEmpty();
   }
 
@@ -121,7 +120,7 @@ class MongoDbJournalSpiIT {
     journal.append(key, "one".getBytes(StandardCharsets.UTF_8));
     journal.append(key, "two".getBytes(StandardCharsets.UTF_8));
 
-    List<RawJournalEntry> entries = journal.readLast(key, 100).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 100);
 
     assertThat(entries).hasSize(2);
     assertThat(new String(entries.get(0).data(), StandardCharsets.UTF_8)).isEqualTo("one");
@@ -134,7 +133,7 @@ class MongoDbJournalSpiIT {
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
     journal.complete(key);
 
-    List<RawJournalEntry> entries = journal.readLast(key, 100).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 100);
     assertThat(entries).hasSize(1);
     assertThat(new String(entries.getFirst().data(), StandardCharsets.UTF_8)).isEqualTo("data");
   }
@@ -147,7 +146,7 @@ class MongoDbJournalSpiIT {
 
     journal.delete(key);
 
-    List<RawJournalEntry> entries = journal.readLast(key, 100).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 100);
     assertThat(entries).isEmpty();
   }
 
@@ -160,8 +159,8 @@ class MongoDbJournalSpiIT {
 
     journal.delete(key1);
 
-    assertThat(journal.readLast(key1, 100).toList()).isEmpty();
-    assertThat(journal.readLast(key2, 100).toList()).hasSize(1);
+    assertThat(journal.readLast(key1, 100)).isEmpty();
+    assertThat(journal.readLast(key2, 100)).hasSize(1);
   }
 
   @Test
@@ -169,7 +168,7 @@ class MongoDbJournalSpiIT {
     String key = journal.journalKey("time");
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
 
-    List<RawJournalEntry> entries = journal.readLast(key, 1).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 1);
     assertThat(entries).hasSize(1);
     assertThat(entries.getFirst().timestamp()).isNotNull();
   }
@@ -192,7 +191,7 @@ class MongoDbJournalSpiIT {
         journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofMinutes(10));
 
     assertThat(id).isNotEmpty();
-    List<RawJournalEntry> entries = journal.readLast(key, 1).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 1);
     assertThat(entries).hasSize(1);
   }
 
@@ -202,7 +201,7 @@ class MongoDbJournalSpiIT {
     String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8));
     journal.complete(key);
 
-    List<RawJournalEntry> entries = journal.readAfter(key, id1).toList();
+    List<RawJournalEntry> entries = journal.readAfter(key, id1);
     assertThat(entries).isEmpty();
   }
 }
