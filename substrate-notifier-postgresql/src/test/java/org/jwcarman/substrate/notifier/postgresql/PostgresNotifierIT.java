@@ -131,11 +131,8 @@ class PostgresNotifierIT {
         .atMost(Duration.ofSeconds(5))
         .untilAsserted(() -> assertThat(received).contains("before"));
 
-    // Kill all backend connections to force a reconnect
-    JdbcTemplate adminJdbc = new JdbcTemplate(createDataSource());
-    adminJdbc.execute(
-        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-            + "WHERE pid <> pg_backend_pid() AND datname = current_database()");
+    // Close the listener's dedicated connection to simulate connection loss
+    notifier.listenConnection.get().close();
 
     // Wait for the listener to detect the loss and reconnect
     await().atMost(Duration.ofSeconds(10)).until(() -> !notifier.isListening());

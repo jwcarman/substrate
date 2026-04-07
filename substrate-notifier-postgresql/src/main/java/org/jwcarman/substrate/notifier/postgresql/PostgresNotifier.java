@@ -50,7 +50,7 @@ public class PostgresNotifier implements Notifier, SmartLifecycle {
   private final AtomicBoolean running = new AtomicBoolean(false);
   private final AtomicBoolean listening = new AtomicBoolean(false);
   private final AtomicReference<Thread> listenerThread = new AtomicReference<>();
-  private final AtomicReference<Connection> listenConnection = new AtomicReference<>();
+  final AtomicReference<Connection> listenConnection = new AtomicReference<>();
 
   public PostgresNotifier(
       JdbcTemplate jdbcTemplate, DataSource dataSource, String channel, int pollTimeoutMillis) {
