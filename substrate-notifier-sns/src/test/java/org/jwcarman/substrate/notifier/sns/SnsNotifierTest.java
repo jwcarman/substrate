@@ -23,6 +23,8 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -161,21 +163,14 @@ class SnsNotifierTest {
     assertThat(received).containsExactly("first");
   }
 
-  @Test
-  void extractSnsMessageWithMalformedJsonNoMessageKey() {
-    String body = "{\"Type\": \"Notification\", \"TopicArn\": \"arn:aws:sns:us-east-1:123:test\"}";
-    assertThat(notifier.extractSnsMessage(body)).isEqualTo(body);
-  }
-
-  @Test
-  void extractSnsMessageWithMissingColonAfterMessageKey() {
-    String body = "{\"Message\" no-colon-here \"value\"}";
-    assertThat(notifier.extractSnsMessage(body)).isEqualTo(body);
-  }
-
-  @Test
-  void findClosingQuoteWithUnterminatedString() {
-    String body = "{\"Message\": \"unterminated value}";
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "{\"Type\": \"Notification\", \"TopicArn\": \"arn:aws:sns:us-east-1:123:test\"}",
+        "{\"Message\" no-colon-here \"value\"}",
+        "{\"Message\": \"unterminated value}"
+      })
+  void extractSnsMessageReturnsFallbackForMalformedJson(String body) {
     assertThat(notifier.extractSnsMessage(body)).isEqualTo(body);
   }
 

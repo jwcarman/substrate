@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.journal.nats;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -175,8 +176,7 @@ class NatsJournalSpiTest {
         .thenThrow(new IOException("purge failed"));
 
     NatsJournalSpi journal = createJournal();
-    journal.delete("substrate:journal:test");
-    // No exception thrown — IOException is silently ignored
+    assertThatNoException().isThrownBy(() -> journal.delete("substrate:journal:test"));
   }
 
   @Test
@@ -186,7 +186,7 @@ class NatsJournalSpiTest {
     when(jsm.purgeStream(anyString(), any(PurgeOptions.class))).thenThrow(apiException);
 
     NatsJournalSpi journal = createJournal();
-    journal.delete("substrate:journal:test");
+    assertThatNoException().isThrownBy(() -> journal.delete("substrate:journal:test"));
     // No exception thrown — JetStreamApiException is silently ignored
   }
 
