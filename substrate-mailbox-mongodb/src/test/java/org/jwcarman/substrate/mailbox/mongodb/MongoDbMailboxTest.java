@@ -21,8 +21,10 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import org.bson.Document;
+import org.bson.types.Binary;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -59,24 +61,24 @@ class MongoDbMailboxTest {
 
   @Test
   void deliverUpsertsDocumentAndNotifies() {
-    mailbox.deliver("substrate:mailbox:test", "hello");
+    mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8));
 
     verify(mongoTemplate).upsert(any(Query.class), any(Update.class), eq("substrate_mailbox"));
-    verify(notifier).notify("substrate:mailbox:test", "hello");
+    verify(notifier).notify("substrate:mailbox:test", "substrate:mailbox:test");
   }
 
   @Test
   void awaitReturnsExistingValue() {
     Document doc = new Document();
     doc.put("key", "substrate:mailbox:test");
-    doc.put("value", "existing-value");
+    doc.put("value", new Binary("existing-value".getBytes(StandardCharsets.UTF_8)));
 
     when(mongoTemplate.findOne(any(Query.class), eq(Document.class), eq("substrate_mailbox")))
         .thenReturn(doc);
 
     var future = mailbox.await("substrate:mailbox:test", Duration.ofSeconds(5));
 
-    assertThat(future).isCompletedWithValue("existing-value");
+    assertThat(future.join()).isEqualTo("existing-value".getBytes(StandardCharsets.UTF_8));
   }
 
   @Test

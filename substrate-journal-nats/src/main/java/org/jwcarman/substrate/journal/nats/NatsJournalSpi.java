@@ -69,15 +69,14 @@ public class NatsJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public String append(String key, String data) {
+  public String append(String key, byte[] data) {
     return append(key, data, null);
   }
 
   @Override
-  public String append(String key, String data, Duration ttl) {
+  public String append(String key, byte[] data, Duration ttl) {
     try {
       String subject = toSubject(key);
-      byte[] payload = data != null ? data.getBytes(StandardCharsets.UTF_8) : new byte[0];
 
       io.nats.client.impl.NatsMessage message =
           io.nats.client.impl.NatsMessage.builder()
@@ -86,7 +85,7 @@ public class NatsJournalSpi extends AbstractJournalSpi {
                   new io.nats.client.impl.Headers()
                       .add("timestamp", Instant.now().toString())
                       .add("journalKey", key))
-              .data(payload)
+              .data(data)
               .build();
 
       var ack = jetStream.publish(message);
@@ -265,10 +264,7 @@ public class NatsJournalSpi extends AbstractJournalSpi {
   }
 
   private JournalEntry toJournalEntry(Message message, String key) {
-    String data =
-        message.getData() != null && message.getData().length > 0
-            ? new String(message.getData(), StandardCharsets.UTF_8)
-            : null;
+    byte[] data = message.getData() != null ? message.getData() : new byte[0];
 
     io.nats.client.impl.Headers headers = message.getHeaders();
     String timestampStr = headers != null ? getSingleHeader(headers, "timestamp") : null;

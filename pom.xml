@@ -83,7 +83,23 @@
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
         <sonar.projectKey>jwcarman_substrate</sonar.projectKey>
         <sonar.coverage.exclusions>substrate-example/**</sonar.coverage.exclusions>
+        <codec.version>1.0.0-SNAPSHOT</codec.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.jwcarman.codec</groupId>
+                <artifactId>codec-core</artifactId>
+                <version>${codec.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jwcarman.codec</groupId>
+                <artifactId>codec-jackson</artifactId>
+                <version>${codec.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <modules>
         <module>substrate-bom</module>

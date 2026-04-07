@@ -15,19 +15,37 @@
  */
 package org.jwcarman.substrate.core;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.when;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.jwcarman.codec.spi.Codec;
+import org.jwcarman.codec.spi.CodecFactory;
+import org.jwcarman.codec.spi.TypeRef;
 import org.jwcarman.substrate.memory.InMemoryJournalSpi;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+@ExtendWith(MockitoExtension.class)
 class JournalFactoryTest {
+
+  @Mock private CodecFactory codecFactory;
+  @Mock private Codec<String> stringCodec;
+  @Mock private Codec<List<String>> listCodec;
 
   @Test
   void createReturnsBoundJournalWithPrefixedKey() {
     InMemoryJournalSpi spi = new InMemoryJournalSpi();
-    JournalFactory factory = new JournalFactory(spi);
+    when(codecFactory.create(String.class)).thenReturn(stringCodec);
+    JournalFactory factory = new JournalFactory(spi, codecFactory);
 
-    Journal journal = factory.create("my-stream");
+    Journal<String> journal = factory.create("my-stream", String.class);
 
     assertEquals("substrate:journal:my-stream", journal.key());
   }
@@ -35,12 +53,34 @@ class JournalFactoryTest {
   @Test
   void createdJournalDelegatesToSpi() {
     InMemoryJournalSpi spi = new InMemoryJournalSpi();
-    JournalFactory factory = new JournalFactory(spi);
+    when(codecFactory.create(String.class)).thenReturn(stringCodec);
+    when(stringCodec.encode(anyString()))
+        .thenAnswer(inv -> ((String) inv.getArgument(0)).getBytes(UTF_8));
+    when(stringCodec.decode(any(byte[].class)))
+        .thenAnswer(inv -> new String((byte[]) inv.getArgument(0), UTF_8));
+    JournalFactory factory = new JournalFactory(spi, codecFactory);
 
-    Journal journal = factory.create("test");
+    Journal<String> journal = factory.create("test", String.class);
     String id = journal.append("hello");
 
     assertNotNull(id);
     assertEquals(1, journal.readAfter("0-0").toList().size());
+  }
+
+  @Test
+  void createWithTypeRefReturnsBoundJournal() {
+    InMemoryJournalSpi spi = new InMemoryJournalSpi();
+    TypeRef<List<String>> typeRef = new TypeRef<>() {};
+    when(codecFactory.create(typeRef)).thenReturn(listCodec);
+    lenient()
+        .when(listCodec.encode(any()))
+        .thenAnswer(inv -> inv.getArgument(0).toString().getBytes(UTF_8));
+    JournalFactory factory = new JournalFactory(spi, codecFactory);
+
+    Journal<List<String>> journal = factory.create("typed-stream", typeRef);
+
+    assertEquals("substrate:journal:typed-stream", journal.key());
+    String id = journal.append(List.of("a", "b"));
+    assertNotNull(id);
   }
 }

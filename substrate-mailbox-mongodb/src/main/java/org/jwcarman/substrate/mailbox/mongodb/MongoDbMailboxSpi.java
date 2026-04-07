@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import org.bson.Document;
+import org.bson.types.Binary;
 import org.jwcarman.substrate.spi.AbstractMailboxSpi;
 import org.jwcarman.substrate.spi.Notifier;
 import org.springframework.data.domain.Sort;
@@ -41,7 +42,7 @@ public class MongoDbMailboxSpi extends AbstractMailboxSpi {
   private final Notifier notifier;
   private final String collectionName;
   private final Duration defaultTtl;
-  private final ConcurrentMap<String, CompletableFuture<String>> pending =
+  private final ConcurrentMap<String, CompletableFuture<byte[]>> pending =
       new ConcurrentHashMap<>();
 
   public MongoDbMailboxSpi(
@@ -69,29 +70,29 @@ public class MongoDbMailboxSpi extends AbstractMailboxSpi {
   }
 
   @Override
-  public void deliver(String key, String value) {
+  public void deliver(String key, byte[] value) {
     Query query = new Query(Criteria.where(FIELD_KEY).is(key));
-    Update update = new Update().set(FIELD_VALUE, value);
+    Update update = new Update().set(FIELD_VALUE, new Binary(value));
 
     if (!defaultTtl.isZero()) {
       update.set(FIELD_EXPIRE_AT, Instant.now().plus(defaultTtl));
     }
 
     mongoTemplate.upsert(query, update, collectionName);
-    notifier.notify(key, value);
+    notifier.notify(key, key);
   }
 
   @Override
-  public CompletableFuture<String> await(String key, Duration timeout) {
-    String existing = getValueFromMongo(key);
+  public CompletableFuture<byte[]> await(String key, Duration timeout) {
+    byte[] existing = getValueFromMongo(key);
     if (existing != null) {
       return CompletableFuture.completedFuture(existing);
     }
 
-    CompletableFuture<String> future = pending.computeIfAbsent(key, k -> new CompletableFuture<>());
+    CompletableFuture<byte[]> future = pending.computeIfAbsent(key, k -> new CompletableFuture<>());
 
     // Double-check in case deliver() was called between our get and computeIfAbsent
-    String deliveredAfter = getValueFromMongo(key);
+    byte[] deliveredAfter = getValueFromMongo(key);
     if (deliveredAfter != null) {
       future.complete(deliveredAfter);
       pending.remove(key);
@@ -104,25 +105,29 @@ public class MongoDbMailboxSpi extends AbstractMailboxSpi {
   public void delete(String key) {
     Query query = new Query(Criteria.where(FIELD_KEY).is(key));
     mongoTemplate.remove(query, collectionName);
-    CompletableFuture<String> future = pending.remove(key);
+    CompletableFuture<byte[]> future = pending.remove(key);
     if (future != null) {
       future.cancel(false);
     }
   }
 
-  private String getValueFromMongo(String key) {
+  private byte[] getValueFromMongo(String key) {
     Query query = new Query(Criteria.where(FIELD_KEY).is(key));
     Document doc = mongoTemplate.findOne(query, Document.class, collectionName);
     if (doc != null && doc.containsKey(FIELD_VALUE)) {
-      return doc.getString(FIELD_VALUE);
+      Binary binary = doc.get(FIELD_VALUE, Binary.class);
+      return binary != null ? binary.getData() : null;
     }
     return null;
   }
 
   private void onNotification(String key, String payload) {
-    CompletableFuture<String> future = pending.remove(key);
+    CompletableFuture<byte[]> future = pending.remove(key);
     if (future != null) {
-      future.complete(payload);
+      byte[] value = getValueFromMongo(key);
+      if (value != null) {
+        future.complete(value);
+      }
     }
   }
 }

@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 import org.jwcarman.substrate.spi.AbstractJournalSpi;
 import org.jwcarman.substrate.spi.JournalEntry;
+import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.BatchWriteItemRequest;
@@ -75,18 +76,18 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public String append(String key, String data) {
+  public String append(String key, byte[] data) {
     return append(key, data, ttl);
   }
 
   @Override
-  public String append(String key, String data, Duration ttl) {
+  public String append(String key, byte[] data, Duration ttl) {
     String entryId = generateEntryId();
 
     Map<String, AttributeValue> item = new HashMap<>();
     item.put(FIELD_KEY, AttributeValue.builder().s(key).build());
     item.put(FIELD_ENTRY_ID, AttributeValue.builder().s(entryId).build());
-    item.put(FIELD_DATA, AttributeValue.builder().s(data).build());
+    item.put(FIELD_DATA, AttributeValue.builder().b(SdkBytes.fromByteArray(data)).build());
     item.put(FIELD_TIMESTAMP, AttributeValue.builder().s(Instant.now().toString()).build());
 
     if (ttl != null && !ttl.isZero()) {
@@ -216,7 +217,8 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
   }
 
   private JournalEntry mapItem(Map<String, AttributeValue> item, String key) {
-    String data = item.containsKey(FIELD_DATA) ? item.get(FIELD_DATA).s() : null;
+    byte[] data =
+        item.containsKey(FIELD_DATA) ? item.get(FIELD_DATA).b().asByteArray() : new byte[0];
     Instant timestamp = Instant.parse(item.get(FIELD_TIMESTAMP).s());
     return new JournalEntry(item.get(FIELD_ENTRY_ID).s(), key, data, timestamp);
   }

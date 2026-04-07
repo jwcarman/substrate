@@ -15,6 +15,7 @@
  */
 package org.jwcarman.substrate.memory;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.List;
@@ -35,9 +36,9 @@ class InMemoryJournalSpiTest {
 
   @Test
   void appendReturnsMonotonicallyIncreasingIds() {
-    String id1 = journal.append(KEY, "data1");
-    String id2 = journal.append(KEY, "data2");
-    String id3 = journal.append(KEY, "data3");
+    String id1 = journal.append(KEY, "data1".getBytes(UTF_8));
+    String id2 = journal.append(KEY, "data2".getBytes(UTF_8));
+    String id3 = journal.append(KEY, "data3".getBytes(UTF_8));
 
     assertTrue(parseId(id1) < parseId(id2));
     assertTrue(parseId(id2) < parseId(id3));
@@ -45,9 +46,9 @@ class InMemoryJournalSpiTest {
 
   @Test
   void appendAndReadAfterReturnsEntriesAfterCursor() {
-    String id1 = journal.append(KEY, "data1");
-    String id2 = journal.append(KEY, "data2");
-    String id3 = journal.append(KEY, "data3");
+    String id1 = journal.append(KEY, "data1".getBytes(UTF_8));
+    String id2 = journal.append(KEY, "data2".getBytes(UTF_8));
+    String id3 = journal.append(KEY, "data3".getBytes(UTF_8));
 
     List<JournalEntry> entries = journal.readAfter(KEY, id1).toList();
 
@@ -58,8 +59,8 @@ class InMemoryJournalSpiTest {
 
   @Test
   void readAfterWithZeroCursorReturnsAllEntries() {
-    journal.append(KEY, "data1");
-    journal.append(KEY, "data2");
+    journal.append(KEY, "data1".getBytes(UTF_8));
+    journal.append(KEY, "data2".getBytes(UTF_8));
 
     List<JournalEntry> entries = journal.readAfter(KEY, "0-0").toList();
 
@@ -75,22 +76,22 @@ class InMemoryJournalSpiTest {
 
   @Test
   void readLastReturnsLastNEntriesInOrder() {
-    journal.append(KEY, "data1");
-    journal.append(KEY, "data2");
-    journal.append(KEY, "data3");
-    journal.append(KEY, "data4");
+    journal.append(KEY, "data1".getBytes(UTF_8));
+    journal.append(KEY, "data2".getBytes(UTF_8));
+    journal.append(KEY, "data3".getBytes(UTF_8));
+    journal.append(KEY, "data4".getBytes(UTF_8));
 
     List<JournalEntry> entries = journal.readLast(KEY, 2).toList();
 
     assertEquals(2, entries.size());
-    assertEquals("data3", entries.get(0).data());
-    assertEquals("data4", entries.get(1).data());
+    assertArrayEquals("data3".getBytes(UTF_8), entries.get(0).data());
+    assertArrayEquals("data4".getBytes(UTF_8), entries.get(1).data());
   }
 
   @Test
   void readLastWithCountExceedingSizeReturnsAll() {
-    journal.append(KEY, "data1");
-    journal.append(KEY, "data2");
+    journal.append(KEY, "data1".getBytes(UTF_8));
+    journal.append(KEY, "data2".getBytes(UTF_8));
 
     List<JournalEntry> entries = journal.readLast(KEY, 10).toList();
 
@@ -108,23 +109,23 @@ class InMemoryJournalSpiTest {
   void evictionRemovesOldestEntriesWhenFull() {
     InMemoryJournalSpi smallJournal = new InMemoryJournalSpi(3);
 
-    smallJournal.append(KEY, "data1");
-    smallJournal.append(KEY, "data2");
-    smallJournal.append(KEY, "data3");
-    smallJournal.append(KEY, "data4");
-    smallJournal.append(KEY, "data5");
+    smallJournal.append(KEY, "data1".getBytes(UTF_8));
+    smallJournal.append(KEY, "data2".getBytes(UTF_8));
+    smallJournal.append(KEY, "data3".getBytes(UTF_8));
+    smallJournal.append(KEY, "data4".getBytes(UTF_8));
+    smallJournal.append(KEY, "data5".getBytes(UTF_8));
 
     List<JournalEntry> entries = smallJournal.readAfter(KEY, "0-0").toList();
 
     assertEquals(3, entries.size());
-    assertEquals("data3", entries.get(0).data());
-    assertEquals("data4", entries.get(1).data());
-    assertEquals("data5", entries.get(2).data());
+    assertArrayEquals("data3".getBytes(UTF_8), entries.get(0).data());
+    assertArrayEquals("data4".getBytes(UTF_8), entries.get(1).data());
+    assertArrayEquals("data5".getBytes(UTF_8), entries.get(2).data());
   }
 
   @Test
   void deleteRemovesJournal() {
-    journal.append(KEY, "data1");
+    journal.append(KEY, "data1".getBytes(UTF_8));
 
     journal.delete(KEY);
 
@@ -134,7 +135,7 @@ class InMemoryJournalSpiTest {
 
   @Test
   void appendPreservesEntryFields() {
-    String id = journal.append(KEY, "myData");
+    String id = journal.append(KEY, "myData".getBytes(UTF_8));
 
     List<JournalEntry> entries = journal.readAfter(KEY, "0-0").toList();
 
@@ -142,13 +143,13 @@ class InMemoryJournalSpiTest {
     JournalEntry stored = entries.getFirst();
     assertEquals(id, stored.id());
     assertEquals(KEY, stored.key());
-    assertEquals("myData", stored.data());
+    assertArrayEquals("myData".getBytes(UTF_8), stored.data());
     assertNotNull(stored.timestamp());
   }
 
   @Test
   void readAfterHandlesIdWithoutDash() {
-    journal.append(KEY, "data1");
+    journal.append(KEY, "data1".getBytes(UTF_8));
 
     List<JournalEntry> entries = journal.readAfter(KEY, "0").toList();
 
@@ -160,8 +161,8 @@ class InMemoryJournalSpiTest {
     String key1 = "substrate:journal:one";
     String key2 = "substrate:journal:two";
 
-    journal.append(key1, "data1");
-    journal.append(key2, "data2");
+    journal.append(key1, "data1".getBytes(UTF_8));
+    journal.append(key2, "data2".getBytes(UTF_8));
 
     assertEquals(1, journal.readAfter(key1, "0-0").toList().size());
     assertEquals(1, journal.readAfter(key2, "0-0").toList().size());
@@ -174,21 +175,21 @@ class InMemoryJournalSpiTest {
 
   @Test
   void completeBlocksFurtherAppends() {
-    journal.append(KEY, "data1");
+    journal.append(KEY, "data1".getBytes(UTF_8));
 
     journal.complete(KEY);
 
-    assertThrows(IllegalStateException.class, () -> journal.append(KEY, "data2"));
+    assertThrows(IllegalStateException.class, () -> journal.append(KEY, "data2".getBytes(UTF_8)));
   }
 
   @Test
   void deleteRemovesCompletedStatus() {
-    journal.append(KEY, "data1");
+    journal.append(KEY, "data1".getBytes(UTF_8));
     journal.complete(KEY);
 
     journal.delete(KEY);
 
-    assertDoesNotThrow(() -> journal.append(KEY, "data3"));
+    assertDoesNotThrow(() -> journal.append(KEY, "data3".getBytes(UTF_8)));
   }
 
   private static long parseId(String id) {

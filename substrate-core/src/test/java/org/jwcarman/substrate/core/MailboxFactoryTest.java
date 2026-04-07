@@ -15,20 +15,38 @@
  */
 package org.jwcarman.substrate.core;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.when;
 
 import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.jwcarman.codec.spi.Codec;
+import org.jwcarman.codec.spi.CodecFactory;
+import org.jwcarman.codec.spi.TypeRef;
 import org.jwcarman.substrate.memory.InMemoryMailboxSpi;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+@ExtendWith(MockitoExtension.class)
 class MailboxFactoryTest {
+
+  @Mock private CodecFactory codecFactory;
+  @Mock private Codec<String> stringCodec;
+  @Mock private Codec<List<String>> listCodec;
 
   @Test
   void createReturnsBoundMailboxWithPrefixedKey() {
     InMemoryMailboxSpi spi = new InMemoryMailboxSpi();
-    MailboxFactory factory = new MailboxFactory(spi);
+    when(codecFactory.create(String.class)).thenReturn(stringCodec);
+    MailboxFactory factory = new MailboxFactory(spi, codecFactory);
 
-    Mailbox mailbox = factory.create("my-elicit");
+    Mailbox<String> mailbox = factory.create("my-elicit", String.class);
 
     assertEquals("substrate:mailbox:my-elicit", mailbox.key());
   }
@@ -36,11 +54,32 @@ class MailboxFactoryTest {
   @Test
   void createdMailboxDelegatesToSpi() {
     InMemoryMailboxSpi spi = new InMemoryMailboxSpi();
-    MailboxFactory factory = new MailboxFactory(spi);
+    when(codecFactory.create(String.class)).thenReturn(stringCodec);
+    when(stringCodec.encode(anyString()))
+        .thenAnswer(inv -> ((String) inv.getArgument(0)).getBytes(UTF_8));
+    when(stringCodec.decode(any(byte[].class)))
+        .thenAnswer(inv -> new String((byte[]) inv.getArgument(0), UTF_8));
+    MailboxFactory factory = new MailboxFactory(spi, codecFactory);
 
-    Mailbox mailbox = factory.create("test");
+    Mailbox<String> mailbox = factory.create("test", String.class);
     mailbox.deliver("hello");
 
     assertEquals("hello", mailbox.await(Duration.ofSeconds(1)).join());
+  }
+
+  @Test
+  void createWithTypeRefReturnsBoundMailbox() {
+    InMemoryMailboxSpi spi = new InMemoryMailboxSpi();
+    TypeRef<List<String>> typeRef = new TypeRef<>() {};
+    when(codecFactory.create(typeRef)).thenReturn(listCodec);
+    lenient()
+        .when(listCodec.encode(any()))
+        .thenAnswer(inv -> inv.getArgument(0).toString().getBytes(UTF_8));
+    lenient().when(listCodec.decode(any(byte[].class))).thenAnswer(inv -> List.of("decoded"));
+    MailboxFactory factory = new MailboxFactory(spi, codecFactory);
+
+    Mailbox<List<String>> mailbox = factory.create("typed-elicit", typeRef);
+
+    assertEquals("substrate:mailbox:typed-elicit", mailbox.key());
   }
 }

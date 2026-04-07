@@ -15,7 +15,10 @@
  */
 package org.jwcarman.substrate.core;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 import java.time.Duration;
@@ -23,20 +26,31 @@ import java.time.Instant;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.spi.JournalEntry;
 import org.jwcarman.substrate.spi.JournalSpi;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+@ExtendWith(MockitoExtension.class)
 class DefaultJournalTest {
 
   private static final String KEY = "substrate:journal:test";
 
-  private JournalSpi spi;
-  private DefaultJournal journal;
+  @Mock private JournalSpi spi;
+  @Mock private Codec<String> codec;
+  private DefaultJournal<String> journal;
 
   @BeforeEach
   void setUp() {
-    spi = mock(JournalSpi.class);
-    journal = new DefaultJournal(spi, KEY);
+    lenient()
+        .when(codec.encode(anyString()))
+        .thenAnswer(inv -> ((String) inv.getArgument(0)).getBytes(UTF_8));
+    lenient()
+        .when(codec.decode(any(byte[].class)))
+        .thenAnswer(inv -> new String((byte[]) inv.getArgument(0), UTF_8));
+    journal = new DefaultJournal<>(spi, KEY, codec);
   }
 
   @Test
@@ -46,40 +60,40 @@ class DefaultJournalTest {
 
   @Test
   void appendDelegatesToSpiWithBoundKey() {
-    when(spi.append(KEY, "data")).thenReturn("entry-1");
+    when(spi.append(KEY, "data".getBytes(UTF_8))).thenReturn("entry-1");
 
     String id = journal.append("data");
 
     assertEquals("entry-1", id);
-    verify(spi).append(KEY, "data");
+    verify(spi).append(KEY, "data".getBytes(UTF_8));
   }
 
   @Test
   void appendWithTtlDelegatesToSpiWithBoundKey() {
     Duration ttl = Duration.ofMinutes(5);
-    when(spi.append(KEY, "data", ttl)).thenReturn("entry-2");
+    when(spi.append(KEY, "data".getBytes(UTF_8), ttl)).thenReturn("entry-2");
 
     String id = journal.append("data", ttl);
 
     assertEquals("entry-2", id);
-    verify(spi).append(KEY, "data", ttl);
+    verify(spi).append(KEY, "data".getBytes(UTF_8), ttl);
   }
 
   @Test
   void readAfterDelegatesToSpiWithBoundKey() {
-    JournalEntry entry = new JournalEntry("1", KEY, "data", Instant.now());
+    JournalEntry entry = new JournalEntry("1", KEY, "data".getBytes(UTF_8), Instant.now());
     when(spi.readAfter(KEY, "0")).thenReturn(Stream.of(entry));
 
     var entries = journal.readAfter("0").toList();
 
     assertEquals(1, entries.size());
-    assertEquals(entry, entries.getFirst());
+    assertEquals("data", entries.getFirst().data());
     verify(spi).readAfter(KEY, "0");
   }
 
   @Test
   void readLastDelegatesToSpiWithBoundKey() {
-    JournalEntry entry = new JournalEntry("1", KEY, "data", Instant.now());
+    JournalEntry entry = new JournalEntry("1", KEY, "data".getBytes(UTF_8), Instant.now());
     when(spi.readLast(KEY, 5)).thenReturn(Stream.of(entry));
 
     var entries = journal.readLast(5).toList();

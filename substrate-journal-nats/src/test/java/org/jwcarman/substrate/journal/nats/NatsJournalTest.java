@@ -33,6 +33,7 @@ import io.nats.client.api.StreamConfiguration;
 import io.nats.client.impl.NatsMessage;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,7 +55,7 @@ class NatsJournalSpiTest {
     when(publishAck.getSeqno()).thenReturn(42L);
 
     NatsJournalSpi journal = createJournal();
-    String id = journal.append("substrate:journal:test", "hello");
+    String id = journal.append("substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8));
 
     assertThat(id).isEqualTo("42");
   }
@@ -65,7 +66,8 @@ class NatsJournalSpiTest {
     when(jetStream.publish(any(NatsMessage.class))).thenThrow(new IOException("write failed"));
 
     NatsJournalSpi journal = createJournal();
-    assertThatThrownBy(() -> journal.append("substrate:journal:test", "data"))
+    assertThatThrownBy(
+            () -> journal.append("substrate:journal:test", "data".getBytes(StandardCharsets.UTF_8)))
         .isInstanceOf(UncheckedIOException.class);
   }
 

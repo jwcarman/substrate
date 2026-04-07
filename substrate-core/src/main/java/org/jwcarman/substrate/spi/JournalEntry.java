@@ -17,4 +17,4 @@ package org.jwcarman.substrate.spi;
 
 import java.time.Instant;
 
-public record JournalEntry(String id, String key, String data, Instant timestamp) {}
+public record JournalEntry(String id, String key, byte[] data, Instant timestamp) {}

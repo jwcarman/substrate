@@ -17,6 +17,7 @@ package org.jwcarman.substrate.autoconfigure;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.substrate.core.JournalFactory;
 import org.jwcarman.substrate.core.MailboxFactory;
 import org.jwcarman.substrate.memory.InMemoryJournalSpi;
@@ -67,14 +68,14 @@ public class SubstrateAutoConfiguration {
   }
 
   @Bean
-  @ConditionalOnBean(JournalSpi.class)
-  public JournalFactory journalFactory(JournalSpi journalSpi) {
-    return new JournalFactory(journalSpi);
+  @ConditionalOnBean({JournalSpi.class, CodecFactory.class})
+  public JournalFactory journalFactory(JournalSpi journalSpi, CodecFactory codecFactory) {
+    return new JournalFactory(journalSpi, codecFactory);
   }
 
   @Bean
-  @ConditionalOnBean(MailboxSpi.class)
-  public MailboxFactory mailboxFactory(MailboxSpi mailboxSpi) {
-    return new MailboxFactory(mailboxSpi);
+  @ConditionalOnBean({MailboxSpi.class, CodecFactory.class})
+  public MailboxFactory mailboxFactory(MailboxSpi mailboxSpi, CodecFactory codecFactory) {
+    return new MailboxFactory(mailboxSpi, codecFactory);
   }
 }

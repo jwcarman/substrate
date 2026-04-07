@@ -22,7 +22,6 @@ import io.nats.client.api.KeyValueEntry;
 import io.nats.client.impl.NatsKeyValueWatchSubscription;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -51,11 +50,11 @@ public class NatsMailboxSpi extends AbstractMailboxSpi {
   }
 
   @Override
-  public void deliver(String key, String value) {
+  public void deliver(String key, byte[] value) {
     try {
       var kv = connection.keyValue(bucketName);
-      kv.put(toKvKey(key), value.getBytes(StandardCharsets.UTF_8));
-      notifier.notify(key, value);
+      kv.put(toKvKey(key), value);
+      notifier.notify(key, key);
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to deliver to NATS KV", e);
     } catch (JetStreamApiException e) {
@@ -64,7 +63,7 @@ public class NatsMailboxSpi extends AbstractMailboxSpi {
   }
 
   @Override
-  public CompletableFuture<String> await(String key, Duration timeout) {
+  public CompletableFuture<byte[]> await(String key, Duration timeout) {
     try {
       var kv = connection.keyValue(bucketName);
       String kvKey = toKvKey(key);
@@ -72,11 +71,10 @@ public class NatsMailboxSpi extends AbstractMailboxSpi {
       // Check if value already exists
       KeyValueEntry existing = kv.get(kvKey);
       if (existing != null) {
-        return CompletableFuture.completedFuture(
-            new String(existing.getValue(), StandardCharsets.UTF_8));
+        return CompletableFuture.completedFuture(existing.getValue());
       }
 
-      CompletableFuture<String> future = new CompletableFuture<>();
+      CompletableFuture<byte[]> future = new CompletableFuture<>();
 
       NatsKeyValueWatchSubscription watcher =
           kv.watch(
@@ -85,7 +83,7 @@ public class NatsMailboxSpi extends AbstractMailboxSpi {
                 @Override
                 public void watch(KeyValueEntry entry) {
                   if (entry != null && entry.getValue() != null) {
-                    future.complete(new String(entry.getValue(), StandardCharsets.UTF_8));
+                    future.complete(entry.getValue());
                   }
                 }
 
@@ -99,7 +97,7 @@ public class NatsMailboxSpi extends AbstractMailboxSpi {
       // Double-check in case deliver() was called between our get and watch
       KeyValueEntry deliveredAfter = kv.get(kvKey);
       if (deliveredAfter != null) {
-        future.complete(new String(deliveredAfter.getValue(), StandardCharsets.UTF_8));
+        future.complete(deliveredAfter.getValue());
       }
 
       return future

@@ -15,26 +15,40 @@
  */
 package org.jwcarman.substrate.core;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.spi.MailboxSpi;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+@ExtendWith(MockitoExtension.class)
 class DefaultMailboxTest {
 
   private static final String KEY = "substrate:mailbox:test";
 
-  private MailboxSpi spi;
-  private DefaultMailbox mailbox;
+  @Mock private MailboxSpi spi;
+  @Mock private Codec<String> codec;
+  private DefaultMailbox<String> mailbox;
 
   @BeforeEach
   void setUp() {
-    spi = mock(MailboxSpi.class);
-    mailbox = new DefaultMailbox(spi, KEY);
+    lenient()
+        .when(codec.encode(anyString()))
+        .thenAnswer(inv -> ((String) inv.getArgument(0)).getBytes(UTF_8));
+    lenient()
+        .when(codec.decode(any(byte[].class)))
+        .thenAnswer(inv -> new String((byte[]) inv.getArgument(0), UTF_8));
+    mailbox = new DefaultMailbox<>(spi, KEY, codec);
   }
 
   @Test
@@ -46,18 +60,19 @@ class DefaultMailboxTest {
   void deliverDelegatesToSpiWithBoundKey() {
     mailbox.deliver("hello");
 
-    verify(spi).deliver(KEY, "hello");
+    verify(spi).deliver(KEY, "hello".getBytes(UTF_8));
   }
 
   @Test
   void awaitDelegatesToSpiWithBoundKey() {
     Duration timeout = Duration.ofSeconds(5);
-    CompletableFuture<String> expected = CompletableFuture.completedFuture("result");
-    when(spi.await(KEY, timeout)).thenReturn(expected);
+    CompletableFuture<byte[]> spiFuture =
+        CompletableFuture.completedFuture("result".getBytes(UTF_8));
+    when(spi.await(KEY, timeout)).thenReturn(spiFuture);
 
     CompletableFuture<String> result = mailbox.await(timeout);
 
-    assertSame(expected, result);
+    assertEquals("result", result.join());
     verify(spi).await(KEY, timeout);
   }
 

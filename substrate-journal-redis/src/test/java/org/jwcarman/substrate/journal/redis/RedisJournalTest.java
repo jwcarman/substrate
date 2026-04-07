@@ -28,7 +28,9 @@ import io.lettuce.core.StreamMessage;
 import io.lettuce.core.XAddArgs;
 import io.lettuce.core.XReadArgs;
 import io.lettuce.core.api.sync.RedisCommands;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -57,7 +59,8 @@ class RedisJournalSpiTest {
         .thenReturn("1712404800000-0");
     when(commands.expire("substrate:journal:test", 3600)).thenReturn(true);
 
-    String entryId = journal.append("substrate:journal:test", "hello");
+    String entryId =
+        journal.append("substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8));
 
     assertThat(entryId).isEqualTo("1712404800000-0");
 
@@ -67,7 +70,10 @@ class RedisJournalSpiTest {
             any(XAddArgs.class),
             argThat(
                 (Map<String, String> body) ->
-                    "hello".equals(body.get("data")) && body.containsKey("timestamp")));
+                    Base64.getEncoder()
+                            .encodeToString("hello".getBytes(StandardCharsets.UTF_8))
+                            .equals(body.get("data"))
+                        && body.containsKey("timestamp")));
   }
 
   @Test
@@ -76,7 +82,7 @@ class RedisJournalSpiTest {
         .thenReturn("1-0");
     when(commands.expire("substrate:journal:test", 3600)).thenReturn(true);
 
-    journal.append("substrate:journal:test", "data");
+    journal.append("substrate:journal:test", "data".getBytes(StandardCharsets.UTF_8));
 
     verify(commands).expire("substrate:journal:test", 3600);
   }
@@ -87,7 +93,8 @@ class RedisJournalSpiTest {
         .thenReturn("1-0");
     when(commands.expire("substrate:journal:test", 300)).thenReturn(true);
 
-    journal.append("substrate:journal:test", "data", Duration.ofMinutes(5));
+    journal.append(
+        "substrate:journal:test", "data".getBytes(StandardCharsets.UTF_8), Duration.ofMinutes(5));
 
     verify(commands).expire("substrate:journal:test", 300);
   }
@@ -98,12 +105,20 @@ class RedisJournalSpiTest {
         new StreamMessage<>(
             "substrate:journal:test",
             "2-0",
-            Map.of("data", "first", "timestamp", "2026-04-06T12:00:00Z"));
+            Map.of(
+                "data",
+                Base64.getEncoder().encodeToString("first".getBytes(StandardCharsets.UTF_8)),
+                "timestamp",
+                "2026-04-06T12:00:00Z"));
     StreamMessage<String, String> msg2 =
         new StreamMessage<>(
             "substrate:journal:test",
             "3-0",
-            Map.of("data", "second", "timestamp", "2026-04-06T12:01:00Z"));
+            Map.of(
+                "data",
+                Base64.getEncoder().encodeToString("second".getBytes(StandardCharsets.UTF_8)),
+                "timestamp",
+                "2026-04-06T12:01:00Z"));
 
     when(commands.xread(any(XReadArgs.class), any(XReadArgs.StreamOffset[].class)))
         .thenReturn(List.of(msg1, msg2));
@@ -113,10 +128,10 @@ class RedisJournalSpiTest {
 
     assertThat(entries).hasSize(2);
     assertThat(entries.get(0).id()).isEqualTo("2-0");
-    assertThat(entries.get(0).data()).isEqualTo("first");
+    assertThat(new String(entries.get(0).data(), StandardCharsets.UTF_8)).isEqualTo("first");
     assertThat(entries.get(0).key()).isEqualTo("substrate:journal:test");
     assertThat(entries.get(1).id()).isEqualTo("3-0");
-    assertThat(entries.get(1).data()).isEqualTo("second");
+    assertThat(new String(entries.get(1).data(), StandardCharsets.UTF_8)).isEqualTo("second");
   }
 
   @Test
@@ -145,12 +160,20 @@ class RedisJournalSpiTest {
         new StreamMessage<>(
             "substrate:journal:test",
             "2-0",
-            Map.of("data", "second", "timestamp", "2026-04-06T12:01:00Z"));
+            Map.of(
+                "data",
+                Base64.getEncoder().encodeToString("second".getBytes(StandardCharsets.UTF_8)),
+                "timestamp",
+                "2026-04-06T12:01:00Z"));
     StreamMessage<String, String> msg1 =
         new StreamMessage<>(
             "substrate:journal:test",
             "1-0",
-            Map.of("data", "first", "timestamp", "2026-04-06T12:00:00Z"));
+            Map.of(
+                "data",
+                Base64.getEncoder().encodeToString("first".getBytes(StandardCharsets.UTF_8)),
+                "timestamp",
+                "2026-04-06T12:00:00Z"));
 
     when(commands.xrevrange(eq("substrate:journal:test"), any(Range.class), any(Limit.class)))
         .thenReturn(List.of(msg2, msg1));
@@ -160,9 +183,9 @@ class RedisJournalSpiTest {
 
     assertThat(entries).hasSize(2);
     assertThat(entries.get(0).id()).isEqualTo("1-0");
-    assertThat(entries.get(0).data()).isEqualTo("first");
+    assertThat(new String(entries.get(0).data(), StandardCharsets.UTF_8)).isEqualTo("first");
     assertThat(entries.get(1).id()).isEqualTo("2-0");
-    assertThat(entries.get(1).data()).isEqualTo("second");
+    assertThat(new String(entries.get(1).data(), StandardCharsets.UTF_8)).isEqualTo("second");
   }
 
   @Test
@@ -188,7 +211,10 @@ class RedisJournalSpiTest {
 
   @Test
   void toJournalEntryUsesInstantNowWhenTimestampIsMissing() {
-    Map<String, String> body = Map.of("data", "test-data");
+    Map<String, String> body =
+        Map.of(
+            "data",
+            Base64.getEncoder().encodeToString("test-data".getBytes(StandardCharsets.UTF_8)));
     StreamMessage<String, String> msg = new StreamMessage<>("substrate:journal:test", "1-0", body);
 
     when(commands.xread(any(XReadArgs.class), any(XReadArgs.StreamOffset[].class)))
@@ -198,6 +224,7 @@ class RedisJournalSpiTest {
 
     assertThat(entries).hasSize(1);
     assertThat(entries.getFirst().timestamp()).isNotNull();
-    assertThat(entries.getFirst().data()).isEqualTo("test-data");
+    assertThat(new String(entries.getFirst().data(), StandardCharsets.UTF_8))
+        .isEqualTo("test-data");
   }
 }

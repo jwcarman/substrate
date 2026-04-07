@@ -41,12 +41,12 @@ public class PostgresJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public String append(String key, String data) {
+  public String append(String key, byte[] data) {
     return append(key, data, null);
   }
 
   @Override
-  public String append(String key, String data, Duration ttl) {
+  public String append(String key, byte[] data, Duration ttl) {
     Long id =
         jdbcTemplate.queryForObject(
             "INSERT INTO substrate_journal_entries (key, data, timestamp)"
@@ -114,7 +114,7 @@ public class PostgresJournalSpi extends AbstractJournalSpi {
     return new JournalEntry(
         String.valueOf(rs.getLong("id")),
         rs.getString("key"),
-        rs.getString("data"),
+        rs.getBytes("data"),
         rs.getTimestamp("timestamp").toInstant());
   }
 }

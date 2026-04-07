@@ -20,6 +20,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +52,7 @@ class DynamoDbJournalSpiTest {
 
   @Test
   void appendPutsItemWithCorrectFields() {
-    journal.append("substrate:journal:test", "hello");
+    journal.append("substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8));
 
     ArgumentCaptor<PutItemRequest> captor = ArgumentCaptor.forClass(PutItemRequest.class);
     verify(client).putItem(captor.capture());
@@ -63,14 +64,15 @@ class DynamoDbJournalSpiTest {
     assertThat(item.get("key").s()).isEqualTo("substrate:journal:test");
     assertThat(item.get("entry_id").s())
         .matches("[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}");
-    assertThat(item.get("data").s()).isEqualTo("hello");
+    assertThat(item.get("data").b().asByteArray())
+        .isEqualTo("hello".getBytes(StandardCharsets.UTF_8));
     assertThat(item.get("timestamp").s()).isNotEmpty();
     assertThat(item.get("ttl").n()).isNotEmpty();
   }
 
   @Test
   void appendReturnsUuidV7Id() {
-    String id = journal.append("substrate:journal:test", "hello");
+    String id = journal.append("substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8));
     assertThat(id).matches("[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}");
   }
 
@@ -78,7 +80,7 @@ class DynamoDbJournalSpiTest {
   void appendWithNullTtlOmitsTtlField() {
     DynamoDbJournalSpi noTtlJournal =
         new DynamoDbJournalSpi(client, "substrate:journal:", "substrate_journal", Duration.ZERO);
-    noTtlJournal.append("substrate:journal:test", "data");
+    noTtlJournal.append("substrate:journal:test", "data".getBytes(StandardCharsets.UTF_8));
 
     ArgumentCaptor<PutItemRequest> captor = ArgumentCaptor.forClass(PutItemRequest.class);
     verify(client).putItem(captor.capture());

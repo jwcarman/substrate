@@ -29,7 +29,7 @@ import org.jwcarman.substrate.spi.Notifier;
 
 public class HazelcastMailboxSpi extends AbstractMailboxSpi {
 
-  private final IMap<String, String> map;
+  private final IMap<String, byte[]> map;
   private final Notifier notifier;
   private final Duration defaultTtl;
 
@@ -46,25 +46,25 @@ public class HazelcastMailboxSpi extends AbstractMailboxSpi {
   }
 
   @Override
-  public void deliver(String key, String value) {
+  public void deliver(String key, byte[] value) {
     map.put(key, value, defaultTtl.toMillis(), TimeUnit.MILLISECONDS);
-    notifier.notify(key, value);
+    notifier.notify(key, key);
   }
 
   @Override
-  public CompletableFuture<String> await(String key, Duration timeout) {
-    String existing = map.get(key);
+  public CompletableFuture<byte[]> await(String key, Duration timeout) {
+    byte[] existing = map.get(key);
     if (existing != null) {
       return CompletableFuture.completedFuture(existing);
     }
 
-    CompletableFuture<String> future = new CompletableFuture<>();
+    CompletableFuture<byte[]> future = new CompletableFuture<>();
 
     MailboxEntryListener listener = new MailboxEntryListener(key, future);
     UUID listenerId = map.addEntryListener(listener, key, true);
 
     // Double-check in case deliver() was called between our get and addEntryListener
-    String deliveredAfter = map.get(key);
+    byte[] deliveredAfter = map.get(key);
     if (deliveredAfter != null) {
       future.complete(deliveredAfter);
     }
@@ -80,25 +80,25 @@ public class HazelcastMailboxSpi extends AbstractMailboxSpi {
   }
 
   private static class MailboxEntryListener
-      implements EntryAddedListener<String, String>, EntryUpdatedListener<String, String> {
+      implements EntryAddedListener<String, byte[]>, EntryUpdatedListener<String, byte[]> {
 
     private final String key;
-    private final CompletableFuture<String> future;
+    private final CompletableFuture<byte[]> future;
 
-    MailboxEntryListener(String key, CompletableFuture<String> future) {
+    MailboxEntryListener(String key, CompletableFuture<byte[]> future) {
       this.key = key;
       this.future = future;
     }
 
     @Override
-    public void entryAdded(EntryEvent<String, String> event) {
+    public void entryAdded(EntryEvent<String, byte[]> event) {
       if (key.equals(event.getKey())) {
         future.complete(event.getValue());
       }
     }
 
     @Override
-    public void entryUpdated(EntryEvent<String, String> event) {
+    public void entryUpdated(EntryEvent<String, byte[]> event) {
       if (key.equals(event.getKey())) {
         future.complete(event.getValue());
       }

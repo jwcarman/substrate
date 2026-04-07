@@ -20,6 +20,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +30,7 @@ import org.jwcarman.substrate.spi.Notifier;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest;
@@ -58,17 +60,18 @@ class DynamoDbMailboxTest {
 
   @Test
   void deliverPutsItemAndNotifies() {
-    mailbox.deliver("substrate:mailbox:test", "hello");
+    mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8));
 
     ArgumentCaptor<PutItemRequest> captor = ArgumentCaptor.forClass(PutItemRequest.class);
     verify(client).putItem(captor.capture());
 
     Map<String, AttributeValue> item = captor.getValue().item();
     assertThat(item.get("key").s()).isEqualTo("substrate:mailbox:test");
-    assertThat(item.get("value").s()).isEqualTo("hello");
+    assertThat(item.get("value").b().asByteArray())
+        .isEqualTo("hello".getBytes(StandardCharsets.UTF_8));
     assertThat(item.get("ttl").n()).isNotEmpty();
 
-    verify(notifier).notify("substrate:mailbox:test", "hello");
+    verify(notifier).notify("substrate:mailbox:test", "substrate:mailbox:test");
   }
 
   @Test
@@ -79,12 +82,17 @@ class DynamoDbMailboxTest {
                 .item(
                     Map.of(
                         "key", AttributeValue.builder().s("substrate:mailbox:test").build(),
-                        "value", AttributeValue.builder().s("existing-value").build()))
+                        "value",
+                            AttributeValue.builder()
+                                .b(
+                                    SdkBytes.fromByteArray(
+                                        "existing-value".getBytes(StandardCharsets.UTF_8)))
+                                .build()))
                 .build());
 
     var future = mailbox.await("substrate:mailbox:test", Duration.ofSeconds(5));
 
-    assertThat(future).isCompletedWithValue("existing-value");
+    assertThat(future.join()).isEqualTo("existing-value".getBytes(StandardCharsets.UTF_8));
   }
 
   @Test

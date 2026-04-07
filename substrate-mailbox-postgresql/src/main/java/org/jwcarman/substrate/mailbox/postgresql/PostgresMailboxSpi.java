@@ -29,7 +29,7 @@ public class PostgresMailboxSpi extends AbstractMailboxSpi {
 
   private final JdbcTemplate jdbcTemplate;
   private final Notifier notifier;
-  private final ConcurrentMap<String, CompletableFuture<String>> pending =
+  private final ConcurrentMap<String, CompletableFuture<byte[]>> pending =
       new ConcurrentHashMap<>();
 
   public PostgresMailboxSpi(JdbcTemplate jdbcTemplate, Notifier notifier, String prefix) {
@@ -40,24 +40,24 @@ public class PostgresMailboxSpi extends AbstractMailboxSpi {
   }
 
   @Override
-  public void deliver(String key, String value) {
+  public void deliver(String key, byte[] value) {
     jdbcTemplate.update(
         "INSERT INTO substrate_mailbox (key, value) VALUES (?, ?)"
             + " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, created_at = NOW()",
         key,
         value);
-    notifier.notify(key, value);
+    notifier.notify(key, key);
   }
 
   @Override
-  public CompletableFuture<String> await(String key, Duration timeout) {
-    String existing = lookupValue(key);
+  public CompletableFuture<byte[]> await(String key, Duration timeout) {
+    byte[] existing = lookupValue(key);
     if (existing != null) {
       return CompletableFuture.completedFuture(existing);
     }
-    CompletableFuture<String> future = pending.computeIfAbsent(key, k -> new CompletableFuture<>());
+    CompletableFuture<byte[]> future = pending.computeIfAbsent(key, k -> new CompletableFuture<>());
     // Double-check in case deliver() was called between our lookup and computeIfAbsent
-    String deliveredAfter = lookupValue(key);
+    byte[] deliveredAfter = lookupValue(key);
     if (deliveredAfter != null) {
       future.complete(deliveredAfter);
       pending.remove(key);
@@ -68,23 +68,26 @@ public class PostgresMailboxSpi extends AbstractMailboxSpi {
   @Override
   public void delete(String key) {
     jdbcTemplate.update("DELETE FROM substrate_mailbox WHERE key = ?", key);
-    CompletableFuture<String> future = pending.remove(key);
+    CompletableFuture<byte[]> future = pending.remove(key);
     if (future != null) {
       future.cancel(false);
     }
   }
 
-  private String lookupValue(String key) {
-    List<String> results =
+  private byte[] lookupValue(String key) {
+    List<byte[]> results =
         jdbcTemplate.queryForList(
-            "SELECT value FROM substrate_mailbox WHERE key = ?", String.class, key);
+            "SELECT value FROM substrate_mailbox WHERE key = ?", byte[].class, key);
     return results.isEmpty() ? null : results.getFirst();
   }
 
   private void onNotification(String key, String payload) {
-    CompletableFuture<String> future = pending.remove(key);
+    CompletableFuture<byte[]> future = pending.remove(key);
     if (future != null) {
-      future.complete(payload);
+      byte[] value = lookupValue(key);
+      if (value != null) {
+        future.complete(value);
+      }
     }
   }
 }

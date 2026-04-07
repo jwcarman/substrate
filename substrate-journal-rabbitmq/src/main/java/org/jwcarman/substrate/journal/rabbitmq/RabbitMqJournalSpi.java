@@ -61,12 +61,12 @@ public class RabbitMqJournalSpi extends AbstractJournalSpi implements AutoClosea
   }
 
   @Override
-  public String append(String key, String data) {
+  public String append(String key, byte[] data) {
     return append(key, data, null);
   }
 
   @Override
-  public String append(String key, String data, Duration ttl) {
+  public String append(String key, byte[] data, Duration ttl) {
     String streamName = toStreamName(key);
     ensureStreamExists(streamName);
     String entryId = generateEntryId();
@@ -146,9 +146,7 @@ public class RabbitMqJournalSpi extends AbstractJournalSpi implements AutoClosea
         streamName, name -> environment.producerBuilder().stream(name).build());
   }
 
-  private Message buildMessage(Producer producer, String entryId, String key, String data) {
-    byte[] body = data != null ? data.getBytes(StandardCharsets.UTF_8) : new byte[0];
-
+  private Message buildMessage(Producer producer, String entryId, String key, byte[] data) {
     return producer
         .messageBuilder()
         .applicationProperties()
@@ -156,7 +154,7 @@ public class RabbitMqJournalSpi extends AbstractJournalSpi implements AutoClosea
         .entry(FIELD_JOURNAL_KEY, key)
         .entry(FIELD_TIMESTAMP, Instant.now().toString())
         .messageBuilder()
-        .addData(body)
+        .addData(data)
         .build();
   }
 
@@ -233,10 +231,7 @@ public class RabbitMqJournalSpi extends AbstractJournalSpi implements AutoClosea
     String timestampStr = (String) props.get(FIELD_TIMESTAMP);
     Instant timestamp = timestampStr != null ? Instant.parse(timestampStr) : Instant.now();
 
-    String data =
-        message.getBodyAsBinary() != null && message.getBodyAsBinary().length > 0
-            ? new String(message.getBodyAsBinary(), StandardCharsets.UTF_8)
-            : null;
+    byte[] data = message.getBodyAsBinary() != null ? message.getBodyAsBinary() : new byte[0];
 
     queue.add(new JournalEntry(entryId, key, data, timestamp));
   }

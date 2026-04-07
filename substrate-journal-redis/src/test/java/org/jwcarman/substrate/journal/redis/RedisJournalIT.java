@@ -22,6 +22,7 @@ import io.lettuce.core.RedisURI;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.sync.RedisCommands;
 import io.lettuce.core.codec.StringCodec;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -66,33 +67,33 @@ class RedisJournalSpiIT {
   @Test
   void appendAndReadAfterFullLifecycle() {
     String key = journal.journalKey("test-stream");
-    String id1 = journal.append(key, "first");
-    String id2 = journal.append(key, "second");
-    String id3 = journal.append(key, "third");
+    String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8));
+    String id2 = journal.append(key, "second".getBytes(StandardCharsets.UTF_8));
+    String id3 = journal.append(key, "third".getBytes(StandardCharsets.UTF_8));
 
     List<JournalEntry> entries = journal.readAfter(key, id1).toList();
 
     assertThat(entries).hasSize(2);
     assertThat(entries.get(0).id()).isEqualTo(id2);
-    assertThat(entries.get(0).data()).isEqualTo("second");
+    assertThat(new String(entries.get(0).data(), StandardCharsets.UTF_8)).isEqualTo("second");
     assertThat(entries.get(0).key()).isEqualTo(key);
     assertThat(entries.get(0).timestamp()).isNotNull();
     assertThat(entries.get(1).id()).isEqualTo(id3);
-    assertThat(entries.get(1).data()).isEqualTo("third");
+    assertThat(new String(entries.get(1).data(), StandardCharsets.UTF_8)).isEqualTo("third");
   }
 
   @Test
   void readLastReturnsEntriesInChronologicalOrder() {
     String key = journal.journalKey("last-test");
-    journal.append(key, "a");
-    journal.append(key, "b");
-    journal.append(key, "c");
+    journal.append(key, "a".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "b".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "c".getBytes(StandardCharsets.UTF_8));
 
     List<JournalEntry> entries = journal.readLast(key, 2).toList();
 
     assertThat(entries).hasSize(2);
-    assertThat(entries.get(0).data()).isEqualTo("b");
-    assertThat(entries.get(1).data()).isEqualTo("c");
+    assertThat(new String(entries.get(0).data(), StandardCharsets.UTF_8)).isEqualTo("b");
+    assertThat(new String(entries.get(1).data(), StandardCharsets.UTF_8)).isEqualTo("c");
   }
 
   @Test
@@ -104,7 +105,7 @@ class RedisJournalSpiIT {
   @Test
   void deleteRemovesStream() {
     String key = journal.journalKey("delete-test");
-    journal.append(key, "data");
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
     journal.delete(key);
 
     List<JournalEntry> entries = journal.readAfter(key, "0-0").toList();
@@ -114,7 +115,7 @@ class RedisJournalSpiIT {
   @Test
   void completeAndDeleteRemovesCompletionFlag() {
     String key = journal.journalKey("complete-test");
-    journal.append(key, "data");
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
     journal.complete(key);
 
     assertThat(commands.get(key + ":completed")).isEqualTo("true");
@@ -127,7 +128,7 @@ class RedisJournalSpiIT {
   @Test
   void appendWithCustomTtlSetsExpiration() {
     String key = journal.journalKey("ttl-test");
-    journal.append(key, "data", Duration.ofMinutes(10));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofMinutes(10));
 
     Long ttl = commands.ttl(key);
     assertThat(ttl).isGreaterThan(0).isLessThanOrEqualTo(600);

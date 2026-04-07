@@ -33,6 +33,10 @@
 
     <dependencies>
         <dependency>
+            <groupId>org.jwcarman.codec</groupId>
+            <artifactId>codec-core</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.fasterxml.uuid</groupId>
             <artifactId>java-uuid-generator</artifactId>
             <version>5.2.0</version>
@@ -64,6 +68,11 @@
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.jwcarman.codec</groupId>
+            <artifactId>codec-jackson</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

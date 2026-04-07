@@ -17,16 +17,15 @@ package org.jwcarman.substrate.core;
 
 import java.time.Duration;
 import java.util.stream.Stream;
-import org.jwcarman.substrate.spi.JournalEntry;
 
-public interface Journal {
-  String append(String data);
+public interface Journal<T> {
+  String append(T data);
 
-  String append(String data, Duration ttl);
+  String append(T data, Duration ttl);
 
-  Stream<JournalEntry> readAfter(String afterId);
+  Stream<TypedJournalEntry<T>> readAfter(String afterId);
 
-  Stream<JournalEntry> readLast(int count);
+  Stream<TypedJournalEntry<T>> readLast(int count);
 
   void complete();
 

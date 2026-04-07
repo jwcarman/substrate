@@ -47,12 +47,12 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public String append(String key, String data) {
+  public String append(String key, byte[] data) {
     return append(key, data, null);
   }
 
   @Override
-  public String append(String key, String data, Duration ttl) {
+  public String append(String key, byte[] data, Duration ttl) {
     if (completed.contains(key)) {
       throw new IllegalStateException("Journal '" + key + "' is completed");
     }

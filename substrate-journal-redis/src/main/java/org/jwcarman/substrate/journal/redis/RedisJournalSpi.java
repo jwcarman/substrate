@@ -24,6 +24,7 @@ import io.lettuce.core.XReadArgs.StreamOffset;
 import io.lettuce.core.api.sync.RedisCommands;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,14 +52,14 @@ public class RedisJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public String append(String key, String data) {
+  public String append(String key, byte[] data) {
     return append(key, data, defaultTtl);
   }
 
   @Override
-  public String append(String key, String data, Duration ttl) {
+  public String append(String key, byte[] data, Duration ttl) {
     Map<String, String> body = new LinkedHashMap<>();
-    body.put(FIELD_DATA, data);
+    body.put(FIELD_DATA, Base64.getEncoder().encodeToString(data));
     body.put(FIELD_TIMESTAMP, Instant.now().toString());
 
     XAddArgs args = new XAddArgs().maxlen(maxLen).approximateTrimming();
@@ -101,7 +102,8 @@ public class RedisJournalSpi extends AbstractJournalSpi {
 
   private JournalEntry toJournalEntry(String key, StreamMessage<String, String> message) {
     Map<String, String> body = message.getBody();
-    String data = body.get(FIELD_DATA);
+    String encodedData = body.get(FIELD_DATA);
+    byte[] data = encodedData != null ? Base64.getDecoder().decode(encodedData) : new byte[0];
     String timestampStr = body.get(FIELD_TIMESTAMP);
     Instant timestamp = timestampStr != null ? Instant.parse(timestampStr) : Instant.now();
     return new JournalEntry(message.getId(), key, data, timestamp);

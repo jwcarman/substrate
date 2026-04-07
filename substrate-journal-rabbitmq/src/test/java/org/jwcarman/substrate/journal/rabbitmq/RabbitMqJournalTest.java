@@ -34,6 +34,7 @@ import com.rabbitmq.stream.Producer;
 import com.rabbitmq.stream.ProducerBuilder;
 import com.rabbitmq.stream.StreamCreator;
 import com.rabbitmq.stream.StreamException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -70,7 +71,7 @@ class RabbitMqJournalSpiTest {
     wireMessageBuilder();
     wireSuccessfulPublish();
 
-    String id = journal.append("substrate:journal:test", "hello");
+    String id = journal.append("substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8));
 
     assertThat(id).isNotNull();
     verify(producer).send(any(Message.class), any(ConfirmationHandler.class));
@@ -95,7 +96,8 @@ class RabbitMqJournalSpiTest {
         .when(producer)
         .send(any(Message.class), any(ConfirmationHandler.class));
 
-    assertThatThrownBy(() -> journal.append("substrate:journal:test", "data"))
+    assertThatThrownBy(
+            () -> journal.append("substrate:journal:test", "data".getBytes(StandardCharsets.UTF_8)))
         .isInstanceOf(StreamException.class);
   }
 
@@ -106,7 +108,7 @@ class RabbitMqJournalSpiTest {
     wireSuccessfulPublish();
 
     // Trigger producer creation by appending
-    journal.append("substrate:journal:test", "hello");
+    journal.append("substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8));
 
     journal.delete("substrate:journal:test");
 
@@ -129,7 +131,7 @@ class RabbitMqJournalSpiTest {
     wireMessageBuilder();
     wireSuccessfulPublish();
 
-    journal.append("substrate:journal:test", "hello");
+    journal.append("substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8));
     journal.close();
 
     verify(producer).close();

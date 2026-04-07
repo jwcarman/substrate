@@ -17,37 +17,39 @@ package org.jwcarman.substrate.core;
 
 import java.time.Duration;
 import java.util.stream.Stream;
-import org.jwcarman.substrate.spi.JournalEntry;
+import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.spi.JournalSpi;
 
-public class DefaultJournal implements Journal {
+public class DefaultJournal<T> implements Journal<T> {
 
   private final JournalSpi journalSpi;
   private final String key;
+  private final Codec<T> codec;
 
-  public DefaultJournal(JournalSpi journalSpi, String key) {
+  public DefaultJournal(JournalSpi journalSpi, String key, Codec<T> codec) {
     this.journalSpi = journalSpi;
     this.key = key;
+    this.codec = codec;
   }
 
   @Override
-  public String append(String data) {
-    return journalSpi.append(key, data);
+  public String append(T data) {
+    return journalSpi.append(key, codec.encode(data));
   }
 
   @Override
-  public String append(String data, Duration ttl) {
-    return journalSpi.append(key, data, ttl);
+  public String append(T data, Duration ttl) {
+    return journalSpi.append(key, codec.encode(data), ttl);
   }
 
   @Override
-  public Stream<JournalEntry> readAfter(String afterId) {
-    return journalSpi.readAfter(key, afterId);
+  public Stream<TypedJournalEntry<T>> readAfter(String afterId) {
+    return journalSpi.readAfter(key, afterId).map(this::toTyped);
   }
 
   @Override
-  public Stream<JournalEntry> readLast(int count) {
-    return journalSpi.readLast(key, count);
+  public Stream<TypedJournalEntry<T>> readLast(int count) {
+    return journalSpi.readLast(key, count).map(this::toTyped);
   }
 
   @Override
@@ -63,5 +65,10 @@ public class DefaultJournal implements Journal {
   @Override
   public String key() {
     return key;
+  }
+
+  private TypedJournalEntry<T> toTyped(org.jwcarman.substrate.spi.JournalEntry entry) {
+    return new TypedJournalEntry<>(
+        entry.id(), entry.key(), codec.decode(entry.data()), entry.timestamp());
   }
 }

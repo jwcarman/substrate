@@ -13,17 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.substrate.spi;
+package org.jwcarman.substrate.core;
 
-import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
+import java.time.Instant;
 
-public interface MailboxSpi {
-  void deliver(String key, byte[] value);
-
-  CompletableFuture<byte[]> await(String key, Duration timeout);
-
-  void delete(String key);
-
-  String mailboxKey(String name);
-}
+public record TypedJournalEntry<T>(String id, String key, T data, Instant timestamp) {}

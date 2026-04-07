@@ -56,10 +56,10 @@ class NatsMailboxTest {
     when(connection.keyValue("substrate-mailbox")).thenReturn(kv);
 
     NatsMailboxSpi mailbox = createMailbox();
-    mailbox.deliver("substrate:mailbox:test", "hello");
+    mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8));
 
     verify(kv).put(anyString(), any(byte[].class));
-    verify(notifier).notify("substrate:mailbox:test", "hello");
+    verify(notifier).notify("substrate:mailbox:test", "substrate:mailbox:test");
   }
 
   @Test
@@ -75,7 +75,7 @@ class NatsMailboxTest {
     NatsMailboxSpi mailbox = createMailbox();
     var future = mailbox.await("substrate:mailbox:test", Duration.ofSeconds(5));
 
-    assertThat(future).isCompletedWithValue("existing-value");
+    assertThat(future.join()).isEqualTo("existing-value".getBytes(StandardCharsets.UTF_8));
   }
 
   private void wireConnectionForConstruction() throws Exception {

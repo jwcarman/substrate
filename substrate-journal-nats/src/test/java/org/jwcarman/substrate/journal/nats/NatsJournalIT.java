@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.nats.client.Connection;
 import io.nats.client.Nats;
 import io.nats.client.Options;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.AfterAll;
@@ -64,7 +65,7 @@ class NatsJournalSpiIT {
   @Test
   void appendReturnsSequenceId() {
     String key = journal.journalKey("append-test-" + System.nanoTime());
-    String id = journal.append(key, "hello");
+    String id = journal.append(key, "hello".getBytes(StandardCharsets.UTF_8));
 
     assertThat(id).matches("\\d+");
   }
@@ -72,8 +73,8 @@ class NatsJournalSpiIT {
   @Test
   void appendReturnsMonotonicallyIncreasingIds() {
     String key = journal.journalKey("mono-" + System.nanoTime());
-    String id1 = journal.append(key, "first");
-    String id2 = journal.append(key, "second");
+    String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8));
+    String id2 = journal.append(key, "second".getBytes(StandardCharsets.UTF_8));
 
     assertThat(Long.parseLong(id2)).isGreaterThan(Long.parseLong(id1));
   }
@@ -81,17 +82,17 @@ class NatsJournalSpiIT {
   @Test
   void readAfterReturnsEntriesInOrder() {
     String key = journal.journalKey("read-after-" + System.nanoTime());
-    String id1 = journal.append(key, "payload1");
-    String id2 = journal.append(key, "payload2");
-    String id3 = journal.append(key, "payload3");
+    String id1 = journal.append(key, "payload1".getBytes(StandardCharsets.UTF_8));
+    String id2 = journal.append(key, "payload2".getBytes(StandardCharsets.UTF_8));
+    String id3 = journal.append(key, "payload3".getBytes(StandardCharsets.UTF_8));
 
     List<JournalEntry> entries = journal.readAfter(key, id1).toList();
 
     assertThat(entries).hasSize(2);
     assertThat(entries.get(0).id()).isEqualTo(id2);
-    assertThat(entries.get(0).data()).isEqualTo("payload2");
+    assertThat(new String(entries.get(0).data(), StandardCharsets.UTF_8)).isEqualTo("payload2");
     assertThat(entries.get(1).id()).isEqualTo(id3);
-    assertThat(entries.get(1).data()).isEqualTo("payload3");
+    assertThat(new String(entries.get(1).data(), StandardCharsets.UTF_8)).isEqualTo("payload3");
   }
 
   @Test
@@ -104,16 +105,16 @@ class NatsJournalSpiIT {
   @Test
   void readLastReturnsLastNInChronologicalOrder() {
     String key = journal.journalKey("read-last-" + System.nanoTime());
-    journal.append(key, "first");
-    journal.append(key, "second");
-    journal.append(key, "third");
-    journal.append(key, "fourth");
+    journal.append(key, "first".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "second".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "third".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "fourth".getBytes(StandardCharsets.UTF_8));
 
     List<JournalEntry> entries = journal.readLast(key, 2).toList();
 
     assertThat(entries).hasSize(2);
-    assertThat(entries.get(0).data()).isEqualTo("third");
-    assertThat(entries.get(1).data()).isEqualTo("fourth");
+    assertThat(new String(entries.get(0).data(), StandardCharsets.UTF_8)).isEqualTo("third");
+    assertThat(new String(entries.get(1).data(), StandardCharsets.UTF_8)).isEqualTo("fourth");
   }
 
   @Test
@@ -126,21 +127,21 @@ class NatsJournalSpiIT {
   @Test
   void readLastReturnsAllWhenCountExceedsSize() {
     String key = journal.journalKey("small-" + System.nanoTime());
-    journal.append(key, "one");
-    journal.append(key, "two");
+    journal.append(key, "one".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "two".getBytes(StandardCharsets.UTF_8));
 
     List<JournalEntry> entries = journal.readLast(key, 100).toList();
 
     assertThat(entries).hasSize(2);
-    assertThat(entries.get(0).data()).isEqualTo("one");
-    assertThat(entries.get(1).data()).isEqualTo("two");
+    assertThat(new String(entries.get(0).data(), StandardCharsets.UTF_8)).isEqualTo("one");
+    assertThat(new String(entries.get(1).data(), StandardCharsets.UTF_8)).isEqualTo("two");
   }
 
   @Test
   void deletePurgesSubject() {
     String key = journal.journalKey("delete-" + System.nanoTime());
-    journal.append(key, "hello");
-    journal.append(key, "world");
+    journal.append(key, "hello".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "world".getBytes(StandardCharsets.UTF_8));
 
     journal.delete(key);
 
@@ -152,8 +153,8 @@ class NatsJournalSpiIT {
   void deleteDoesNotAffectOtherJournals() {
     String key1 = journal.journalKey("a-" + System.nanoTime());
     String key2 = journal.journalKey("b-" + System.nanoTime());
-    journal.append(key1, "a-event");
-    journal.append(key2, "b-event");
+    journal.append(key1, "a-event".getBytes(StandardCharsets.UTF_8));
+    journal.append(key2, "b-event".getBytes(StandardCharsets.UTF_8));
 
     journal.delete(key1);
 
@@ -164,7 +165,7 @@ class NatsJournalSpiIT {
   @Test
   void timestampIsPreserved() {
     String key = journal.journalKey("time-" + System.nanoTime());
-    journal.append(key, "data");
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
 
     List<JournalEntry> entries = journal.readLast(key, 1).toList();
     assertThat(entries).hasSize(1);

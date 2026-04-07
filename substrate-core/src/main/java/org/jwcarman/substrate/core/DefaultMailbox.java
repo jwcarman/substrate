@@ -17,26 +17,29 @@ package org.jwcarman.substrate.core;
 
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.spi.MailboxSpi;
 
-public class DefaultMailbox implements Mailbox {
+public class DefaultMailbox<T> implements Mailbox<T> {
 
   private final MailboxSpi mailboxSpi;
   private final String key;
+  private final Codec<T> codec;
 
-  public DefaultMailbox(MailboxSpi mailboxSpi, String key) {
+  public DefaultMailbox(MailboxSpi mailboxSpi, String key, Codec<T> codec) {
     this.mailboxSpi = mailboxSpi;
     this.key = key;
+    this.codec = codec;
   }
 
   @Override
-  public void deliver(String value) {
-    mailboxSpi.deliver(key, value);
+  public void deliver(T value) {
+    mailboxSpi.deliver(key, codec.encode(value));
   }
 
   @Override
-  public CompletableFuture<String> await(Duration timeout) {
-    return mailboxSpi.await(key, timeout);
+  public CompletableFuture<T> await(Duration timeout) {
+    return mailboxSpi.await(key, timeout).thenApply(codec::decode);
   }
 
   @Override

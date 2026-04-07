@@ -23,7 +23,9 @@ import static org.mockito.Mockito.when;
 
 import io.lettuce.core.SetArgs;
 import io.lettuce.core.api.sync.RedisCommands;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,27 +49,33 @@ class RedisMailboxTest {
 
   @Test
   void deliverSetsValueWithTtlAndNotifies() {
-    mailbox.deliver("substrate:mailbox:test", "hello");
+    mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8));
 
-    verify(commands).set(eq("substrate:mailbox:test"), eq("hello"), any(SetArgs.class));
-    verify(notifier).notify("substrate:mailbox:test", "hello");
+    verify(commands)
+        .set(
+            eq("substrate:mailbox:test"),
+            eq(Base64.getEncoder().encodeToString("hello".getBytes(StandardCharsets.UTF_8))),
+            any(SetArgs.class));
+    verify(notifier).notify("substrate:mailbox:test", "substrate:mailbox:test");
   }
 
   @Test
   void awaitReturnsImmediatelyWhenValueExists() {
-    when(commands.get("substrate:mailbox:test")).thenReturn("existing-value");
+    when(commands.get("substrate:mailbox:test"))
+        .thenReturn(
+            Base64.getEncoder().encodeToString("existing-value".getBytes(StandardCharsets.UTF_8)));
 
-    CompletableFuture<String> future =
+    CompletableFuture<byte[]> future =
         mailbox.await("substrate:mailbox:test", Duration.ofSeconds(5));
 
-    assertThat(future).isCompletedWithValue("existing-value");
+    assertThat(future.join()).isEqualTo("existing-value".getBytes(StandardCharsets.UTF_8));
   }
 
   @Test
   void awaitReturnsPendingFutureWhenValueDoesNotExist() {
     when(commands.get("substrate:mailbox:test")).thenReturn(null);
 
-    CompletableFuture<String> future =
+    CompletableFuture<byte[]> future =
         mailbox.await("substrate:mailbox:test", Duration.ofSeconds(5));
 
     assertThat(future).isNotDone();
@@ -76,7 +84,7 @@ class RedisMailboxTest {
   @Test
   void deleteRemovesKeyAndCancelsPendingFuture() {
     when(commands.get("substrate:mailbox:test")).thenReturn(null);
-    CompletableFuture<String> future =
+    CompletableFuture<byte[]> future =
         mailbox.await("substrate:mailbox:test", Duration.ofSeconds(30));
 
     when(commands.del("substrate:mailbox:test")).thenReturn(1L);

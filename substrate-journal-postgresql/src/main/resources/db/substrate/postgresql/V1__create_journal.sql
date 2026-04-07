@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS substrate_journal_entries (
     id          BIGSERIAL PRIMARY KEY,
     key         VARCHAR(512) NOT NULL,
-    data        TEXT NOT NULL,
+    data        BYTEA NOT NULL,
     timestamp   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

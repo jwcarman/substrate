@@ -18,6 +18,7 @@ package org.jwcarman.substrate.mailbox.redis;
 import io.lettuce.core.SetArgs;
 import io.lettuce.core.api.sync.RedisCommands;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -30,7 +31,7 @@ public class RedisMailboxSpi extends AbstractMailboxSpi {
   private final RedisCommands<String, String> commands;
   private final Notifier notifier;
   private final Duration defaultTtl;
-  private final ConcurrentMap<String, CompletableFuture<String>> pending =
+  private final ConcurrentMap<String, CompletableFuture<byte[]>> pending =
       new ConcurrentHashMap<>();
 
   public RedisMailboxSpi(
@@ -46,21 +47,21 @@ public class RedisMailboxSpi extends AbstractMailboxSpi {
   }
 
   @Override
-  public void deliver(String key, String value) {
+  public void deliver(String key, byte[] value) {
     SetArgs setArgs = SetArgs.Builder.ex(defaultTtl.toSeconds());
-    commands.set(key, value, setArgs);
-    notifier.notify(key, value);
+    commands.set(key, Base64.getEncoder().encodeToString(value), setArgs);
+    notifier.notify(key, key);
   }
 
   @Override
-  public CompletableFuture<String> await(String key, Duration timeout) {
-    String existing = commands.get(key);
+  public CompletableFuture<byte[]> await(String key, Duration timeout) {
+    byte[] existing = getValueFromRedis(key);
     if (existing != null) {
       return CompletableFuture.completedFuture(existing);
     }
-    CompletableFuture<String> future = pending.computeIfAbsent(key, k -> new CompletableFuture<>());
+    CompletableFuture<byte[]> future = pending.computeIfAbsent(key, k -> new CompletableFuture<>());
     // Double-check in case deliver() was called between our get and computeIfAbsent
-    String deliveredAfter = commands.get(key);
+    byte[] deliveredAfter = getValueFromRedis(key);
     if (deliveredAfter != null) {
       future.complete(deliveredAfter);
       pending.remove(key);
@@ -71,16 +72,24 @@ public class RedisMailboxSpi extends AbstractMailboxSpi {
   @Override
   public void delete(String key) {
     commands.del(key);
-    CompletableFuture<String> future = pending.remove(key);
+    CompletableFuture<byte[]> future = pending.remove(key);
     if (future != null) {
       future.cancel(false);
     }
   }
 
+  private byte[] getValueFromRedis(String key) {
+    String encoded = commands.get(key);
+    return encoded != null ? Base64.getDecoder().decode(encoded) : null;
+  }
+
   private void onNotification(String key, String payload) {
-    CompletableFuture<String> future = pending.remove(key);
+    CompletableFuture<byte[]> future = pending.remove(key);
     if (future != null) {
-      future.complete(payload);
+      byte[] value = getValueFromRedis(key);
+      if (value != null) {
+        future.complete(value);
+      }
     }
   }
 }

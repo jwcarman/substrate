@@ -21,6 +21,7 @@ import com.hazelcast.ringbuffer.Ringbuffer;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.stream.Stream;
 import org.jwcarman.substrate.spi.AbstractJournalSpi;
@@ -44,12 +45,12 @@ public class HazelcastJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public String append(String key, String data) {
+  public String append(String key, byte[] data) {
     return append(key, data, null);
   }
 
   @Override
-  public String append(String key, String data, Duration ttl) {
+  public String append(String key, byte[] data, Duration ttl) {
     Ringbuffer<String> ringbuffer = hazelcast.getRingbuffer(key);
     String json = serialize(data);
     long sequence = ringbuffer.add(json);
@@ -133,9 +134,10 @@ public class HazelcastJournalSpi extends AbstractJournalSpi {
     completedMap.remove(key);
   }
 
-  private String serialize(String data) {
+  private String serialize(byte[] data) {
     try {
-      StoredEntry entry = new StoredEntry(data, Instant.now().toString());
+      StoredEntry entry =
+          new StoredEntry(Base64.getEncoder().encodeToString(data), Instant.now().toString());
       return objectMapper.writeValueAsString(entry);
     } catch (tools.jackson.core.JacksonException e) {
       throw new IllegalStateException("Failed to serialize journal entry", e);
@@ -145,7 +147,8 @@ public class HazelcastJournalSpi extends AbstractJournalSpi {
   private JournalEntry deserialize(String json, String key, String id) {
     try {
       StoredEntry stored = objectMapper.readValue(json, StoredEntry.class);
-      return new JournalEntry(id, key, stored.data(), Instant.parse(stored.timestamp()));
+      byte[] data = Base64.getDecoder().decode(stored.data());
+      return new JournalEntry(id, key, data, Instant.parse(stored.timestamp()));
     } catch (tools.jackson.core.JacksonException e) {
       throw new IllegalStateException("Failed to deserialize journal entry", e);
     }

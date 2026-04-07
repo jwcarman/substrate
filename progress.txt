@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-07T14:13:00Z
-ITERATION: 13
-SPEC_COMPLETED: 012-remove-jackson-module.md
-WHAT_WAS_DONE: Removed substrate-jackson module entirely — deleted directory, removed from parent POM modules list, removed from substrate-bom dependency management
-VERIFICATION: ./mvnw verify — BUILD SUCCESS (all 22 modules pass); grep confirms no substrate-jackson references remain in source code or POMs
+LAST_RUN: 2026-04-07T14:44:00Z
+ITERATION: 14
+SPEC_COMPLETED: 013-byte-array-spis-and-codec.md
+WHAT_WAS_DONE: Converted all SPI data parameters from String to byte[], made core API generic (Journal<T>, Mailbox<T>) with Codec integration, updated all 14 backend implementations and their tests
+VERIFICATION: ./mvnw verify — BUILD SUCCESS (all 22 modules pass); ./mvnw spotless:check — PASS
 STATUS: MORE_WORK
-NEXT_SPEC: 013-byte-array-spis-and-codec.md
-NOTES: Deletion-only spec. References to substrate-jackson remain only in specs/done/ and specs/backlog/ (historical docs) and specs/013 (dependency note). No code references remain.
+NEXT_SPEC: 014-journal-subscribers.md
+NOTES: codec-core 1.0.0-SNAPSHOT used instead of spec's 0.1.0 (only version available in local Maven repo). Notifier remains String-based as specified. Mailbox backends now use notifier as pure signal and fetch byte[] values from backend storage on notification. Redis and Hazelcast use Base64 encoding for byte[] data in String-typed storage. codec-jackson added as test-scoped dependency in substrate-core for round-trip tests.

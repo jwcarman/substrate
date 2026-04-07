@@ -23,6 +23,7 @@ import io.lettuce.core.RedisURI;
 import io.lettuce.core.api.sync.RedisCommands;
 import io.lettuce.core.codec.StringCodec;
 import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterEach;
@@ -77,29 +78,32 @@ class RedisMailboxIT {
   @Test
   void deliverThenAwaitReturnsImmediately() {
     String key = mailbox.mailboxKey("deliver-first");
-    mailbox.deliver(key, "hello");
+    mailbox.deliver(key, "hello".getBytes(StandardCharsets.UTF_8));
 
-    CompletableFuture<String> future = mailbox.await(key, Duration.ofSeconds(5));
+    CompletableFuture<byte[]> future = mailbox.await(key, Duration.ofSeconds(5));
 
-    assertThat(future).isCompletedWithValue("hello");
+    assertThat(future.join()).isEqualTo("hello".getBytes(StandardCharsets.UTF_8));
   }
 
   @Test
   void awaitThenDeliverResolvesViaPubSub() {
     String key = mailbox.mailboxKey("await-first");
-    CompletableFuture<String> future = mailbox.await(key, Duration.ofSeconds(10));
+    CompletableFuture<byte[]> future = mailbox.await(key, Duration.ofSeconds(10));
 
-    mailbox.deliver(key, "delayed-value");
+    mailbox.deliver(key, "delayed-value".getBytes(StandardCharsets.UTF_8));
 
     await()
         .atMost(Duration.ofSeconds(5))
-        .untilAsserted(() -> assertThat(future).isCompletedWithValue("delayed-value"));
+        .untilAsserted(
+            () ->
+                assertThat(future.join())
+                    .isEqualTo("delayed-value".getBytes(StandardCharsets.UTF_8)));
   }
 
   @Test
   void deleteRemovesValue() {
     String key = mailbox.mailboxKey("delete-test");
-    mailbox.deliver(key, "to-delete");
+    mailbox.deliver(key, "to-delete".getBytes(StandardCharsets.UTF_8));
     mailbox.delete(key);
 
     RedisCommands<String, String> commands = client.connect(StringCodec.UTF8).sync();
@@ -109,7 +113,7 @@ class RedisMailboxIT {
   @Test
   void deleteCancelsPendingFuture() {
     String key = mailbox.mailboxKey("cancel-test");
-    CompletableFuture<String> future = mailbox.await(key, Duration.ofSeconds(30));
+    CompletableFuture<byte[]> future = mailbox.await(key, Duration.ofSeconds(30));
 
     mailbox.delete(key);
 

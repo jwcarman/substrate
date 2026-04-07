@@ -23,6 +23,7 @@ import static org.mockito.Mockito.when;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.map.IMap;
 import com.hazelcast.ringbuffer.Ringbuffer;
+import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,7 +51,7 @@ class HazelcastJournalSpiTest {
     when(hazelcastInstance.<String>getRingbuffer("test-key")).thenReturn(ringbuffer);
     when(ringbuffer.add(anyString())).thenReturn(42L);
 
-    String id = journal.append("test-key", "hello");
+    String id = journal.append("test-key", "hello".getBytes(StandardCharsets.UTF_8));
 
     assertThat(id).isEqualTo("42");
     verify(ringbuffer).add(anyString());

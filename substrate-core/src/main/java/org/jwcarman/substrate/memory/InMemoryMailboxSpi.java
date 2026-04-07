@@ -24,32 +24,32 @@ import org.jwcarman.substrate.spi.AbstractMailboxSpi;
 
 public class InMemoryMailboxSpi extends AbstractMailboxSpi {
 
-  private final ConcurrentMap<String, CompletableFuture<String>> pending =
+  private final ConcurrentMap<String, CompletableFuture<byte[]>> pending =
       new ConcurrentHashMap<>();
-  private final ConcurrentMap<String, String> delivered = new ConcurrentHashMap<>();
+  private final ConcurrentMap<String, byte[]> delivered = new ConcurrentHashMap<>();
 
   public InMemoryMailboxSpi() {
     super("substrate:mailbox:");
   }
 
   @Override
-  public void deliver(String key, String value) {
+  public void deliver(String key, byte[] value) {
     delivered.put(key, value);
-    CompletableFuture<String> future = pending.remove(key);
+    CompletableFuture<byte[]> future = pending.remove(key);
     if (future != null) {
       future.complete(value);
     }
   }
 
   @Override
-  public CompletableFuture<String> await(String key, Duration timeout) {
-    String existing = delivered.get(key);
+  public CompletableFuture<byte[]> await(String key, Duration timeout) {
+    byte[] existing = delivered.get(key);
     if (existing != null) {
       return CompletableFuture.completedFuture(existing);
     }
-    CompletableFuture<String> future = pending.computeIfAbsent(key, k -> new CompletableFuture<>());
+    CompletableFuture<byte[]> future = pending.computeIfAbsent(key, k -> new CompletableFuture<>());
     // Check again in case deliver() was called between our get and computeIfAbsent
-    String deliveredAfter = delivered.get(key);
+    byte[] deliveredAfter = delivered.get(key);
     if (deliveredAfter != null) {
       future.complete(deliveredAfter);
     }
@@ -59,7 +59,7 @@ public class InMemoryMailboxSpi extends AbstractMailboxSpi {
   @Override
   public void delete(String key) {
     delivered.remove(key);
-    CompletableFuture<String> future = pending.remove(key);
+    CompletableFuture<byte[]> future = pending.remove(key);
     if (future != null) {
       future.cancel(false);
     }

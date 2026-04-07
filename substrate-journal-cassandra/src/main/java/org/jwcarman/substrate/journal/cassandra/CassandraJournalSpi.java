@@ -20,6 +20,7 @@ import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.uuid.Uuids;
+import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -36,7 +37,7 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
   private static final String FIELD_ENTRY_ID = "entry_id";
   private static final String FIELD_DATA = "data";
   private static final String FIELD_TIMESTAMP = "timestamp";
-  private static final String COMPLETED_DATA = "__COMPLETED__";
+  private static final ByteBuffer COMPLETED_DATA = ByteBuffer.wrap("__COMPLETED__".getBytes());
 
   private final CqlSession session;
   private final String tableName;
@@ -131,7 +132,7 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
             + FIELD_ENTRY_ID
             + " TIMEUUID, "
             + FIELD_DATA
-            + " TEXT, "
+            + " BLOB, "
             + FIELD_TIMESTAMP
             + " TIMESTAMP, "
             + "PRIMARY KEY ("
@@ -145,21 +146,23 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public String append(String key, String data) {
+  public String append(String key, byte[] data) {
     return append(key, data, defaultTtl);
   }
 
   @Override
-  public String append(String key, String data, Duration ttl) {
+  public String append(String key, byte[] data, Duration ttl) {
     UUID entryId = Uuids.timeBased();
     Instant now = Instant.now();
+    ByteBuffer dataBuffer = ByteBuffer.wrap(data);
 
     Duration effectiveTtl = ttl != null ? ttl : defaultTtl;
     if (effectiveTtl != null && !effectiveTtl.isZero()) {
       session.execute(
-          insertWithTtlStatement.bind(key, entryId, data, now, (int) effectiveTtl.toSeconds()));
+          insertWithTtlStatement.bind(
+              key, entryId, dataBuffer, now, (int) effectiveTtl.toSeconds()));
     } else {
-      session.execute(insertStatement.bind(key, entryId, data, now));
+      session.execute(insertStatement.bind(key, entryId, dataBuffer, now));
     }
 
     return entryId.toString();
@@ -172,7 +175,7 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
 
     List<JournalEntry> entries = new ArrayList<>();
     for (Row row : rs) {
-      if (!COMPLETED_DATA.equals(row.getString(FIELD_DATA))) {
+      if (!COMPLETED_DATA.equals(row.getByteBuffer(FIELD_DATA))) {
         entries.add(mapRow(key, row));
       }
     }
@@ -186,7 +189,7 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
 
     List<JournalEntry> entries = new ArrayList<>();
     for (Row row : rs) {
-      if (!COMPLETED_DATA.equals(row.getString(FIELD_DATA))) {
+      if (!COMPLETED_DATA.equals(row.getByteBuffer(FIELD_DATA))) {
         entries.add(mapRow(key, row));
       }
     }
@@ -202,13 +205,14 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
   public void complete(String key) {
     UUID entryId = Uuids.timeBased();
     Instant now = Instant.now();
+    ByteBuffer completedMarker = COMPLETED_DATA.duplicate();
 
     if (defaultTtl != null && !defaultTtl.isZero()) {
       session.execute(
           insertWithTtlStatement.bind(
-              key, entryId, COMPLETED_DATA, now, (int) defaultTtl.toSeconds()));
+              key, entryId, completedMarker, now, (int) defaultTtl.toSeconds()));
     } else {
-      session.execute(insertStatement.bind(key, entryId, COMPLETED_DATA, now));
+      session.execute(insertStatement.bind(key, entryId, completedMarker, now));
     }
   }
 
@@ -219,8 +223,15 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
 
   private JournalEntry mapRow(String key, Row row) {
     UUID entryId = row.getUuid(FIELD_ENTRY_ID);
-    String data = row.getString(FIELD_DATA);
+    ByteBuffer buffer = row.getByteBuffer(FIELD_DATA);
+    byte[] data = buffer != null ? toByteArray(buffer) : new byte[0];
     Instant timestamp = row.getInstant(FIELD_TIMESTAMP);
     return new JournalEntry(entryId.toString(), key, data, timestamp);
+  }
+
+  private static byte[] toByteArray(ByteBuffer buffer) {
+    byte[] bytes = new byte[buffer.remaining()];
+    buffer.get(bytes);
+    return bytes;
   }
 }

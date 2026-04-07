@@ -22,6 +22,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.stream.Stream;
 import org.bson.Document;
+import org.bson.types.Binary;
 import org.jwcarman.substrate.spi.AbstractJournalSpi;
 import org.jwcarman.substrate.spi.JournalEntry;
 import org.springframework.data.domain.Sort;
@@ -64,18 +65,18 @@ public class MongoDbJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public String append(String key, String data) {
+  public String append(String key, byte[] data) {
     return append(key, data, ttl);
   }
 
   @Override
-  public String append(String key, String data, Duration ttl) {
+  public String append(String key, byte[] data, Duration ttl) {
     String entryId = generateEntryId();
 
     Document doc = new Document();
     doc.put(FIELD_KEY, key);
     doc.put(FIELD_ENTRY_ID, entryId);
-    doc.put(FIELD_DATA, data);
+    doc.put(FIELD_DATA, new Binary(data));
     doc.put(FIELD_TIMESTAMP, Instant.now());
 
     if (ttl != null && !ttl.isZero()) {
@@ -139,10 +140,9 @@ public class MongoDbJournalSpi extends AbstractJournalSpi {
   private JournalEntry mapDocument(Document doc) {
     Date date = doc.get(FIELD_TIMESTAMP, Date.class);
     Instant timestamp = date != null ? date.toInstant() : null;
+    Binary binary = doc.get(FIELD_DATA, Binary.class);
+    byte[] data = binary != null ? binary.getData() : new byte[0];
     return new JournalEntry(
-        doc.getString(FIELD_ENTRY_ID),
-        doc.getString(FIELD_KEY),
-        doc.getString(FIELD_DATA),
-        timestamp);
+        doc.getString(FIELD_ENTRY_ID), doc.getString(FIELD_KEY), data, timestamp);
   }
 }

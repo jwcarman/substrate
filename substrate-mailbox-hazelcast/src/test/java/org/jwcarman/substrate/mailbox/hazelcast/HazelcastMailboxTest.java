@@ -24,6 +24,7 @@ import static org.mockito.Mockito.when;
 
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.map.IMap;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -39,14 +40,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class HazelcastMailboxTest {
 
   @Mock private HazelcastInstance hazelcastInstance;
-  @Mock private IMap<String, String> map;
+  @Mock private IMap<String, byte[]> map;
   @Mock private Notifier notifier;
 
   private HazelcastMailboxSpi mailbox;
 
   @BeforeEach
   void setUp() {
-    when(hazelcastInstance.<String, String>getMap("substrate-mailbox")).thenReturn(map);
+    when(hazelcastInstance.<String, byte[]>getMap("substrate-mailbox")).thenReturn(map);
     mailbox =
         new HazelcastMailboxSpi(
             hazelcastInstance,
@@ -58,20 +59,25 @@ class HazelcastMailboxTest {
 
   @Test
   void deliverPutsValueInMapWithTtlAndNotifies() {
-    mailbox.deliver("test-key", "test-value");
+    mailbox.deliver("test-key", "test-value".getBytes(StandardCharsets.UTF_8));
 
     verify(map)
-        .put("test-key", "test-value", Duration.ofMinutes(5).toMillis(), TimeUnit.MILLISECONDS);
-    verify(notifier).notify("test-key", "test-value");
+        .put(
+            eq("test-key"),
+            eq("test-value".getBytes(StandardCharsets.UTF_8)),
+            eq(Duration.ofMinutes(5).toMillis()),
+            eq(TimeUnit.MILLISECONDS));
+    verify(notifier).notify("test-key", "test-key");
   }
 
   @Test
   void awaitReturnsImmediatelyIfValueExists() throws Exception {
-    when(map.get("test-key")).thenReturn("existing-value");
+    when(map.get("test-key")).thenReturn("existing-value".getBytes(StandardCharsets.UTF_8));
 
-    CompletableFuture<String> future = mailbox.await("test-key", Duration.ofSeconds(5));
+    CompletableFuture<byte[]> future = mailbox.await("test-key", Duration.ofSeconds(5));
 
-    assertThat(future.get(1, TimeUnit.SECONDS)).isEqualTo("existing-value");
+    assertThat(new String(future.get(1, TimeUnit.SECONDS), StandardCharsets.UTF_8))
+        .isEqualTo("existing-value");
   }
 
   @Test

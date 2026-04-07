@@ -18,6 +18,7 @@ package org.jwcarman.substrate.mailbox.dynamodb;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -76,37 +77,41 @@ class DynamoDbMailboxIT {
   void deliverAndAwaitFullLifecycle() throws Exception {
     String key = mailbox.mailboxKey("test-" + System.nanoTime());
 
-    mailbox.deliver(key, "hello");
+    mailbox.deliver(key, "hello".getBytes(StandardCharsets.UTF_8));
 
-    CompletableFuture<String> future = mailbox.await(key, Duration.ofSeconds(5));
-    assertThat(future.get(5, TimeUnit.SECONDS)).isEqualTo("hello");
+    CompletableFuture<byte[]> future = mailbox.await(key, Duration.ofSeconds(5));
+    assertThat(new String(future.get(5, TimeUnit.SECONDS), StandardCharsets.UTF_8))
+        .isEqualTo("hello");
   }
 
   @Test
   void awaitResolvesWhenDeliveredAfterWaiting() {
     String key = mailbox.mailboxKey("async-" + System.nanoTime());
 
-    CompletableFuture<String> future = mailbox.await(key, Duration.ofSeconds(10));
+    CompletableFuture<byte[]> future = mailbox.await(key, Duration.ofSeconds(10));
 
     CompletableFuture.runAsync(
         () -> {
           await().pollDelay(Duration.ofMillis(200)).atMost(Duration.ofSeconds(1)).until(() -> true);
-          mailbox.deliver(key, "delayed-value");
+          mailbox.deliver(key, "delayed-value".getBytes(StandardCharsets.UTF_8));
         });
 
     await()
         .atMost(Duration.ofSeconds(10))
-        .untilAsserted(() -> assertThat(future).isCompletedWithValue("delayed-value"));
+        .untilAsserted(
+            () ->
+                assertThat(future.join())
+                    .isEqualTo("delayed-value".getBytes(StandardCharsets.UTF_8)));
   }
 
   @Test
   void deleteRemovesValue() {
     String key = mailbox.mailboxKey("delete-" + System.nanoTime());
 
-    mailbox.deliver(key, "to-delete");
+    mailbox.deliver(key, "to-delete".getBytes(StandardCharsets.UTF_8));
     mailbox.delete(key);
 
-    CompletableFuture<String> future = mailbox.await(key, Duration.ofMillis(500));
+    CompletableFuture<byte[]> future = mailbox.await(key, Duration.ofMillis(500));
     assertThat(future)
         .failsWithin(Duration.ofSeconds(2))
         .withThrowableOfType(java.util.concurrent.ExecutionException.class);

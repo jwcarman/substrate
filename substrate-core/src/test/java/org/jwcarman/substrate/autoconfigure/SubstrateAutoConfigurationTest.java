@@ -22,6 +22,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.jwcarman.codec.jackson.JacksonCodecFactory;
+import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.substrate.core.JournalFactory;
 import org.jwcarman.substrate.core.MailboxFactory;
 import org.jwcarman.substrate.memory.InMemoryJournalSpi;
@@ -38,6 +40,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(OutputCaptureExtension.class)
 class SubstrateAutoConfigurationTest {
@@ -148,13 +151,36 @@ class SubstrateAutoConfigurationTest {
   }
 
   @Test
-  void createsJournalFactoryWhenJournalSpiBeanExists() {
-    contextRunner.run(context -> assertThat(context).hasSingleBean(JournalFactory.class));
+  void createsJournalFactoryWhenJournalSpiAndCodecFactoryBeansExist() {
+    contextRunner
+        .withUserConfiguration(CodecFactoryConfiguration.class)
+        .run(context -> assertThat(context).hasSingleBean(JournalFactory.class));
   }
 
   @Test
-  void createsMailboxFactoryWhenMailboxSpiBeanExists() {
-    contextRunner.run(context -> assertThat(context).hasSingleBean(MailboxFactory.class));
+  void createsMailboxFactoryWhenMailboxSpiAndCodecFactoryBeansExist() {
+    contextRunner
+        .withUserConfiguration(CodecFactoryConfiguration.class)
+        .run(context -> assertThat(context).hasSingleBean(MailboxFactory.class));
+  }
+
+  @Test
+  void doesNotCreateJournalFactoryWhenCodecFactoryBeanIsMissing() {
+    contextRunner.run(context -> assertThat(context).doesNotHaveBean(JournalFactory.class));
+  }
+
+  @Test
+  void doesNotCreateMailboxFactoryWhenCodecFactoryBeanIsMissing() {
+    contextRunner.run(context -> assertThat(context).doesNotHaveBean(MailboxFactory.class));
+  }
+
+  @Configuration(proxyBeanMethods = false)
+  static class CodecFactoryConfiguration {
+
+    @Bean
+    CodecFactory codecFactory() {
+      return new JacksonCodecFactory(JsonMapper.builder().build());
+    }
   }
 
   @Configuration(proxyBeanMethods = false)
@@ -187,12 +213,12 @@ class SubstrateAutoConfigurationTest {
   static class StubJournalSpi implements JournalSpi {
 
     @Override
-    public String append(String key, String data) {
+    public String append(String key, byte[] data) {
       return "stub-id";
     }
 
     @Override
-    public String append(String key, String data, Duration ttl) {
+    public String append(String key, byte[] data, Duration ttl) {
       return "stub-id";
     }
 
@@ -221,11 +247,11 @@ class SubstrateAutoConfigurationTest {
   static class StubMailboxSpi implements MailboxSpi {
 
     @Override
-    public void deliver(String key, String value) {}
+    public void deliver(String key, byte[] value) {}
 
     @Override
-    public CompletableFuture<String> await(String key, Duration timeout) {
-      return CompletableFuture.completedFuture("stub");
+    public CompletableFuture<byte[]> await(String key, Duration timeout) {
+      return CompletableFuture.completedFuture(new byte[0]);
     }
 
     @Override

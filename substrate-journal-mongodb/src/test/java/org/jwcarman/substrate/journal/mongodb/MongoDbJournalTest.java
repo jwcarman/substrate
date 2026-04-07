@@ -21,9 +21,11 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import org.bson.Document;
+import org.bson.types.Binary;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,7 +51,7 @@ class MongoDbJournalSpiTest {
 
   @Test
   void appendInsertsDocumentWithCorrectFields() {
-    journal.append("substrate:journal:test", "hello");
+    journal.append("substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8));
 
     ArgumentCaptor<Document> captor = ArgumentCaptor.forClass(Document.class);
     verify(mongoTemplate).insert(captor.capture(), eq("substrate_journal"));
@@ -58,14 +60,15 @@ class MongoDbJournalSpiTest {
     assertThat(doc.getString("key")).isEqualTo("substrate:journal:test");
     assertThat(doc.getString("entryId"))
         .matches("[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}");
-    assertThat(doc.getString("data")).isEqualTo("hello");
+    assertThat(doc.get("data", Binary.class).getData())
+        .isEqualTo("hello".getBytes(StandardCharsets.UTF_8));
     assertThat(doc.get("timestamp")).isNotNull();
     assertThat(doc.get("expireAt")).isNotNull();
   }
 
   @Test
   void appendReturnsUuidV7Id() {
-    String id = journal.append("substrate:journal:test", "hello");
+    String id = journal.append("substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8));
     assertThat(id).matches("[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}");
   }
 
@@ -74,7 +77,7 @@ class MongoDbJournalSpiTest {
     MongoDbJournalSpi noTtlJournal =
         new MongoDbJournalSpi(
             mongoTemplate, "substrate:journal:", "substrate_journal", Duration.ZERO);
-    noTtlJournal.append("substrate:journal:test", "data");
+    noTtlJournal.append("substrate:journal:test", "data".getBytes(StandardCharsets.UTF_8));
 
     ArgumentCaptor<Document> captor = ArgumentCaptor.forClass(Document.class);
     verify(mongoTemplate).insert(captor.capture(), eq("substrate_journal"));

@@ -15,17 +15,26 @@
  */
 package org.jwcarman.substrate.core;
 
+import org.jwcarman.codec.spi.CodecFactory;
+import org.jwcarman.codec.spi.TypeRef;
 import org.jwcarman.substrate.spi.JournalSpi;
 
 public class JournalFactory {
 
   private final JournalSpi journalSpi;
+  private final CodecFactory codecFactory;
 
-  public JournalFactory(JournalSpi journalSpi) {
+  public JournalFactory(JournalSpi journalSpi, CodecFactory codecFactory) {
     this.journalSpi = journalSpi;
+    this.codecFactory = codecFactory;
   }
 
-  public Journal create(String name) {
-    return new DefaultJournal(journalSpi, journalSpi.journalKey(name));
+  public <T> Journal<T> create(String name, Class<T> type) {
+    return new DefaultJournal<>(journalSpi, journalSpi.journalKey(name), codecFactory.create(type));
+  }
+
+  public <T> Journal<T> create(String name, TypeRef<T> typeRef) {
+    return new DefaultJournal<>(
+        journalSpi, journalSpi.journalKey(name), codecFactory.create(typeRef));
   }
 }

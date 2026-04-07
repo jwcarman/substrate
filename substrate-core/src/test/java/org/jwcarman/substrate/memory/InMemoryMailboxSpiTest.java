@@ -15,6 +15,7 @@
  */
 package org.jwcarman.substrate.memory;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -37,29 +38,29 @@ class InMemoryMailboxSpiTest {
 
   @Test
   void deliverThenAwaitReturnsImmediately() {
-    mailbox.deliver(KEY, "hello");
+    mailbox.deliver(KEY, "hello".getBytes(UTF_8));
 
-    CompletableFuture<String> future = mailbox.await(KEY, Duration.ofSeconds(1));
+    CompletableFuture<byte[]> future = mailbox.await(KEY, Duration.ofSeconds(1));
 
     assertTrue(future.isDone());
-    assertEquals("hello", future.join());
+    assertArrayEquals("hello".getBytes(UTF_8), future.join());
   }
 
   @Test
   void awaitThenDeliverCompletesAsync() {
-    CompletableFuture<String> future = mailbox.await(KEY, Duration.ofSeconds(5));
+    CompletableFuture<byte[]> future = mailbox.await(KEY, Duration.ofSeconds(5));
 
     assertFalse(future.isDone());
 
-    mailbox.deliver(KEY, "world");
+    mailbox.deliver(KEY, "world".getBytes(UTF_8));
 
     await().atMost(Duration.ofSeconds(2)).until(future::isDone);
-    assertEquals("world", future.join());
+    assertArrayEquals("world".getBytes(UTF_8), future.join());
   }
 
   @Test
   void awaitTimesOut() {
-    CompletableFuture<String> future = mailbox.await(KEY, Duration.ofMillis(50));
+    CompletableFuture<byte[]> future = mailbox.await(KEY, Duration.ofMillis(50));
 
     await()
         .atMost(Duration.ofSeconds(2))
@@ -75,7 +76,7 @@ class InMemoryMailboxSpiTest {
 
   @Test
   void deleteCancelsPendingFuture() {
-    CompletableFuture<String> future = mailbox.await(KEY, Duration.ofSeconds(30));
+    CompletableFuture<byte[]> future = mailbox.await(KEY, Duration.ofSeconds(30));
 
     mailbox.delete(KEY);
 
@@ -85,11 +86,11 @@ class InMemoryMailboxSpiTest {
 
   @Test
   void deleteRemovesDeliveredValue() {
-    mailbox.deliver(KEY, "hello");
+    mailbox.deliver(KEY, "hello".getBytes(UTF_8));
 
     mailbox.delete(KEY);
 
-    CompletableFuture<String> future = mailbox.await(KEY, Duration.ofMillis(50));
+    CompletableFuture<byte[]> future = mailbox.await(KEY, Duration.ofMillis(50));
 
     await()
         .atMost(Duration.ofSeconds(2))

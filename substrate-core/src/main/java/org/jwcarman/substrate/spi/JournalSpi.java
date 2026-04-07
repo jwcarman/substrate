@@ -19,9 +19,9 @@ import java.time.Duration;
 import java.util.stream.Stream;
 
 public interface JournalSpi {
-  String append(String key, String data);
+  String append(String key, byte[] data);
 
-  String append(String key, String data, Duration ttl);
+  String append(String key, byte[] data, Duration ttl);
 
   Stream<JournalEntry> readAfter(String key, String afterId);
 

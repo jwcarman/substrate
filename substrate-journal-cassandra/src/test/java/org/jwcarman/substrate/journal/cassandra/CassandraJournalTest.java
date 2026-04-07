@@ -27,6 +27,7 @@ import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Row;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
@@ -63,7 +64,7 @@ class CassandraJournalSpiTest {
 
   @Test
   void appendReturnsTimeuuidId() {
-    String id = journal.append("substrate:journal:test", "hello");
+    String id = journal.append("substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8));
 
     UUID uuid = UUID.fromString(id);
     assertThat(uuid.version()).isEqualTo(1);
@@ -71,7 +72,7 @@ class CassandraJournalSpiTest {
 
   @Test
   void appendExecutesPreparedStatement() {
-    journal.append("substrate:journal:test", "hello");
+    journal.append("substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8));
 
     // Constructor executes 0 statements; append executes 1
     verify(session, atLeast(1)).execute(any(BoundStatement.class));
@@ -82,7 +83,7 @@ class CassandraJournalSpiTest {
     CassandraJournalSpi noTtlJournal =
         new CassandraJournalSpi(session, "substrate:journal:", "substrate_journal", Duration.ZERO);
 
-    noTtlJournal.append("substrate:journal:test", "data");
+    noTtlJournal.append("substrate:journal:test", "data".getBytes(StandardCharsets.UTF_8));
 
     verify(session, atLeast(1)).execute(any(BoundStatement.class));
   }

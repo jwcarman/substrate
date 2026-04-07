@@ -15,17 +15,26 @@
  */
 package org.jwcarman.substrate.core;
 
+import org.jwcarman.codec.spi.CodecFactory;
+import org.jwcarman.codec.spi.TypeRef;
 import org.jwcarman.substrate.spi.MailboxSpi;
 
 public class MailboxFactory {
 
   private final MailboxSpi mailboxSpi;
+  private final CodecFactory codecFactory;
 
-  public MailboxFactory(MailboxSpi mailboxSpi) {
+  public MailboxFactory(MailboxSpi mailboxSpi, CodecFactory codecFactory) {
     this.mailboxSpi = mailboxSpi;
+    this.codecFactory = codecFactory;
   }
 
-  public Mailbox create(String name) {
-    return new DefaultMailbox(mailboxSpi, mailboxSpi.mailboxKey(name));
+  public <T> Mailbox<T> create(String name, Class<T> type) {
+    return new DefaultMailbox<>(mailboxSpi, mailboxSpi.mailboxKey(name), codecFactory.create(type));
+  }
+
+  public <T> Mailbox<T> create(String name, TypeRef<T> typeRef) {
+    return new DefaultMailbox<>(
+        mailboxSpi, mailboxSpi.mailboxKey(name), codecFactory.create(typeRef));
   }
 }
