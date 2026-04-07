@@ -31,11 +31,11 @@ import org.springframework.context.annotation.PropertySource;
 public class HazelcastMailboxAutoConfiguration {
 
   @Bean
-  public HazelcastMailbox hazelcastMailbox(
+  public HazelcastMailboxSpi hazelcastMailbox(
       HazelcastInstance hazelcastInstance,
       Notifier notifier,
       HazelcastMailboxProperties properties) {
-    return new HazelcastMailbox(
+    return new HazelcastMailboxSpi(
         hazelcastInstance,
         notifier,
         properties.prefix(),

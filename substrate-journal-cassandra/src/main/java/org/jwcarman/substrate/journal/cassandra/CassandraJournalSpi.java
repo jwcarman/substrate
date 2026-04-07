@@ -27,10 +27,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
-import org.jwcarman.substrate.spi.AbstractJournal;
+import org.jwcarman.substrate.spi.AbstractJournalSpi;
 import org.jwcarman.substrate.spi.JournalEntry;
 
-public class CassandraJournal extends AbstractJournal {
+public class CassandraJournalSpi extends AbstractJournalSpi {
 
   private static final String FIELD_KEY = "key";
   private static final String FIELD_ENTRY_ID = "entry_id";
@@ -48,7 +48,7 @@ public class CassandraJournal extends AbstractJournal {
   private final PreparedStatement readLastStatement;
   private final PreparedStatement deleteStatement;
 
-  public CassandraJournal(
+  public CassandraJournalSpi(
       CqlSession session, String prefix, String tableName, Duration defaultTtl) {
     super(prefix);
     this.session = session;

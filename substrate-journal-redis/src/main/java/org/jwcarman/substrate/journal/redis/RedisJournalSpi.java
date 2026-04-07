@@ -28,10 +28,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
-import org.jwcarman.substrate.spi.AbstractJournal;
+import org.jwcarman.substrate.spi.AbstractJournalSpi;
 import org.jwcarman.substrate.spi.JournalEntry;
 
-public class RedisJournal extends AbstractJournal {
+public class RedisJournalSpi extends AbstractJournalSpi {
 
   private static final int READ_BATCH_SIZE = 100;
   private static final String FIELD_DATA = "data";
@@ -42,7 +42,7 @@ public class RedisJournal extends AbstractJournal {
   private final long maxLen;
   private final Duration defaultTtl;
 
-  public RedisJournal(
+  public RedisJournalSpi(
       RedisCommands<String, String> commands, String prefix, long maxLen, Duration defaultTtl) {
     super(prefix);
     this.commands = commands;

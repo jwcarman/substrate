@@ -30,7 +30,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
 
 @Testcontainers
-class RabbitMqJournalIT {
+class RabbitMqJournalSpiIT {
 
   @Container
   static RabbitMQContainer rabbitMQContainer =
@@ -41,7 +41,7 @@ class RabbitMqJournalIT {
               "/etc/rabbitmq/enabled_plugins");
 
   private Environment environment;
-  private RabbitMqJournal journal;
+  private RabbitMqJournalSpi journal;
 
   @BeforeEach
   void setUp() {
@@ -52,7 +52,7 @@ class RabbitMqJournalIT {
             .build();
 
     journal =
-        new RabbitMqJournal(environment, "substrate:journal:", Duration.ofHours(1), 524288000L);
+        new RabbitMqJournalSpi(environment, "substrate:journal:", Duration.ofHours(1), 524288000L);
   }
 
   @AfterEach

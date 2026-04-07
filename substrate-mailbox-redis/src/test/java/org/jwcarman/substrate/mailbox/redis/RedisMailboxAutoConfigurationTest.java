@@ -25,8 +25,8 @@ import io.lettuce.core.api.sync.RedisCommands;
 import io.lettuce.core.codec.StringCodec;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.memory.InMemoryMailbox;
-import org.jwcarman.substrate.spi.Mailbox;
+import org.jwcarman.substrate.memory.InMemoryMailboxSpi;
+import org.jwcarman.substrate.spi.MailboxSpi;
 import org.jwcarman.substrate.spi.Notifier;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -51,7 +51,7 @@ class RedisMailboxAutoConfigurationTest {
   }
 
   @Test
-  void createsRedisMailboxBean() {
+  void createsRedisMailboxSpiBean() {
     new ApplicationContextRunner()
         .withConfiguration(
             AutoConfigurations.of(
@@ -59,8 +59,8 @@ class RedisMailboxAutoConfigurationTest {
         .withUserConfiguration(MockRedisConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(RedisMailbox.class);
-              assertThat(context).hasSingleBean(Mailbox.class);
+              assertThat(context).hasSingleBean(RedisMailboxSpi.class);
+              assertThat(context).hasSingleBean(MailboxSpi.class);
             });
   }
 
@@ -73,9 +73,9 @@ class RedisMailboxAutoConfigurationTest {
         .withUserConfiguration(MockRedisConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(Mailbox.class);
-              assertThat(context.getBean(Mailbox.class)).isInstanceOf(RedisMailbox.class);
-              assertThat(context).doesNotHaveBean(InMemoryMailbox.class);
+              assertThat(context).hasSingleBean(MailboxSpi.class);
+              assertThat(context.getBean(MailboxSpi.class)).isInstanceOf(RedisMailboxSpi.class);
+              assertThat(context).doesNotHaveBean(InMemoryMailboxSpi.class);
             });
   }
 

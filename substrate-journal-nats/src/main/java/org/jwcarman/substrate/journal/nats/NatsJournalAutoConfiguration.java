@@ -30,8 +30,8 @@ import org.springframework.context.annotation.PropertySource;
 public class NatsJournalAutoConfiguration {
 
   @Bean
-  public NatsJournal natsJournal(Connection connection, NatsJournalProperties properties) {
-    return new NatsJournal(
+  public NatsJournalSpi natsJournal(Connection connection, NatsJournalProperties properties) {
+    return new NatsJournalSpi(
         connection,
         properties.prefix(),
         properties.streamName(),

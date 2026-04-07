@@ -25,10 +25,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
-import org.jwcarman.substrate.spi.AbstractJournal;
+import org.jwcarman.substrate.spi.AbstractJournalSpi;
 import org.jwcarman.substrate.spi.JournalEntry;
 
-public class InMemoryJournal extends AbstractJournal {
+public class InMemoryJournalSpi extends AbstractJournalSpi {
 
   private static final int DEFAULT_MAX_LEN = 100_000;
 
@@ -37,11 +37,11 @@ public class InMemoryJournal extends AbstractJournal {
   private final int maxLen;
   private final AtomicLong counter = new AtomicLong(0);
 
-  public InMemoryJournal() {
+  public InMemoryJournalSpi() {
     this(DEFAULT_MAX_LEN);
   }
 
-  public InMemoryJournal(int maxLen) {
+  public InMemoryJournalSpi(int maxLen) {
     super("substrate:journal:");
     this.maxLen = maxLen;
   }

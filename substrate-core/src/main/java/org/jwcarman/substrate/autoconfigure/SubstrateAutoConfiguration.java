@@ -17,13 +17,16 @@ package org.jwcarman.substrate.autoconfigure;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.jwcarman.substrate.memory.InMemoryJournal;
-import org.jwcarman.substrate.memory.InMemoryMailbox;
+import org.jwcarman.substrate.core.JournalFactory;
+import org.jwcarman.substrate.core.MailboxFactory;
+import org.jwcarman.substrate.memory.InMemoryJournalSpi;
+import org.jwcarman.substrate.memory.InMemoryMailboxSpi;
 import org.jwcarman.substrate.memory.InMemoryNotifier;
-import org.jwcarman.substrate.spi.Journal;
-import org.jwcarman.substrate.spi.Mailbox;
+import org.jwcarman.substrate.spi.JournalSpi;
+import org.jwcarman.substrate.spi.MailboxSpi;
 import org.jwcarman.substrate.spi.Notifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -37,21 +40,21 @@ public class SubstrateAutoConfiguration {
   private static final Log log = LogFactory.getLog(SubstrateAutoConfiguration.class);
 
   @Bean
-  @ConditionalOnMissingBean(Journal.class)
-  public InMemoryJournal journal() {
+  @ConditionalOnMissingBean(JournalSpi.class)
+  public InMemoryJournalSpi journalSpi() {
     log.warn(
         "No Journal implementation found; using in-memory fallback (single-node only). "
             + "For clustered deployments, add a backend module (e.g. substrate-journal-redis).");
-    return new InMemoryJournal();
+    return new InMemoryJournalSpi();
   }
 
   @Bean
-  @ConditionalOnMissingBean(Mailbox.class)
-  public InMemoryMailbox mailbox() {
+  @ConditionalOnMissingBean(MailboxSpi.class)
+  public InMemoryMailboxSpi mailboxSpi() {
     log.warn(
         "No Mailbox implementation found; using in-memory fallback (single-node only). "
             + "For clustered deployments, add a backend module (e.g. substrate-mailbox-redis).");
-    return new InMemoryMailbox();
+    return new InMemoryMailboxSpi();
   }
 
   @Bean
@@ -61,5 +64,17 @@ public class SubstrateAutoConfiguration {
         "No Notifier implementation found; using in-memory fallback (single-node only). "
             + "For clustered deployments, add a backend module (e.g. substrate-notifier-redis).");
     return new InMemoryNotifier();
+  }
+
+  @Bean
+  @ConditionalOnBean(JournalSpi.class)
+  public JournalFactory journalFactory(JournalSpi journalSpi) {
+    return new JournalFactory(journalSpi);
+  }
+
+  @Bean
+  @ConditionalOnBean(MailboxSpi.class)
+  public MailboxFactory mailboxFactory(MailboxSpi mailboxSpi) {
+    return new MailboxFactory(mailboxSpi);
   }
 }

@@ -33,7 +33,7 @@ import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 public class PostgresJournalAutoConfiguration {
 
   @Bean
-  public PostgresJournal postgresJournal(
+  public PostgresJournalSpi postgresJournal(
       DataSource dataSource, PostgresJournalProperties properties) {
     if (properties.autoCreateSchema()) {
       ResourceDatabasePopulator populator = new ResourceDatabasePopulator();
@@ -42,6 +42,6 @@ public class PostgresJournalAutoConfiguration {
     }
 
     JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
-    return new PostgresJournal(jdbcTemplate, properties.prefix(), properties.maxLen());
+    return new PostgresJournalSpi(jdbcTemplate, properties.prefix(), properties.maxLen());
   }
 }

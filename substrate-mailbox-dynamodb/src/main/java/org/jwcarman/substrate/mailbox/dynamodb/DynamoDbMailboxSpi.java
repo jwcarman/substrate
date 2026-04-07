@@ -23,7 +23,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
-import org.jwcarman.substrate.spi.AbstractMailbox;
+import org.jwcarman.substrate.spi.AbstractMailboxSpi;
 import org.jwcarman.substrate.spi.Notifier;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
@@ -35,7 +35,7 @@ import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.ResourceInUseException;
 import software.amazon.awssdk.services.dynamodb.model.ScalarAttributeType;
 
-public class DynamoDbMailbox extends AbstractMailbox {
+public class DynamoDbMailboxSpi extends AbstractMailboxSpi {
 
   private static final String FIELD_KEY = "key";
   private static final String FIELD_VALUE = "value";
@@ -48,7 +48,7 @@ public class DynamoDbMailbox extends AbstractMailbox {
   private final ConcurrentMap<String, CompletableFuture<String>> pending =
       new ConcurrentHashMap<>();
 
-  public DynamoDbMailbox(
+  public DynamoDbMailboxSpi(
       DynamoDbClient client,
       Notifier notifier,
       String prefix,

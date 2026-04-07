@@ -33,14 +33,14 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Testcontainers
-class RedisJournalIT {
+class RedisJournalSpiIT {
 
   @Container
   private static final GenericContainer<?> REDIS =
       new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
 
   private RedisClient client;
-  private RedisJournal journal;
+  private RedisJournalSpi journal;
   private RedisCommands<String, String> commands;
 
   @BeforeEach
@@ -53,7 +53,7 @@ class RedisJournalIT {
                 .build());
     StatefulRedisConnection<String, String> connection = client.connect(StringCodec.UTF8);
     commands = connection.sync();
-    journal = new RedisJournal(commands, "substrate:journal:", 100_000, Duration.ofHours(1));
+    journal = new RedisJournalSpi(commands, "substrate:journal:", 100_000, Duration.ofHours(1));
   }
 
   @AfterEach

@@ -22,12 +22,14 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.jwcarman.substrate.memory.InMemoryJournal;
-import org.jwcarman.substrate.memory.InMemoryMailbox;
+import org.jwcarman.substrate.core.JournalFactory;
+import org.jwcarman.substrate.core.MailboxFactory;
+import org.jwcarman.substrate.memory.InMemoryJournalSpi;
+import org.jwcarman.substrate.memory.InMemoryMailboxSpi;
 import org.jwcarman.substrate.memory.InMemoryNotifier;
-import org.jwcarman.substrate.spi.Journal;
 import org.jwcarman.substrate.spi.JournalEntry;
-import org.jwcarman.substrate.spi.Mailbox;
+import org.jwcarman.substrate.spi.JournalSpi;
+import org.jwcarman.substrate.spi.MailboxSpi;
 import org.jwcarman.substrate.spi.NotificationHandler;
 import org.jwcarman.substrate.spi.Notifier;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -50,20 +52,20 @@ class SubstrateAutoConfigurationTest {
   }
 
   @Test
-  void createsInMemoryJournalWhenNoOtherBeanExists() {
+  void createsInMemoryJournalSpiWhenNoOtherBeanExists() {
     contextRunner.run(
         context -> {
-          assertThat(context).hasSingleBean(Journal.class);
-          assertThat(context.getBean(Journal.class)).isInstanceOf(InMemoryJournal.class);
+          assertThat(context).hasSingleBean(JournalSpi.class);
+          assertThat(context.getBean(JournalSpi.class)).isInstanceOf(InMemoryJournalSpi.class);
         });
   }
 
   @Test
-  void createsInMemoryMailboxWhenNoOtherBeanExists() {
+  void createsInMemoryMailboxSpiWhenNoOtherBeanExists() {
     contextRunner.run(
         context -> {
-          assertThat(context).hasSingleBean(Mailbox.class);
-          assertThat(context.getBean(Mailbox.class)).isInstanceOf(InMemoryMailbox.class);
+          assertThat(context).hasSingleBean(MailboxSpi.class);
+          assertThat(context.getBean(MailboxSpi.class)).isInstanceOf(InMemoryMailboxSpi.class);
         });
   }
 
@@ -77,26 +79,26 @@ class SubstrateAutoConfigurationTest {
   }
 
   @Test
-  void doesNotCreateInMemoryJournalWhenExternalBeanExists() {
+  void doesNotCreateInMemoryJournalSpiWhenExternalBeanExists() {
     contextRunner
-        .withUserConfiguration(CustomJournalConfiguration.class)
+        .withUserConfiguration(CustomJournalSpiConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(Journal.class);
-              assertThat(context.getBean(Journal.class)).isInstanceOf(StubJournal.class);
-              assertThat(context).doesNotHaveBean(InMemoryJournal.class);
+              assertThat(context).hasSingleBean(JournalSpi.class);
+              assertThat(context.getBean(JournalSpi.class)).isInstanceOf(StubJournalSpi.class);
+              assertThat(context).doesNotHaveBean(InMemoryJournalSpi.class);
             });
   }
 
   @Test
-  void doesNotCreateInMemoryMailboxWhenExternalBeanExists() {
+  void doesNotCreateInMemoryMailboxSpiWhenExternalBeanExists() {
     contextRunner
-        .withUserConfiguration(CustomMailboxConfiguration.class)
+        .withUserConfiguration(CustomMailboxSpiConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(Mailbox.class);
-              assertThat(context.getBean(Mailbox.class)).isInstanceOf(StubMailbox.class);
-              assertThat(context).doesNotHaveBean(InMemoryMailbox.class);
+              assertThat(context).hasSingleBean(MailboxSpi.class);
+              assertThat(context.getBean(MailboxSpi.class)).isInstanceOf(StubMailboxSpi.class);
+              assertThat(context).doesNotHaveBean(InMemoryMailboxSpi.class);
             });
   }
 
@@ -116,8 +118,8 @@ class SubstrateAutoConfigurationTest {
   void logsWarningsWhenFallingBackToInMemoryImplementations(CapturedOutput output) {
     contextRunner.run(
         context -> {
-          assertThat(context).hasSingleBean(InMemoryJournal.class);
-          assertThat(context).hasSingleBean(InMemoryMailbox.class);
+          assertThat(context).hasSingleBean(InMemoryJournalSpi.class);
+          assertThat(context).hasSingleBean(InMemoryMailboxSpi.class);
           assertThat(context).hasSingleBean(InMemoryNotifier.class);
         });
     assertThat(output)
@@ -130,13 +132,13 @@ class SubstrateAutoConfigurationTest {
   void doesNotLogWarningsWhenExternalBeansExist(CapturedOutput output) {
     contextRunner
         .withUserConfiguration(
-            CustomJournalConfiguration.class,
-            CustomMailboxConfiguration.class,
+            CustomJournalSpiConfiguration.class,
+            CustomMailboxSpiConfiguration.class,
             CustomNotifierConfiguration.class)
         .run(
             context -> {
-              assertThat(context).doesNotHaveBean(InMemoryJournal.class);
-              assertThat(context).doesNotHaveBean(InMemoryMailbox.class);
+              assertThat(context).doesNotHaveBean(InMemoryJournalSpi.class);
+              assertThat(context).doesNotHaveBean(InMemoryMailboxSpi.class);
               assertThat(context).doesNotHaveBean(InMemoryNotifier.class);
             });
     assertThat(output)
@@ -145,21 +147,31 @@ class SubstrateAutoConfigurationTest {
         .doesNotContain("No Notifier implementation found; using in-memory fallback");
   }
 
+  @Test
+  void createsJournalFactoryWhenJournalSpiBeanExists() {
+    contextRunner.run(context -> assertThat(context).hasSingleBean(JournalFactory.class));
+  }
+
+  @Test
+  void createsMailboxFactoryWhenMailboxSpiBeanExists() {
+    contextRunner.run(context -> assertThat(context).hasSingleBean(MailboxFactory.class));
+  }
+
   @Configuration(proxyBeanMethods = false)
-  static class CustomJournalConfiguration {
+  static class CustomJournalSpiConfiguration {
 
     @Bean
-    Journal customJournal() {
-      return new StubJournal();
+    JournalSpi customJournalSpi() {
+      return new StubJournalSpi();
     }
   }
 
   @Configuration(proxyBeanMethods = false)
-  static class CustomMailboxConfiguration {
+  static class CustomMailboxSpiConfiguration {
 
     @Bean
-    Mailbox customMailbox() {
-      return new StubMailbox();
+    MailboxSpi customMailboxSpi() {
+      return new StubMailboxSpi();
     }
   }
 
@@ -172,7 +184,7 @@ class SubstrateAutoConfigurationTest {
     }
   }
 
-  static class StubJournal implements Journal {
+  static class StubJournalSpi implements JournalSpi {
 
     @Override
     public String append(String key, String data) {
@@ -206,7 +218,7 @@ class SubstrateAutoConfigurationTest {
     }
   }
 
-  static class StubMailbox implements Mailbox {
+  static class StubMailboxSpi implements MailboxSpi {
 
     @Override
     public void deliver(String key, String value) {}

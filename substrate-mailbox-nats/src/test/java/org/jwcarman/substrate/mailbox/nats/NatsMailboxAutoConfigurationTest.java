@@ -24,8 +24,8 @@ import io.nats.client.KeyValueManagement;
 import io.nats.client.api.KeyValueStatus;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.memory.InMemoryMailbox;
-import org.jwcarman.substrate.spi.Mailbox;
+import org.jwcarman.substrate.memory.InMemoryMailboxSpi;
+import org.jwcarman.substrate.spi.MailboxSpi;
 import org.jwcarman.substrate.spi.Notifier;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -35,14 +35,14 @@ import org.springframework.context.annotation.Configuration;
 class NatsMailboxAutoConfigurationTest {
 
   @Test
-  void createsNatsMailboxBean() {
+  void createsNatsMailboxSpiBean() {
     new ApplicationContextRunner()
         .withConfiguration(AutoConfigurations.of(NatsMailboxAutoConfiguration.class))
         .withUserConfiguration(MockNatsConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(NatsMailbox.class);
-              assertThat(context).hasSingleBean(Mailbox.class);
+              assertThat(context).hasSingleBean(NatsMailboxSpi.class);
+              assertThat(context).hasSingleBean(MailboxSpi.class);
             });
   }
 
@@ -55,9 +55,9 @@ class NatsMailboxAutoConfigurationTest {
         .withUserConfiguration(MockNatsConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(Mailbox.class);
-              assertThat(context.getBean(Mailbox.class)).isInstanceOf(NatsMailbox.class);
-              assertThat(context).doesNotHaveBean(InMemoryMailbox.class);
+              assertThat(context).hasSingleBean(MailboxSpi.class);
+              assertThat(context.getBean(MailboxSpi.class)).isInstanceOf(NatsMailboxSpi.class);
+              assertThat(context).doesNotHaveBean(InMemoryMailboxSpi.class);
             });
   }
 

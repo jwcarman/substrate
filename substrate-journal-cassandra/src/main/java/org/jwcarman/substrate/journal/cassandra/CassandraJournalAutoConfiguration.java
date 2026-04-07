@@ -30,10 +30,10 @@ import org.springframework.context.annotation.PropertySource;
 public class CassandraJournalAutoConfiguration {
 
   @Bean
-  public CassandraJournal cassandraJournal(
+  public CassandraJournalSpi cassandraJournal(
       CqlSession cqlSession, CassandraJournalProperties properties) {
-    CassandraJournal journal =
-        new CassandraJournal(
+    CassandraJournalSpi journal =
+        new CassandraJournalSpi(
             cqlSession, properties.prefix(), properties.tableName(), properties.defaultTtl());
 
     if (properties.autoCreateSchema()) {

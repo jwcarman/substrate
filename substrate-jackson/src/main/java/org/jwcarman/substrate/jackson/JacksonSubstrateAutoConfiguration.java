@@ -15,8 +15,8 @@
  */
 package org.jwcarman.substrate.jackson;
 
-import org.jwcarman.substrate.spi.Journal;
-import org.jwcarman.substrate.spi.Mailbox;
+import org.jwcarman.substrate.spi.JournalSpi;
+import org.jwcarman.substrate.spi.MailboxSpi;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -28,14 +28,16 @@ import tools.jackson.databind.ObjectMapper;
 public class JacksonSubstrateAutoConfiguration {
 
   @Bean
-  @ConditionalOnBean({Journal.class, ObjectMapper.class})
-  public JacksonJournalFactory jacksonJournalFactory(Journal journal, ObjectMapper objectMapper) {
+  @ConditionalOnBean({JournalSpi.class, ObjectMapper.class})
+  public JacksonJournalFactory jacksonJournalFactory(
+      JournalSpi journal, ObjectMapper objectMapper) {
     return new JacksonJournalFactory(journal, objectMapper);
   }
 
   @Bean
-  @ConditionalOnBean({Mailbox.class, ObjectMapper.class})
-  public JacksonMailboxFactory jacksonMailboxFactory(Mailbox mailbox, ObjectMapper objectMapper) {
+  @ConditionalOnBean({MailboxSpi.class, ObjectMapper.class})
+  public JacksonMailboxFactory jacksonMailboxFactory(
+      MailboxSpi mailbox, ObjectMapper objectMapper) {
     return new JacksonMailboxFactory(mailbox, objectMapper);
   }
 }

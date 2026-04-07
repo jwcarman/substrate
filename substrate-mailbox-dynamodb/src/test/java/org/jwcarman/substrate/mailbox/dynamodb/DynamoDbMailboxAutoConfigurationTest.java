@@ -20,8 +20,8 @@ import static org.mockito.Mockito.mock;
 
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.memory.InMemoryMailbox;
-import org.jwcarman.substrate.spi.Mailbox;
+import org.jwcarman.substrate.memory.InMemoryMailboxSpi;
+import org.jwcarman.substrate.spi.MailboxSpi;
 import org.jwcarman.substrate.spi.Notifier;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -32,14 +32,14 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 class DynamoDbMailboxAutoConfigurationTest {
 
   @Test
-  void createsDynamoDbMailboxBean() {
+  void createsDynamoDbMailboxSpiBean() {
     new ApplicationContextRunner()
         .withConfiguration(AutoConfigurations.of(DynamoDbMailboxAutoConfiguration.class))
         .withUserConfiguration(MockDynamoDbConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(DynamoDbMailbox.class);
-              assertThat(context).hasSingleBean(Mailbox.class);
+              assertThat(context).hasSingleBean(DynamoDbMailboxSpi.class);
+              assertThat(context).hasSingleBean(MailboxSpi.class);
             });
   }
 
@@ -52,9 +52,9 @@ class DynamoDbMailboxAutoConfigurationTest {
         .withUserConfiguration(MockDynamoDbConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(Mailbox.class);
-              assertThat(context.getBean(Mailbox.class)).isInstanceOf(DynamoDbMailbox.class);
-              assertThat(context).doesNotHaveBean(InMemoryMailbox.class);
+              assertThat(context).hasSingleBean(MailboxSpi.class);
+              assertThat(context.getBean(MailboxSpi.class)).isInstanceOf(DynamoDbMailboxSpi.class);
+              assertThat(context).doesNotHaveBean(InMemoryMailboxSpi.class);
             });
   }
 

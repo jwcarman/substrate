@@ -34,13 +34,13 @@ import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactor
 public class RedisJournalAutoConfiguration {
 
   @Bean
-  public RedisJournal redisJournal(
+  public RedisJournalSpi redisJournal(
       RedisConnectionFactory connectionFactory, RedisJournalProperties properties) {
     LettuceConnectionFactory lcf = (LettuceConnectionFactory) connectionFactory;
     RedisClient client = (RedisClient) lcf.getNativeClient();
     StatefulRedisConnection<String, String> connection = client.connect(StringCodec.UTF8);
 
-    return new RedisJournal(
+    return new RedisJournalSpi(
         connection.sync(), properties.prefix(), properties.maxLen(), properties.defaultTtl());
   }
 }

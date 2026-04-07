@@ -15,16 +15,16 @@
  */
 package org.jwcarman.substrate.jackson;
 
-import org.jwcarman.substrate.spi.Journal;
+import org.jwcarman.substrate.spi.JournalSpi;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
 public class JacksonJournalFactory {
 
-  private final Journal journal;
+  private final JournalSpi journal;
   private final ObjectMapper objectMapper;
 
-  public JacksonJournalFactory(Journal journal, ObjectMapper objectMapper) {
+  public JacksonJournalFactory(JournalSpi journal, ObjectMapper objectMapper) {
     this.journal = journal;
     this.objectMapper = objectMapper;
   }

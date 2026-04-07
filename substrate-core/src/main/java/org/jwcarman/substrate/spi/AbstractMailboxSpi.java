@@ -15,11 +15,11 @@
  */
 package org.jwcarman.substrate.spi;
 
-public abstract class AbstractMailbox implements Mailbox {
+public abstract class AbstractMailboxSpi implements MailboxSpi {
 
   private final String prefix;
 
-  protected AbstractMailbox(String prefix) {
+  protected AbstractMailboxSpi(String prefix) {
     this.prefix = prefix;
   }
 

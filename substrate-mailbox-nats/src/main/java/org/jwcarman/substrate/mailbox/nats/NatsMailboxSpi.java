@@ -26,17 +26,17 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import org.jwcarman.substrate.spi.AbstractMailbox;
+import org.jwcarman.substrate.spi.AbstractMailboxSpi;
 import org.jwcarman.substrate.spi.Notifier;
 
-public class NatsMailbox extends AbstractMailbox {
+public class NatsMailboxSpi extends AbstractMailboxSpi {
 
   private final Connection connection;
   private final Notifier notifier;
   private final String bucketName;
   private final Duration defaultTtl;
 
-  public NatsMailbox(
+  public NatsMailboxSpi(
       Connection connection,
       Notifier notifier,
       String prefix,
@@ -129,21 +129,25 @@ public class NatsMailbox extends AbstractMailbox {
 
   private void ensureBucketExists() {
     try {
-      var kvm = connection.keyValueManagement();
-      try {
-        kvm.getStatus(bucketName);
-      } catch (JetStreamApiException _) {
-        kvm.create(
-            KeyValueConfiguration.builder()
-                .name(bucketName)
-                .ttl(defaultTtl)
-                .maxHistoryPerKey(1)
-                .build());
-      }
+      createBucketIfMissing();
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to create NATS KV bucket", e);
     } catch (JetStreamApiException e) {
       throw new IllegalStateException("Failed to create NATS KV bucket", e);
+    }
+  }
+
+  private void createBucketIfMissing() throws IOException, JetStreamApiException {
+    var kvm = connection.keyValueManagement();
+    try {
+      kvm.getStatus(bucketName);
+    } catch (JetStreamApiException _) {
+      kvm.create(
+          KeyValueConfiguration.builder()
+              .name(bucketName)
+              .ttl(defaultTtl)
+              .maxHistoryPerKey(1)
+              .build());
     }
   }
 

@@ -38,11 +38,11 @@ class RedisMailboxTest {
   @Mock private RedisCommands<String, String> commands;
   @Mock private Notifier notifier;
 
-  private RedisMailbox mailbox;
+  private RedisMailboxSpi mailbox;
 
   @BeforeEach
   void setUp() {
-    mailbox = new RedisMailbox(commands, notifier, "substrate:mailbox:", Duration.ofMinutes(5));
+    mailbox = new RedisMailboxSpi(commands, notifier, "substrate:mailbox:", Duration.ofMinutes(5));
   }
 
   @Test

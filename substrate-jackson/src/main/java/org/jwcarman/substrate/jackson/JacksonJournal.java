@@ -17,24 +17,24 @@ package org.jwcarman.substrate.jackson;
 
 import java.time.Duration;
 import java.util.stream.Stream;
-import org.jwcarman.substrate.spi.Journal;
 import org.jwcarman.substrate.spi.JournalEntry;
+import org.jwcarman.substrate.spi.JournalSpi;
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ObjectMapper;
 
 public class JacksonJournal<T> {
 
-  private final Journal journal;
+  private final JournalSpi journal;
   private final ObjectMapper objectMapper;
   private final JavaType javaType;
 
-  public JacksonJournal(Journal journal, ObjectMapper objectMapper, JavaType javaType) {
+  public JacksonJournal(JournalSpi journal, ObjectMapper objectMapper, JavaType javaType) {
     this.journal = journal;
     this.objectMapper = objectMapper;
     this.javaType = javaType;
   }
 
-  public JacksonJournal(Journal journal, ObjectMapper objectMapper, Class<T> type) {
+  public JacksonJournal(JournalSpi journal, ObjectMapper objectMapper, Class<T> type) {
     this(journal, objectMapper, objectMapper.constructType(type));
   }
 

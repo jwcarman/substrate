@@ -21,8 +21,8 @@ import static org.mockito.Mockito.mock;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.memory.InMemoryMailbox;
-import org.jwcarman.substrate.spi.Mailbox;
+import org.jwcarman.substrate.memory.InMemoryMailboxSpi;
+import org.jwcarman.substrate.spi.MailboxSpi;
 import org.jwcarman.substrate.spi.Notifier;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -40,7 +40,7 @@ class PostgresMailboxAutoConfigurationTest {
   static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
 
   @Test
-  void createsPostgresMailboxBean() {
+  void createsPostgresMailboxSpiBean() {
     new ApplicationContextRunner()
         .withConfiguration(
             AutoConfigurations.of(
@@ -48,8 +48,8 @@ class PostgresMailboxAutoConfigurationTest {
         .withUserConfiguration(PostgresMailboxTestConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(PostgresMailbox.class);
-              assertThat(context).hasSingleBean(Mailbox.class);
+              assertThat(context).hasSingleBean(PostgresMailboxSpi.class);
+              assertThat(context).hasSingleBean(MailboxSpi.class);
             });
   }
 
@@ -62,9 +62,9 @@ class PostgresMailboxAutoConfigurationTest {
         .withUserConfiguration(PostgresMailboxTestConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(Mailbox.class);
-              assertThat(context.getBean(Mailbox.class)).isInstanceOf(PostgresMailbox.class);
-              assertThat(context).doesNotHaveBean(InMemoryMailbox.class);
+              assertThat(context).hasSingleBean(MailboxSpi.class);
+              assertThat(context.getBean(MailboxSpi.class)).isInstanceOf(PostgresMailboxSpi.class);
+              assertThat(context).doesNotHaveBean(InMemoryMailboxSpi.class);
             });
   }
 

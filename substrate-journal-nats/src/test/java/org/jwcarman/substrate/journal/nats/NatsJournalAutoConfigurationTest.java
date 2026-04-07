@@ -26,8 +26,8 @@ import io.nats.client.JetStreamManagement;
 import io.nats.client.api.StreamConfiguration;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.memory.InMemoryJournal;
-import org.jwcarman.substrate.spi.Journal;
+import org.jwcarman.substrate.memory.InMemoryJournalSpi;
+import org.jwcarman.substrate.spi.JournalSpi;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -36,14 +36,14 @@ import org.springframework.context.annotation.Configuration;
 class NatsJournalAutoConfigurationTest {
 
   @Test
-  void createsNatsJournalBean() {
+  void createsNatsJournalSpiBean() {
     new ApplicationContextRunner()
         .withConfiguration(AutoConfigurations.of(NatsJournalAutoConfiguration.class))
         .withUserConfiguration(MockNatsConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(NatsJournal.class);
-              assertThat(context).hasSingleBean(Journal.class);
+              assertThat(context).hasSingleBean(NatsJournalSpi.class);
+              assertThat(context).hasSingleBean(JournalSpi.class);
             });
   }
 
@@ -56,9 +56,9 @@ class NatsJournalAutoConfigurationTest {
         .withUserConfiguration(MockNatsConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(Journal.class);
-              assertThat(context.getBean(Journal.class)).isInstanceOf(NatsJournal.class);
-              assertThat(context).doesNotHaveBean(InMemoryJournal.class);
+              assertThat(context).hasSingleBean(JournalSpi.class);
+              assertThat(context.getBean(JournalSpi.class)).isInstanceOf(NatsJournalSpi.class);
+              assertThat(context).doesNotHaveBean(InMemoryJournalSpi.class);
             });
   }
 

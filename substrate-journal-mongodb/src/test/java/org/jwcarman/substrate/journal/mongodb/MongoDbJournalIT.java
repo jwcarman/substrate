@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.journal.mongodb;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
@@ -31,11 +32,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 @Testcontainers
-class MongoDbJournalIT {
+class MongoDbJournalSpiIT {
 
   @Container static MongoDBContainer mongo = new MongoDBContainer(DockerImageName.parse("mongo:7"));
 
-  private MongoDbJournal journal;
+  private MongoDbJournalSpi journal;
 
   @BeforeEach
   void setUp() {
@@ -45,7 +46,7 @@ class MongoDbJournalIT {
     mongoTemplate.dropCollection("substrate_journal");
 
     journal =
-        new MongoDbJournal(
+        new MongoDbJournalSpi(
             mongoTemplate, "substrate:journal:", "substrate_journal", Duration.ofHours(24));
     journal.ensureIndexes();
   }
@@ -180,7 +181,7 @@ class MongoDbJournalIT {
   @Test
   void indexesAreCreated() {
     // ensureIndexes was called in setUp; calling again should not throw
-    journal.ensureIndexes();
+    assertThatNoException().isThrownBy(() -> journal.ensureIndexes());
   }
 
   @Test

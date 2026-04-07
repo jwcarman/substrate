@@ -124,25 +124,29 @@ public class PostgresNotifier implements Notifier, SmartLifecycle {
 
         log.info("Listening on PostgreSQL channel '{}'", channel);
 
-        boolean firstPoll = true;
-        while (running.get()) {
-          PGNotification[] notifications = pgConnection.getNotifications(pollTimeoutMillis);
-          if (firstPoll) {
-            listening.set(true);
-            firstPoll = false;
-          }
-          if (notifications != null) {
-            for (PGNotification notification : notifications) {
-              dispatchNotification(notification.getParameter());
-            }
-          }
-        }
+        pollNotifications(pgConnection);
       } catch (SQLException e) {
         listening.set(false);
         if (running.get()) {
           log.warn("PostgreSQL LISTEN connection lost, reconnecting", e);
           closeListenConnection();
           sleepBeforeReconnect();
+        }
+      }
+    }
+  }
+
+  private void pollNotifications(PGConnection pgConnection) throws SQLException {
+    boolean firstPoll = true;
+    while (running.get()) {
+      PGNotification[] notifications = pgConnection.getNotifications(pollTimeoutMillis);
+      if (firstPoll) {
+        listening.set(true);
+        firstPoll = false;
+      }
+      if (notifications != null) {
+        for (PGNotification notification : notifications) {
+          dispatchNotification(notification.getParameter());
         }
       }
     }

@@ -35,7 +35,7 @@ class HazelcastMailboxIT {
 
   private static HazelcastInstance hazelcast;
   private HazelcastNotifier notifier;
-  private HazelcastMailbox mailbox;
+  private HazelcastMailboxSpi mailbox;
 
   @BeforeAll
   static void startHazelcast() {
@@ -57,7 +57,7 @@ class HazelcastMailboxIT {
     notifier = new HazelcastNotifier(hazelcast, "substrate-notify");
     notifier.start();
     mailbox =
-        new HazelcastMailbox(
+        new HazelcastMailboxSpi(
             hazelcast,
             notifier,
             "substrate:mailbox:",
@@ -91,11 +91,7 @@ class HazelcastMailboxIT {
     // Deliver after a short delay
     CompletableFuture.runAsync(
         () -> {
-          try {
-            Thread.sleep(200);
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-          }
+          await().pollDelay(Duration.ofMillis(200)).atMost(Duration.ofSeconds(1)).until(() -> true);
           mailbox.deliver(key, "delayed-value");
         });
 
@@ -105,7 +101,7 @@ class HazelcastMailboxIT {
   }
 
   @Test
-  void deleteRemovesValue() throws Exception {
+  void deleteRemovesValue() {
     String key = mailbox.mailboxKey("delete-" + System.nanoTime());
 
     mailbox.deliver(key, "to-delete");

@@ -25,8 +25,8 @@ import io.lettuce.core.api.sync.RedisCommands;
 import io.lettuce.core.codec.StringCodec;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.memory.InMemoryJournal;
-import org.jwcarman.substrate.spi.Journal;
+import org.jwcarman.substrate.memory.InMemoryJournalSpi;
+import org.jwcarman.substrate.spi.JournalSpi;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -50,14 +50,14 @@ class RedisJournalAutoConfigurationTest {
   }
 
   @Test
-  void createsRedisJournalBean() {
+  void createsRedisJournalSpiBean() {
     new ApplicationContextRunner()
         .withConfiguration(AutoConfigurations.of(RedisJournalAutoConfiguration.class))
         .withUserConfiguration(MockRedisConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(RedisJournal.class);
-              assertThat(context).hasSingleBean(Journal.class);
+              assertThat(context).hasSingleBean(RedisJournalSpi.class);
+              assertThat(context).hasSingleBean(JournalSpi.class);
             });
   }
 
@@ -70,9 +70,9 @@ class RedisJournalAutoConfigurationTest {
         .withUserConfiguration(MockRedisConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(Journal.class);
-              assertThat(context.getBean(Journal.class)).isInstanceOf(RedisJournal.class);
-              assertThat(context).doesNotHaveBean(InMemoryJournal.class);
+              assertThat(context).hasSingleBean(JournalSpi.class);
+              assertThat(context.getBean(JournalSpi.class)).isInstanceOf(RedisJournalSpi.class);
+              assertThat(context).doesNotHaveBean(InMemoryJournalSpi.class);
             });
   }
 

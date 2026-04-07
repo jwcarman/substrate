@@ -45,7 +45,7 @@ class NatsMailboxTest {
   void mailboxKeyUsesConfiguredPrefix() throws Exception {
     wireConnectionForConstruction();
 
-    NatsMailbox mailbox = createMailbox();
+    NatsMailboxSpi mailbox = createMailbox();
     assertThat(mailbox.mailboxKey("my-box")).isEqualTo("substrate:mailbox:my-box");
   }
 
@@ -55,7 +55,7 @@ class NatsMailboxTest {
     var kv = mock(io.nats.client.KeyValue.class);
     when(connection.keyValue("substrate-mailbox")).thenReturn(kv);
 
-    NatsMailbox mailbox = createMailbox();
+    NatsMailboxSpi mailbox = createMailbox();
     mailbox.deliver("substrate:mailbox:test", "hello");
 
     verify(kv).put(anyString(), any(byte[].class));
@@ -72,7 +72,7 @@ class NatsMailboxTest {
     when(entry.getValue()).thenReturn("existing-value".getBytes(StandardCharsets.UTF_8));
     when(kv.get(anyString())).thenReturn(entry);
 
-    NatsMailbox mailbox = createMailbox();
+    NatsMailboxSpi mailbox = createMailbox();
     var future = mailbox.await("substrate:mailbox:test", Duration.ofSeconds(5));
 
     assertThat(future).isCompletedWithValue("existing-value");
@@ -83,8 +83,8 @@ class NatsMailboxTest {
     when(kvm.getStatus("substrate-mailbox")).thenReturn(mock(KeyValueStatus.class));
   }
 
-  private NatsMailbox createMailbox() {
-    return new NatsMailbox(
+  private NatsMailboxSpi createMailbox() {
+    return new NatsMailboxSpi(
         connection, notifier, "substrate:mailbox:", "substrate-mailbox", Duration.ofMinutes(5));
   }
 }

@@ -17,23 +17,23 @@ package org.jwcarman.substrate.jackson;
 
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
-import org.jwcarman.substrate.spi.Mailbox;
+import org.jwcarman.substrate.spi.MailboxSpi;
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ObjectMapper;
 
 public class JacksonMailbox<T> {
 
-  private final Mailbox mailbox;
+  private final MailboxSpi mailbox;
   private final ObjectMapper objectMapper;
   private final JavaType javaType;
 
-  public JacksonMailbox(Mailbox mailbox, ObjectMapper objectMapper, JavaType javaType) {
+  public JacksonMailbox(MailboxSpi mailbox, ObjectMapper objectMapper, JavaType javaType) {
     this.mailbox = mailbox;
     this.objectMapper = objectMapper;
     this.javaType = javaType;
   }
 
-  public JacksonMailbox(Mailbox mailbox, ObjectMapper objectMapper, Class<T> type) {
+  public JacksonMailbox(MailboxSpi mailbox, ObjectMapper objectMapper, Class<T> type) {
     this(mailbox, objectMapper, objectMapper.constructType(type));
   }
 

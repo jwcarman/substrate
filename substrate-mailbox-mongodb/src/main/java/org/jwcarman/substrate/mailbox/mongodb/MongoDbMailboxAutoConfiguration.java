@@ -32,10 +32,10 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 public class MongoDbMailboxAutoConfiguration {
 
   @Bean
-  public MongoDbMailbox mongoDbMailbox(
+  public MongoDbMailboxSpi mongoDbMailbox(
       MongoTemplate mongoTemplate, Notifier notifier, MongoDbMailboxProperties properties) {
-    MongoDbMailbox mailbox =
-        new MongoDbMailbox(
+    MongoDbMailboxSpi mailbox =
+        new MongoDbMailboxSpi(
             mongoTemplate,
             notifier,
             properties.prefix(),

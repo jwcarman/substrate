@@ -40,15 +40,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class RedisJournalTest {
+class RedisJournalSpiTest {
 
   @Mock private RedisCommands<String, String> commands;
 
-  private RedisJournal journal;
+  private RedisJournalSpi journal;
 
   @BeforeEach
   void setUp() {
-    journal = new RedisJournal(commands, "substrate:journal:", 100_000, Duration.ofHours(1));
+    journal = new RedisJournalSpi(commands, "substrate:journal:", 100_000, Duration.ofHours(1));
   }
 
   @Test

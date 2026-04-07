@@ -22,7 +22,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.stream.Stream;
 import org.bson.Document;
-import org.jwcarman.substrate.spi.AbstractJournal;
+import org.jwcarman.substrate.spi.AbstractJournalSpi;
 import org.jwcarman.substrate.spi.JournalEntry;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -31,7 +31,7 @@ import org.springframework.data.mongodb.core.index.Index;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 
-public class MongoDbJournal extends AbstractJournal {
+public class MongoDbJournalSpi extends AbstractJournalSpi {
 
   private static final String FIELD_KEY = "key";
   private static final String FIELD_ENTRY_ID = "entryId";
@@ -44,7 +44,7 @@ public class MongoDbJournal extends AbstractJournal {
   private final String collectionName;
   private final Duration ttl;
 
-  public MongoDbJournal(
+  public MongoDbJournalSpi(
       MongoTemplate mongoTemplate, String prefix, String collectionName, Duration ttl) {
     super(prefix);
     this.mongoTemplate = mongoTemplate;

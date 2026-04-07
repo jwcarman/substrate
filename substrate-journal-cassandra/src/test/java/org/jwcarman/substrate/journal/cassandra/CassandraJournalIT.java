@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.journal.cassandra;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 
 import com.datastax.oss.driver.api.core.CqlSession;
 import java.net.InetSocketAddress;
@@ -30,11 +31,11 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Testcontainers
-class CassandraJournalIT {
+class CassandraJournalSpiIT {
 
   @Container static CassandraContainer cassandra = new CassandraContainer("cassandra:4.1");
 
-  private CassandraJournal journal;
+  private CassandraJournalSpi journal;
   private CqlSession session;
 
   @BeforeEach
@@ -61,7 +62,7 @@ class CassandraJournalIT {
     session.execute("TRUNCATE substrate_journal");
 
     journal =
-        new CassandraJournal(session, "substrate:journal:", "substrate_journal", Duration.ZERO);
+        new CassandraJournalSpi(session, "substrate:journal:", "substrate_journal", Duration.ZERO);
   }
 
   @Test
@@ -202,8 +203,8 @@ class CassandraJournalIT {
 
   @Test
   void appendWithTtlDoesNotError() {
-    CassandraJournal ttlJournal =
-        new CassandraJournal(
+    CassandraJournalSpi ttlJournal =
+        new CassandraJournalSpi(
             session, "substrate:journal:", "substrate_journal", Duration.ofHours(1));
 
     String key = ttlJournal.journalKey("ttl-test");
@@ -233,6 +234,6 @@ class CassandraJournalIT {
   @Test
   void schemaAutoCreationHandlesExistingTable() {
     // createSchema was already called in setUp; calling again should not throw
-    journal.createSchema();
+    assertThatNoException().isThrownBy(() -> journal.createSchema());
   }
 }

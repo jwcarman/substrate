@@ -43,7 +43,7 @@ class NatsMailboxIT {
 
   private static Connection connection;
   private NatsNotifier notifier;
-  private NatsMailbox mailbox;
+  private NatsMailboxSpi mailbox;
 
   @BeforeAll
   static void connect() throws Exception {
@@ -63,7 +63,7 @@ class NatsMailboxIT {
     notifier = new NatsNotifier(connection, "substrate:notify:");
     notifier.start();
     mailbox =
-        new NatsMailbox(
+        new NatsMailboxSpi(
             connection,
             notifier,
             "substrate:mailbox:",
@@ -97,11 +97,7 @@ class NatsMailboxIT {
     // Deliver after a short delay
     CompletableFuture.runAsync(
         () -> {
-          try {
-            Thread.sleep(200);
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-          }
+          await().pollDelay(Duration.ofMillis(200)).atMost(Duration.ofSeconds(1)).until(() -> true);
           mailbox.deliver(key, "delayed-value");
         });
 
@@ -111,7 +107,7 @@ class NatsMailboxIT {
   }
 
   @Test
-  void deleteRemovesValue() throws Exception {
+  void deleteRemovesValue() {
     String key = mailbox.mailboxKey("delete-" + System.nanoTime());
 
     mailbox.deliver(key, "to-delete");

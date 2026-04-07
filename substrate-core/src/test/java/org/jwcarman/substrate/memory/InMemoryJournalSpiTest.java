@@ -22,15 +22,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.spi.JournalEntry;
 
-class InMemoryJournalTest {
+class InMemoryJournalSpiTest {
 
   private static final String KEY = "substrate:journal:test";
 
-  private InMemoryJournal journal;
+  private InMemoryJournalSpi journal;
 
   @BeforeEach
   void setUp() {
-    journal = new InMemoryJournal(100);
+    journal = new InMemoryJournalSpi(100);
   }
 
   @Test
@@ -106,7 +106,7 @@ class InMemoryJournalTest {
 
   @Test
   void evictionRemovesOldestEntriesWhenFull() {
-    InMemoryJournal smallJournal = new InMemoryJournal(3);
+    InMemoryJournalSpi smallJournal = new InMemoryJournalSpi(3);
 
     smallJournal.append(KEY, "data1");
     smallJournal.append(KEY, "data2");

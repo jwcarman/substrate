@@ -23,8 +23,8 @@ import com.hazelcast.config.Config;
 import com.hazelcast.core.HazelcastInstance;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.memory.InMemoryJournal;
-import org.jwcarman.substrate.spi.Journal;
+import org.jwcarman.substrate.memory.InMemoryJournalSpi;
+import org.jwcarman.substrate.spi.JournalSpi;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -34,14 +34,14 @@ import tools.jackson.databind.ObjectMapper;
 class HazelcastJournalAutoConfigurationTest {
 
   @Test
-  void createsHazelcastJournalBean() {
+  void createsHazelcastJournalSpiBean() {
     new ApplicationContextRunner()
         .withConfiguration(AutoConfigurations.of(HazelcastJournalAutoConfiguration.class))
         .withUserConfiguration(MockHazelcastConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(HazelcastJournal.class);
-              assertThat(context).hasSingleBean(Journal.class);
+              assertThat(context).hasSingleBean(HazelcastJournalSpi.class);
+              assertThat(context).hasSingleBean(JournalSpi.class);
             });
   }
 
@@ -54,9 +54,9 @@ class HazelcastJournalAutoConfigurationTest {
         .withUserConfiguration(MockHazelcastConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(Journal.class);
-              assertThat(context.getBean(Journal.class)).isInstanceOf(HazelcastJournal.class);
-              assertThat(context).doesNotHaveBean(InMemoryJournal.class);
+              assertThat(context).hasSingleBean(JournalSpi.class);
+              assertThat(context.getBean(JournalSpi.class)).isInstanceOf(HazelcastJournalSpi.class);
+              assertThat(context).doesNotHaveBean(InMemoryJournalSpi.class);
             });
   }
 

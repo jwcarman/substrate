@@ -40,7 +40,7 @@ class PostgresMailboxIT {
 
   private DataSource dataSource;
   private PostgresNotifier notifier;
-  private PostgresMailbox mailbox;
+  private PostgresMailboxSpi mailbox;
   private JdbcTemplate jdbcTemplate;
 
   @BeforeEach
@@ -57,7 +57,7 @@ class PostgresMailboxIT {
     notifier = new PostgresNotifier(jdbcTemplate, dataSource, "substrate_notify", 500);
     notifier.start();
 
-    mailbox = new PostgresMailbox(jdbcTemplate, notifier, "substrate:mailbox:");
+    mailbox = new PostgresMailboxSpi(jdbcTemplate, notifier, "substrate:mailbox:");
   }
 
   @AfterEach
@@ -98,7 +98,7 @@ class PostgresMailboxIT {
     Integer count =
         jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM substrate_mailbox WHERE key = ?", Integer.class, key);
-    assertThat(count).isEqualTo(0);
+    assertThat(count).isZero();
   }
 
   @Test

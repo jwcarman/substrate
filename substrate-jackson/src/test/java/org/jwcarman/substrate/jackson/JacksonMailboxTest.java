@@ -22,18 +22,18 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.memory.InMemoryMailbox;
+import org.jwcarman.substrate.memory.InMemoryMailboxSpi;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
 class JacksonMailboxTest {
 
-  private InMemoryMailbox mailbox;
+  private InMemoryMailboxSpi mailbox;
   private JsonMapper objectMapper;
 
   @BeforeEach
   void setUp() {
-    mailbox = new InMemoryMailbox();
+    mailbox = new InMemoryMailboxSpi();
     objectMapper = JsonMapper.builder().build();
   }
 

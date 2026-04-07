@@ -33,12 +33,12 @@ import tools.jackson.databind.ObjectMapper;
 public class HazelcastJournalAutoConfiguration {
 
   @Bean
-  public HazelcastJournal hazelcastJournal(
+  public HazelcastJournalSpi hazelcastJournal(
       HazelcastInstance hazelcastInstance,
       ObjectMapper objectMapper,
       HazelcastJournalProperties properties) {
     configureRingbufferDefaults(hazelcastInstance, properties);
-    return new HazelcastJournal(
+    return new HazelcastJournalSpi(
         hazelcastInstance, objectMapper, properties.prefix(), properties.ringbufferCapacity());
   }
 

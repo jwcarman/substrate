@@ -34,16 +34,16 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
 
 @ExtendWith(MockitoExtension.class)
-class MongoDbJournalTest {
+class MongoDbJournalSpiTest {
 
   @Mock private MongoTemplate mongoTemplate;
 
-  private MongoDbJournal journal;
+  private MongoDbJournalSpi journal;
 
   @BeforeEach
   void setUp() {
     journal =
-        new MongoDbJournal(
+        new MongoDbJournalSpi(
             mongoTemplate, "substrate:journal:", "substrate_journal", Duration.ofHours(24));
   }
 
@@ -71,8 +71,9 @@ class MongoDbJournalTest {
 
   @Test
   void appendWithZeroTtlOmitsExpireAtField() {
-    MongoDbJournal noTtlJournal =
-        new MongoDbJournal(mongoTemplate, "substrate:journal:", "substrate_journal", Duration.ZERO);
+    MongoDbJournalSpi noTtlJournal =
+        new MongoDbJournalSpi(
+            mongoTemplate, "substrate:journal:", "substrate_journal", Duration.ZERO);
     noTtlJournal.append("substrate:journal:test", "data");
 
     ArgumentCaptor<Document> captor = ArgumentCaptor.forClass(Document.class);

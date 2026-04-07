@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.journal.rabbitmq;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -41,7 +42,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class RabbitMqJournalTest {
+class RabbitMqJournalSpiTest {
 
   @Mock private Environment environment;
   @Mock private StreamCreator streamCreator;
@@ -50,11 +51,12 @@ class RabbitMqJournalTest {
   @Mock private MessageBuilder messageBuilder;
   @Mock private MessageBuilder.ApplicationPropertiesBuilder appPropsBuilder;
 
-  private RabbitMqJournal journal;
+  private RabbitMqJournalSpi journal;
 
   @BeforeEach
   void setUp() {
-    journal = new RabbitMqJournal(environment, "substrate:journal:", Duration.ofHours(24), 1024L);
+    journal =
+        new RabbitMqJournalSpi(environment, "substrate:journal:", Duration.ofHours(24), 1024L);
   }
 
   @Test
@@ -118,8 +120,7 @@ class RabbitMqJournalTest {
         .when(environment)
         .deleteStream("substrate-journal-test");
 
-    journal.delete("substrate:journal:test");
-    // No exception thrown
+    assertThatNoException().isThrownBy(() -> journal.delete("substrate:journal:test"));
   }
 
   @Test

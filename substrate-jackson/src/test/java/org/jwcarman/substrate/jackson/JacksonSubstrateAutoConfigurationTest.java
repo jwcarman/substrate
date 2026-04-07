@@ -18,10 +18,10 @@ package org.jwcarman.substrate.jackson;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.memory.InMemoryJournal;
-import org.jwcarman.substrate.memory.InMemoryMailbox;
-import org.jwcarman.substrate.spi.Journal;
-import org.jwcarman.substrate.spi.Mailbox;
+import org.jwcarman.substrate.memory.InMemoryJournalSpi;
+import org.jwcarman.substrate.memory.InMemoryMailboxSpi;
+import org.jwcarman.substrate.spi.JournalSpi;
+import org.jwcarman.substrate.spi.MailboxSpi;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -101,8 +101,8 @@ class JacksonSubstrateAutoConfigurationTest {
   static class JournalAndObjectMapperConfiguration {
 
     @Bean
-    Journal journal() {
-      return new InMemoryJournal();
+    JournalSpi journal() {
+      return new InMemoryJournalSpi();
     }
 
     @Bean
@@ -115,8 +115,8 @@ class JacksonSubstrateAutoConfigurationTest {
   static class MailboxAndObjectMapperConfiguration {
 
     @Bean
-    Mailbox mailbox() {
-      return new InMemoryMailbox();
+    MailboxSpi mailbox() {
+      return new InMemoryMailboxSpi();
     }
 
     @Bean
@@ -138,13 +138,13 @@ class JacksonSubstrateAutoConfigurationTest {
   static class JournalAndMailboxOnlyConfiguration {
 
     @Bean
-    Journal journal() {
-      return new InMemoryJournal();
+    JournalSpi journal() {
+      return new InMemoryJournalSpi();
     }
 
     @Bean
-    Mailbox mailbox() {
-      return new InMemoryMailbox();
+    MailboxSpi mailbox() {
+      return new InMemoryMailboxSpi();
     }
   }
 
@@ -152,13 +152,13 @@ class JacksonSubstrateAutoConfigurationTest {
   static class AllBeansConfiguration {
 
     @Bean
-    Journal journal() {
-      return new InMemoryJournal();
+    JournalSpi journal() {
+      return new InMemoryJournalSpi();
     }
 
     @Bean
-    Mailbox mailbox() {
-      return new InMemoryMailbox();
+    MailboxSpi mailbox() {
+      return new InMemoryMailboxSpi();
     }
 
     @Bean

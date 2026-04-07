@@ -34,7 +34,7 @@ import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 public class PostgresMailboxAutoConfiguration {
 
   @Bean
-  public PostgresMailbox postgresMailbox(
+  public PostgresMailboxSpi postgresMailbox(
       DataSource dataSource, Notifier notifier, PostgresMailboxProperties properties) {
     if (properties.autoCreateSchema()) {
       ResourceDatabasePopulator populator = new ResourceDatabasePopulator();
@@ -43,6 +43,6 @@ public class PostgresMailboxAutoConfiguration {
     }
 
     JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
-    return new PostgresMailbox(jdbcTemplate, notifier, properties.prefix());
+    return new PostgresMailboxSpi(jdbcTemplate, notifier, properties.prefix());
   }
 }

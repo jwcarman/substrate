@@ -40,7 +40,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class NatsJournalTest {
+class NatsJournalSpiTest {
 
   @Mock private Connection connection;
   @Mock private JetStream jetStream;
@@ -53,7 +53,7 @@ class NatsJournalTest {
     when(jetStream.publish(any(NatsMessage.class))).thenReturn(publishAck);
     when(publishAck.getSeqno()).thenReturn(42L);
 
-    NatsJournal journal = createJournal();
+    NatsJournalSpi journal = createJournal();
     String id = journal.append("substrate:journal:test", "hello");
 
     assertThat(id).isEqualTo("42");
@@ -64,7 +64,7 @@ class NatsJournalTest {
     wireConnectionForConstruction();
     when(jetStream.publish(any(NatsMessage.class))).thenThrow(new IOException("write failed"));
 
-    NatsJournal journal = createJournal();
+    NatsJournalSpi journal = createJournal();
     assertThatThrownBy(() -> journal.append("substrate:journal:test", "data"))
         .isInstanceOf(UncheckedIOException.class);
   }
@@ -73,7 +73,7 @@ class NatsJournalTest {
   void journalKeyUsesConfiguredPrefix() throws Exception {
     wireConnectionForConstruction();
 
-    NatsJournal journal = createJournal();
+    NatsJournalSpi journal = createJournal();
     assertThat(journal.journalKey("my-stream")).isEqualTo("substrate:journal:my-stream");
   }
 
@@ -85,7 +85,7 @@ class NatsJournalTest {
     when(jsm.addStream(any(StreamConfiguration.class))).thenThrow(existsException);
     when(jsm.updateStream(any(StreamConfiguration.class))).thenReturn(null);
 
-    NatsJournal journal = createJournal();
+    NatsJournalSpi journal = createJournal();
     assertThat(journal).isNotNull();
     verify(jsm).updateStream(any(StreamConfiguration.class));
   }
@@ -103,8 +103,8 @@ class NatsJournalTest {
     lenient().when(jsm.addStream(any(StreamConfiguration.class))).thenReturn(null);
   }
 
-  private NatsJournal createJournal() {
-    return new NatsJournal(
+  private NatsJournalSpi createJournal() {
+    return new NatsJournalSpi(
         connection, "substrate:journal:", "substrate-journal", Duration.ofHours(24), 100000);
   }
 

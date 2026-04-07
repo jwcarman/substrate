@@ -15,30 +15,15 @@
  */
 package org.jwcarman.substrate.spi;
 
-import com.fasterxml.uuid.Generators;
-import com.fasterxml.uuid.impl.TimeBasedEpochGenerator;
+import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
 
-public abstract class AbstractJournal implements Journal {
+public interface MailboxSpi {
+  void deliver(String key, String value);
 
-  private static final TimeBasedEpochGenerator UUID_GENERATOR =
-      Generators.timeBasedEpochGenerator();
+  CompletableFuture<String> await(String key, Duration timeout);
 
-  private final String prefix;
+  void delete(String key);
 
-  protected AbstractJournal(String prefix) {
-    this.prefix = prefix;
-  }
-
-  protected String prefix() {
-    return prefix;
-  }
-
-  @Override
-  public String journalKey(String name) {
-    return prefix + name;
-  }
-
-  protected String generateEntryId() {
-    return UUID_GENERATOR.generate().toString();
-  }
+  String mailboxKey(String name);
 }

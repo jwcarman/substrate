@@ -30,10 +30,10 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 public class DynamoDbJournalAutoConfiguration {
 
   @Bean
-  public DynamoDbJournal dynamoDbJournal(
+  public DynamoDbJournalSpi dynamoDbJournal(
       DynamoDbClient dynamoDbClient, DynamoDbJournalProperties properties) {
-    DynamoDbJournal journal =
-        new DynamoDbJournal(
+    DynamoDbJournalSpi journal =
+        new DynamoDbJournalSpi(
             dynamoDbClient, properties.prefix(), properties.tableName(), properties.ttl());
 
     if (properties.autoCreateTable()) {

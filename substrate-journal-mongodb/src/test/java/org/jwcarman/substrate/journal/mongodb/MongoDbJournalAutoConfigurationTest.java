@@ -22,8 +22,8 @@ import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.memory.InMemoryJournal;
-import org.jwcarman.substrate.spi.Journal;
+import org.jwcarman.substrate.memory.InMemoryJournalSpi;
+import org.jwcarman.substrate.spi.JournalSpi;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -34,14 +34,14 @@ import org.springframework.data.mongodb.core.index.IndexOperations;
 class MongoDbJournalAutoConfigurationTest {
 
   @Test
-  void createsMongoDbJournalBean() {
+  void createsMongoDbJournalSpiBean() {
     new ApplicationContextRunner()
         .withConfiguration(AutoConfigurations.of(MongoDbJournalAutoConfiguration.class))
         .withUserConfiguration(MockMongoConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(MongoDbJournal.class);
-              assertThat(context).hasSingleBean(Journal.class);
+              assertThat(context).hasSingleBean(MongoDbJournalSpi.class);
+              assertThat(context).hasSingleBean(JournalSpi.class);
             });
   }
 
@@ -54,9 +54,9 @@ class MongoDbJournalAutoConfigurationTest {
         .withUserConfiguration(MockMongoConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(Journal.class);
-              assertThat(context.getBean(Journal.class)).isInstanceOf(MongoDbJournal.class);
-              assertThat(context).doesNotHaveBean(InMemoryJournal.class);
+              assertThat(context).hasSingleBean(JournalSpi.class);
+              assertThat(context.getBean(JournalSpi.class)).isInstanceOf(MongoDbJournalSpi.class);
+              assertThat(context).doesNotHaveBean(InMemoryJournalSpi.class);
             });
   }
 

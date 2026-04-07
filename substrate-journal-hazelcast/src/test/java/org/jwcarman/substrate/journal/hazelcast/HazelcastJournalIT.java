@@ -28,10 +28,10 @@ import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.spi.JournalEntry;
 import tools.jackson.databind.ObjectMapper;
 
-class HazelcastJournalIT {
+class HazelcastJournalSpiIT {
 
   private static HazelcastInstance hazelcast;
-  private HazelcastJournal journal;
+  private HazelcastJournalSpi journal;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   @BeforeAll
@@ -51,7 +51,7 @@ class HazelcastJournalIT {
 
   @BeforeEach
   void setUp() {
-    journal = new HazelcastJournal(hazelcast, objectMapper, "substrate:journal:", 1000);
+    journal = new HazelcastJournalSpi(hazelcast, objectMapper, "substrate:journal:", 1000);
   }
 
   @Test

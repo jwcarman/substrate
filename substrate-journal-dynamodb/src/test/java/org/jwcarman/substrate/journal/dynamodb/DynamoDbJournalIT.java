@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.journal.dynamodb;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 
 import java.time.Duration;
 import java.util.List;
@@ -34,14 +35,14 @@ import software.amazon.awssdk.services.dynamodb.model.DeleteTableRequest;
 import software.amazon.awssdk.services.dynamodb.model.ResourceNotFoundException;
 
 @Testcontainers
-class DynamoDbJournalIT {
+class DynamoDbJournalSpiIT {
 
   @Container
   static LocalStackContainer localstack =
       new LocalStackContainer(DockerImageName.parse("localstack/localstack:3.8"))
           .withServices("dynamodb");
 
-  private DynamoDbJournal journal;
+  private DynamoDbJournalSpi journal;
   private DynamoDbClient client;
 
   @BeforeEach
@@ -63,7 +64,7 @@ class DynamoDbJournalIT {
     }
 
     journal =
-        new DynamoDbJournal(
+        new DynamoDbJournalSpi(
             client, "substrate:journal:", "substrate_journal", Duration.ofHours(24));
     journal.createTable();
   }
@@ -222,7 +223,7 @@ class DynamoDbJournalIT {
   @Test
   void tableAutoCreationHandlesExistingTable() {
     // createTable was already called in setUp; calling again should not throw
-    journal.createTable();
+    assertThatNoException().isThrownBy(() -> journal.createTable());
   }
 
   @Test

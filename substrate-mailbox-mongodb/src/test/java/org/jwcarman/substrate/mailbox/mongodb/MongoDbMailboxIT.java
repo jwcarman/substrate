@@ -38,7 +38,7 @@ class MongoDbMailboxIT {
 
   @Container static MongoDBContainer mongo = new MongoDBContainer(DockerImageName.parse("mongo:7"));
 
-  private MongoDbMailbox mailbox;
+  private MongoDbMailboxSpi mailbox;
   private Notifier notifier;
 
   @BeforeEach
@@ -50,7 +50,7 @@ class MongoDbMailboxIT {
 
     notifier = new InMemoryNotifier();
     mailbox =
-        new MongoDbMailbox(
+        new MongoDbMailboxSpi(
             mongoTemplate,
             notifier,
             "substrate:mailbox:",
@@ -77,11 +77,7 @@ class MongoDbMailboxIT {
 
     CompletableFuture.runAsync(
         () -> {
-          try {
-            Thread.sleep(200);
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-          }
+          await().pollDelay(Duration.ofMillis(200)).atMost(Duration.ofSeconds(1)).until(() -> true);
           mailbox.deliver(key, "delayed-value");
         });
 
@@ -91,7 +87,7 @@ class MongoDbMailboxIT {
   }
 
   @Test
-  void deleteRemovesValue() throws Exception {
+  void deleteRemovesValue() {
     String key = mailbox.mailboxKey("delete-" + System.nanoTime());
 
     mailbox.deliver(key, "to-delete");

@@ -24,16 +24,16 @@ import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import org.jwcarman.substrate.spi.AbstractMailbox;
+import org.jwcarman.substrate.spi.AbstractMailboxSpi;
 import org.jwcarman.substrate.spi.Notifier;
 
-public class HazelcastMailbox extends AbstractMailbox {
+public class HazelcastMailboxSpi extends AbstractMailboxSpi {
 
   private final IMap<String, String> map;
   private final Notifier notifier;
   private final Duration defaultTtl;
 
-  public HazelcastMailbox(
+  public HazelcastMailboxSpi(
       HazelcastInstance hazelcastInstance,
       Notifier notifier,
       String prefix,

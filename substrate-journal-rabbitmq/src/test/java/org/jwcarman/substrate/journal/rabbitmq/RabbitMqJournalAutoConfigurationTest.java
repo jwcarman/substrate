@@ -21,8 +21,8 @@ import static org.mockito.Mockito.mock;
 import com.rabbitmq.stream.Environment;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.memory.InMemoryJournal;
-import org.jwcarman.substrate.spi.Journal;
+import org.jwcarman.substrate.memory.InMemoryJournalSpi;
+import org.jwcarman.substrate.spi.JournalSpi;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -31,14 +31,14 @@ import org.springframework.context.annotation.Configuration;
 class RabbitMqJournalAutoConfigurationTest {
 
   @Test
-  void createsRabbitMqJournalBean() {
+  void createsRabbitMqJournalSpiBean() {
     new ApplicationContextRunner()
         .withConfiguration(AutoConfigurations.of(RabbitMqJournalAutoConfiguration.class))
         .withUserConfiguration(MockRabbitMqConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(RabbitMqJournal.class);
-              assertThat(context).hasSingleBean(Journal.class);
+              assertThat(context).hasSingleBean(RabbitMqJournalSpi.class);
+              assertThat(context).hasSingleBean(JournalSpi.class);
             });
   }
 
@@ -51,9 +51,9 @@ class RabbitMqJournalAutoConfigurationTest {
         .withUserConfiguration(MockRabbitMqConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(Journal.class);
-              assertThat(context.getBean(Journal.class)).isInstanceOf(RabbitMqJournal.class);
-              assertThat(context).doesNotHaveBean(InMemoryJournal.class);
+              assertThat(context).hasSingleBean(JournalSpi.class);
+              assertThat(context.getBean(JournalSpi.class)).isInstanceOf(RabbitMqJournalSpi.class);
+              assertThat(context).doesNotHaveBean(InMemoryJournalSpi.class);
             });
   }
 

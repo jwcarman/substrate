@@ -24,15 +24,15 @@ import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-class InMemoryMailboxTest {
+class InMemoryMailboxSpiTest {
 
   private static final String KEY = "substrate:mailbox:test";
 
-  private InMemoryMailbox mailbox;
+  private InMemoryMailboxSpi mailbox;
 
   @BeforeEach
   void setUp() {
-    mailbox = new InMemoryMailbox();
+    mailbox = new InMemoryMailboxSpi();
   }
 
   @Test

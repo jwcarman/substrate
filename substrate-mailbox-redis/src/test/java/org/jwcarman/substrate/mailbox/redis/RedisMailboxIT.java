@@ -42,7 +42,7 @@ class RedisMailboxIT {
 
   private RedisClient client;
   private RedisNotifier notifier;
-  private RedisMailbox mailbox;
+  private RedisMailboxSpi mailbox;
 
   @BeforeEach
   void setUp() {
@@ -61,7 +61,7 @@ class RedisMailboxIT {
     notifier.start();
 
     RedisCommands<String, String> commands = client.connect(StringCodec.UTF8).sync();
-    mailbox = new RedisMailbox(commands, notifier, "substrate:mailbox:", Duration.ofMinutes(5));
+    mailbox = new RedisMailboxSpi(commands, notifier, "substrate:mailbox:", Duration.ofMinutes(5));
   }
 
   @AfterEach

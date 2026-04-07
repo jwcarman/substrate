@@ -32,14 +32,14 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Testcontainers
-class NatsJournalIT {
+class NatsJournalSpiIT {
 
   @Container
   private static final GenericContainer<?> NATS =
       new GenericContainer<>("nats:latest").withCommand("--jetstream").withExposedPorts(4222);
 
   private static Connection connection;
-  private NatsJournal journal;
+  private NatsJournalSpi journal;
 
   @BeforeAll
   static void connect() throws Exception {
@@ -57,7 +57,7 @@ class NatsJournalIT {
   @BeforeEach
   void setUp() {
     journal =
-        new NatsJournal(
+        new NatsJournalSpi(
             connection, "substrate:journal:", "substrate-journal", Duration.ofHours(1), 100000);
   }
 

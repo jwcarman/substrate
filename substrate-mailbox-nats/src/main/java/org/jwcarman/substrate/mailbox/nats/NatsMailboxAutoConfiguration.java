@@ -31,9 +31,9 @@ import org.springframework.context.annotation.PropertySource;
 public class NatsMailboxAutoConfiguration {
 
   @Bean
-  public NatsMailbox natsMailbox(
+  public NatsMailboxSpi natsMailbox(
       Connection connection, Notifier notifier, NatsMailboxProperties properties) {
-    return new NatsMailbox(
+    return new NatsMailboxSpi(
         connection,
         notifier,
         properties.prefix(),

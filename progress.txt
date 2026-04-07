@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-07T13:37:00Z
-ITERATION: 11
-SPEC_COMPLETED: 011-substrate-jackson.md
-WHAT_WAS_DONE: Implemented substrate-jackson module with typed JacksonJournal<T> and JacksonMailbox<T> wrappers using Jackson 3 (tools.jackson) serialization, factory classes with Class<T> and TypeReference<T> support, and Spring Boot auto-configuration
-VERIFICATION: ./mvnw spotless:check — passed; ./mvnw verify — BUILD SUCCESS (all 23 modules pass; substrate-jackson: 22 unit tests — 8 journal, 4 mailbox, 2 journal factory, 2 mailbox factory, 6 auto-config)
-STATUS: DONE
-NEXT_SPEC: none
-NOTES: Existing scaffolded code used Jackson 2 (com.fasterxml.jackson) packages — rewrote to Jackson 3 (tools.jackson) which Spring Boot 4.0.5 ships (jackson-bom 3.1.0). Jackson 3's JacksonException is unchecked (extends RuntimeException), so no try/catch wrapping needed — cleaner API. Maven dependency changed from com.fasterxml.jackson.core:jackson-databind to tools.jackson.core:jackson-databind. ObjectMapper.constructType() used directly instead of getTypeFactory().constructType(). Module added to parent POM and BOM. InMemoryJournal/InMemoryMailbox have no-arg constructors (no Notifier param needed for tests).
+LAST_RUN: 2026-04-07T14:08:00Z
+ITERATION: 12
+SPEC_COMPLETED: 011-spi-refactor.md
+WHAT_WAS_DONE: Refactored substrate-core to separate backend SPI (key-based) from consumer-facing API (key-bound), added factories
+VERIFICATION: ./mvnw spotless:check — passed; ./mvnw verify — BUILD SUCCESS (all 23 modules pass)
+STATUS: MORE_WORK
+NEXT_SPEC: 012-substrate-jackson.md
+NOTES: Renamed Journal→JournalSpi, Mailbox→MailboxSpi, AbstractJournal→AbstractJournalSpi, AbstractMailbox→AbstractMailboxSpi in spi package. Created consumer-facing Journal/Mailbox interfaces in core package with DefaultJournal/DefaultMailbox delegation wrappers. Added JournalFactory/MailboxFactory in core package. Renamed InMemoryJournal→InMemoryJournalSpi, InMemoryMailbox→InMemoryMailboxSpi. All 14 backend implementations renamed (8 journal + 6 mailbox) with Spi suffix. Notifier stays unchanged (no separate SPI). SubstrateAutoConfiguration updated with JournalSpi/MailboxSpi types and new JournalFactory/MailboxFactory beans. substrate-jackson updated to use JournalSpi/MailboxSpi. New unit tests added for DefaultJournal, DefaultMailbox, JournalFactory, MailboxFactory.

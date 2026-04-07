@@ -15,16 +15,16 @@
  */
 package org.jwcarman.substrate.jackson;
 
-import org.jwcarman.substrate.spi.Mailbox;
+import org.jwcarman.substrate.spi.MailboxSpi;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
 public class JacksonMailboxFactory {
 
-  private final Mailbox mailbox;
+  private final MailboxSpi mailbox;
   private final ObjectMapper objectMapper;
 
-  public JacksonMailboxFactory(Mailbox mailbox, ObjectMapper objectMapper) {
+  public JacksonMailboxFactory(MailboxSpi mailbox, ObjectMapper objectMapper) {
     this.mailbox = mailbox;
     this.objectMapper = objectMapper;
   }

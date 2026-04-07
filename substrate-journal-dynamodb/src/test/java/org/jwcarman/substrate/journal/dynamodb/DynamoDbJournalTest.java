@@ -36,16 +36,16 @@ import software.amazon.awssdk.services.dynamodb.model.QueryRequest;
 import software.amazon.awssdk.services.dynamodb.model.QueryResponse;
 
 @ExtendWith(MockitoExtension.class)
-class DynamoDbJournalTest {
+class DynamoDbJournalSpiTest {
 
   @Mock private DynamoDbClient client;
 
-  private DynamoDbJournal journal;
+  private DynamoDbJournalSpi journal;
 
   @BeforeEach
   void setUp() {
     journal =
-        new DynamoDbJournal(
+        new DynamoDbJournalSpi(
             client, "substrate:journal:", "substrate_journal", Duration.ofHours(24));
   }
 
@@ -76,8 +76,8 @@ class DynamoDbJournalTest {
 
   @Test
   void appendWithNullTtlOmitsTtlField() {
-    DynamoDbJournal noTtlJournal =
-        new DynamoDbJournal(client, "substrate:journal:", "substrate_journal", Duration.ZERO);
+    DynamoDbJournalSpi noTtlJournal =
+        new DynamoDbJournalSpi(client, "substrate:journal:", "substrate_journal", Duration.ZERO);
     noTtlJournal.append("substrate:journal:test", "data");
 
     ArgumentCaptor<PutItemRequest> captor = ArgumentCaptor.forClass(PutItemRequest.class);

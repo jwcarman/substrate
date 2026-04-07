@@ -31,12 +31,12 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Testcontainers
-class PostgresJournalIT {
+class PostgresJournalSpiIT {
 
   @Container
   static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
 
-  private PostgresJournal journal;
+  private PostgresJournalSpi journal;
   private JdbcTemplate jdbcTemplate;
 
   @BeforeEach
@@ -51,7 +51,7 @@ class PostgresJournalIT {
     jdbcTemplate.update("DELETE FROM substrate_journal_entries");
     jdbcTemplate.update("DELETE FROM substrate_journal_completed");
 
-    journal = new PostgresJournal(jdbcTemplate, "substrate:journal:", 100_000);
+    journal = new PostgresJournalSpi(jdbcTemplate, "substrate:journal:", 100_000);
   }
 
   @Test
@@ -124,7 +124,7 @@ class PostgresJournalIT {
     Integer count =
         jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM substrate_journal_completed WHERE key = ?", Integer.class, key);
-    assertThat(count).isEqualTo(0);
+    assertThat(count).isZero();
   }
 
   @Test
@@ -157,7 +157,7 @@ class PostgresJournalIT {
 
   @Test
   void trimRemovesOldEntriesWhenExceedingMaxLen() {
-    PostgresJournal smallJournal = new PostgresJournal(jdbcTemplate, "substrate:journal:", 5);
+    PostgresJournalSpi smallJournal = new PostgresJournalSpi(jdbcTemplate, "substrate:journal:", 5);
 
     String key = smallJournal.journalKey("trim-test");
     for (int i = 0; i < 10; i++) {

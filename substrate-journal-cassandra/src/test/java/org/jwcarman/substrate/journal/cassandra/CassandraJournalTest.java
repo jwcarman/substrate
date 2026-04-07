@@ -41,14 +41,14 @@ import org.mockito.quality.Strictness;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class CassandraJournalTest {
+class CassandraJournalSpiTest {
 
   @Mock private CqlSession session;
   @Mock private PreparedStatement preparedStatement;
   @Mock private BoundStatement boundStatement;
   @Mock private ResultSet resultSet;
 
-  private CassandraJournal journal;
+  private CassandraJournalSpi journal;
 
   @BeforeEach
   void setUp() {
@@ -57,7 +57,7 @@ class CassandraJournalTest {
     when(session.execute(any(BoundStatement.class))).thenReturn(resultSet);
 
     journal =
-        new CassandraJournal(
+        new CassandraJournalSpi(
             session, "substrate:journal:", "substrate_journal", Duration.ofHours(24));
   }
 
@@ -79,8 +79,8 @@ class CassandraJournalTest {
 
   @Test
   void appendWithZeroTtlUsesInsertWithoutTtl() {
-    CassandraJournal noTtlJournal =
-        new CassandraJournal(session, "substrate:journal:", "substrate_journal", Duration.ZERO);
+    CassandraJournalSpi noTtlJournal =
+        new CassandraJournalSpi(session, "substrate:journal:", "substrate_journal", Duration.ZERO);
 
     noTtlJournal.append("substrate:journal:test", "data");
 

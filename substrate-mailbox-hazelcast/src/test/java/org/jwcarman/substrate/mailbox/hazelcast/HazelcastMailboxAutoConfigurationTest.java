@@ -24,8 +24,8 @@ import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.map.IMap;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.memory.InMemoryMailbox;
-import org.jwcarman.substrate.spi.Mailbox;
+import org.jwcarman.substrate.memory.InMemoryMailboxSpi;
+import org.jwcarman.substrate.spi.MailboxSpi;
 import org.jwcarman.substrate.spi.Notifier;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -35,14 +35,14 @@ import org.springframework.context.annotation.Configuration;
 class HazelcastMailboxAutoConfigurationTest {
 
   @Test
-  void createsHazelcastMailboxBean() {
+  void createsHazelcastMailboxSpiBean() {
     new ApplicationContextRunner()
         .withConfiguration(AutoConfigurations.of(HazelcastMailboxAutoConfiguration.class))
         .withUserConfiguration(MockHazelcastConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(HazelcastMailbox.class);
-              assertThat(context).hasSingleBean(Mailbox.class);
+              assertThat(context).hasSingleBean(HazelcastMailboxSpi.class);
+              assertThat(context).hasSingleBean(MailboxSpi.class);
             });
   }
 
@@ -55,9 +55,9 @@ class HazelcastMailboxAutoConfigurationTest {
         .withUserConfiguration(MockHazelcastConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(Mailbox.class);
-              assertThat(context.getBean(Mailbox.class)).isInstanceOf(HazelcastMailbox.class);
-              assertThat(context).doesNotHaveBean(InMemoryMailbox.class);
+              assertThat(context).hasSingleBean(MailboxSpi.class);
+              assertThat(context.getBean(MailboxSpi.class)).isInstanceOf(HazelcastMailboxSpi.class);
+              assertThat(context).doesNotHaveBean(InMemoryMailboxSpi.class);
             });
   }
 

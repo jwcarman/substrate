@@ -22,11 +22,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
-import org.jwcarman.substrate.spi.AbstractJournal;
+import org.jwcarman.substrate.spi.AbstractJournalSpi;
 import org.jwcarman.substrate.spi.JournalEntry;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-public class PostgresJournal extends AbstractJournal {
+public class PostgresJournalSpi extends AbstractJournalSpi {
 
   private static final int TRIM_INTERVAL = 100;
 
@@ -34,7 +34,7 @@ public class PostgresJournal extends AbstractJournal {
   private final long maxLen;
   private final AtomicLong appendCounter = new AtomicLong(0);
 
-  public PostgresJournal(JdbcTemplate jdbcTemplate, String prefix, long maxLen) {
+  public PostgresJournalSpi(JdbcTemplate jdbcTemplate, String prefix, long maxLen) {
     super(prefix);
     this.jdbcTemplate = jdbcTemplate;
     this.maxLen = maxLen;

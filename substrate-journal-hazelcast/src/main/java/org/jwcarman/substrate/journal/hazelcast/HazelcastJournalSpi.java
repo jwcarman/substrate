@@ -23,11 +23,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
-import org.jwcarman.substrate.spi.AbstractJournal;
+import org.jwcarman.substrate.spi.AbstractJournalSpi;
 import org.jwcarman.substrate.spi.JournalEntry;
 import tools.jackson.databind.ObjectMapper;
 
-public class HazelcastJournal extends AbstractJournal {
+public class HazelcastJournalSpi extends AbstractJournalSpi {
 
   private static final String COMPLETED_MAP_NAME = "substrate-journal-completed";
 
@@ -35,7 +35,7 @@ public class HazelcastJournal extends AbstractJournal {
   private final ObjectMapper objectMapper;
   private final int batchSize;
 
-  public HazelcastJournal(
+  public HazelcastJournalSpi(
       HazelcastInstance hazelcast, ObjectMapper objectMapper, String prefix, int batchSize) {
     super(prefix);
     this.hazelcast = hazelcast;
@@ -83,7 +83,7 @@ public class HazelcastJournal extends AbstractJournal {
         entries.add(deserialize(json, key, String.valueOf(readFrom + i)));
       }
       return entries.stream();
-    } catch (Exception e) {
+    } catch (Exception _) {
       return Stream.empty();
     }
   }
@@ -114,7 +114,7 @@ public class HazelcastJournal extends AbstractJournal {
         entries.add(deserialize(json, key, String.valueOf(startSequence + i)));
       }
       return entries.stream();
-    } catch (Exception e) {
+    } catch (Exception _) {
       return Stream.empty();
     }
   }

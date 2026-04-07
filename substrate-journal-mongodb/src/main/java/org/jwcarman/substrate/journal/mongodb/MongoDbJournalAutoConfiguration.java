@@ -31,10 +31,10 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 public class MongoDbJournalAutoConfiguration {
 
   @Bean
-  public MongoDbJournal mongoDbJournal(
+  public MongoDbJournalSpi mongoDbJournal(
       MongoTemplate mongoTemplate, MongoDbJournalProperties properties) {
-    MongoDbJournal journal =
-        new MongoDbJournal(
+    MongoDbJournalSpi journal =
+        new MongoDbJournalSpi(
             mongoTemplate, properties.prefix(), properties.collectionName(), properties.ttl());
 
     journal.ensureIndexes();

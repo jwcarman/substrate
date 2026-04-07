@@ -23,7 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
-import org.jwcarman.substrate.spi.AbstractJournal;
+import org.jwcarman.substrate.spi.AbstractJournalSpi;
 import org.jwcarman.substrate.spi.JournalEntry;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
@@ -36,7 +36,7 @@ import software.amazon.awssdk.services.dynamodb.model.ResourceInUseException;
 import software.amazon.awssdk.services.dynamodb.model.ScalarAttributeType;
 import software.amazon.awssdk.services.dynamodb.model.WriteRequest;
 
-public class DynamoDbJournal extends AbstractJournal {
+public class DynamoDbJournalSpi extends AbstractJournalSpi {
 
   private static final int BATCH_DELETE_SIZE = 25;
   private static final String FIELD_KEY = "key";
@@ -50,7 +50,7 @@ public class DynamoDbJournal extends AbstractJournal {
   private final String tableName;
   private final Duration ttl;
 
-  public DynamoDbJournal(DynamoDbClient client, String prefix, String tableName, Duration ttl) {
+  public DynamoDbJournalSpi(DynamoDbClient client, String prefix, String tableName, Duration ttl) {
     super(prefix);
     this.client = client;
     this.tableName = tableName;

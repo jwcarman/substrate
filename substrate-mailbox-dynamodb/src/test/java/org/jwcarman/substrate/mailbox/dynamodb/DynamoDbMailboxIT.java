@@ -44,7 +44,7 @@ class DynamoDbMailboxIT {
       new LocalStackContainer(DockerImageName.parse("localstack/localstack:3.8"))
           .withServices("dynamodb");
 
-  private DynamoDbMailbox mailbox;
+  private DynamoDbMailboxSpi mailbox;
   private Notifier notifier;
 
   @BeforeEach
@@ -67,7 +67,7 @@ class DynamoDbMailboxIT {
 
     notifier = new InMemoryNotifier();
     mailbox =
-        new DynamoDbMailbox(
+        new DynamoDbMailboxSpi(
             client, notifier, "substrate:mailbox:", "substrate_mailbox", Duration.ofMinutes(5));
     mailbox.createTable();
   }
@@ -90,11 +90,7 @@ class DynamoDbMailboxIT {
 
     CompletableFuture.runAsync(
         () -> {
-          try {
-            Thread.sleep(200);
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-          }
+          await().pollDelay(Duration.ofMillis(200)).atMost(Duration.ofSeconds(1)).until(() -> true);
           mailbox.deliver(key, "delayed-value");
         });
 
@@ -104,7 +100,7 @@ class DynamoDbMailboxIT {
   }
 
   @Test
-  void deleteRemovesValue() throws Exception {
+  void deleteRemovesValue() {
     String key = mailbox.mailboxKey("delete-" + System.nanoTime());
 
     mailbox.deliver(key, "to-delete");

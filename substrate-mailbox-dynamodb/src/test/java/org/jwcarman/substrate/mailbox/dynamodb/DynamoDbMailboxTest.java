@@ -42,12 +42,12 @@ class DynamoDbMailboxTest {
   @Mock private DynamoDbClient client;
   @Mock private Notifier notifier;
 
-  private DynamoDbMailbox mailbox;
+  private DynamoDbMailboxSpi mailbox;
 
   @BeforeEach
   void setUp() {
     mailbox =
-        new DynamoDbMailbox(
+        new DynamoDbMailboxSpi(
             client, notifier, "substrate:mailbox:", "substrate_mailbox", Duration.ofMinutes(5));
   }
 

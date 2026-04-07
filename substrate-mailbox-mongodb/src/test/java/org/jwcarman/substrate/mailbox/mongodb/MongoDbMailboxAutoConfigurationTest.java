@@ -22,8 +22,8 @@ import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.memory.InMemoryMailbox;
-import org.jwcarman.substrate.spi.Mailbox;
+import org.jwcarman.substrate.memory.InMemoryMailboxSpi;
+import org.jwcarman.substrate.spi.MailboxSpi;
 import org.jwcarman.substrate.spi.Notifier;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -35,14 +35,14 @@ import org.springframework.data.mongodb.core.index.IndexOperations;
 class MongoDbMailboxAutoConfigurationTest {
 
   @Test
-  void createsMongoDbMailboxBean() {
+  void createsMongoDbMailboxSpiBean() {
     new ApplicationContextRunner()
         .withConfiguration(AutoConfigurations.of(MongoDbMailboxAutoConfiguration.class))
         .withUserConfiguration(MockMongoConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(MongoDbMailbox.class);
-              assertThat(context).hasSingleBean(Mailbox.class);
+              assertThat(context).hasSingleBean(MongoDbMailboxSpi.class);
+              assertThat(context).hasSingleBean(MailboxSpi.class);
             });
   }
 
@@ -55,9 +55,9 @@ class MongoDbMailboxAutoConfigurationTest {
         .withUserConfiguration(MockMongoConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(Mailbox.class);
-              assertThat(context.getBean(Mailbox.class)).isInstanceOf(MongoDbMailbox.class);
-              assertThat(context).doesNotHaveBean(InMemoryMailbox.class);
+              assertThat(context).hasSingleBean(MailboxSpi.class);
+              assertThat(context.getBean(MailboxSpi.class)).isInstanceOf(MongoDbMailboxSpi.class);
+              assertThat(context).doesNotHaveBean(InMemoryMailboxSpi.class);
             });
   }
 

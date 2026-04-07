@@ -13,110 +13,68 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.substrate.mailbox.mongodb;
+package org.jwcarman.substrate.mailbox.redis;
 
+import io.lettuce.core.SetArgs;
+import io.lettuce.core.api.sync.RedisCommands;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
-import org.bson.Document;
-import org.jwcarman.substrate.spi.AbstractMailbox;
+import org.jwcarman.substrate.spi.AbstractMailboxSpi;
 import org.jwcarman.substrate.spi.Notifier;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.index.Index;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.mongodb.core.query.Update;
 
-public class MongoDbMailbox extends AbstractMailbox {
+public class RedisMailboxSpi extends AbstractMailboxSpi {
 
-  private static final String FIELD_KEY = "key";
-  private static final String FIELD_VALUE = "value";
-  private static final String FIELD_EXPIRE_AT = "expireAt";
-
-  private final MongoTemplate mongoTemplate;
+  private final RedisCommands<String, String> commands;
   private final Notifier notifier;
-  private final String collectionName;
   private final Duration defaultTtl;
   private final ConcurrentMap<String, CompletableFuture<String>> pending =
       new ConcurrentHashMap<>();
 
-  public MongoDbMailbox(
-      MongoTemplate mongoTemplate,
+  public RedisMailboxSpi(
+      RedisCommands<String, String> commands,
       Notifier notifier,
       String prefix,
-      String collectionName,
       Duration defaultTtl) {
     super(prefix);
-    this.mongoTemplate = mongoTemplate;
+    this.commands = commands;
     this.notifier = notifier;
-    this.collectionName = collectionName;
     this.defaultTtl = defaultTtl;
     this.notifier.subscribe(this::onNotification);
   }
 
-  public void ensureIndexes() {
-    var indexOps = mongoTemplate.indexOps(collectionName);
-
-    indexOps.createIndex(new Index().on(FIELD_KEY, Sort.Direction.ASC).unique());
-
-    if (!defaultTtl.isZero()) {
-      indexOps.createIndex(new Index().on(FIELD_EXPIRE_AT, Sort.Direction.ASC).expire(0));
-    }
-  }
-
   @Override
   public void deliver(String key, String value) {
-    Query query = new Query(Criteria.where(FIELD_KEY).is(key));
-    Update update = new Update().set(FIELD_VALUE, value);
-
-    if (!defaultTtl.isZero()) {
-      update.set(FIELD_EXPIRE_AT, Instant.now().plus(defaultTtl));
-    }
-
-    mongoTemplate.upsert(query, update, collectionName);
+    SetArgs setArgs = SetArgs.Builder.ex(defaultTtl.toSeconds());
+    commands.set(key, value, setArgs);
     notifier.notify(key, value);
   }
 
   @Override
   public CompletableFuture<String> await(String key, Duration timeout) {
-    String existing = getValueFromMongo(key);
+    String existing = commands.get(key);
     if (existing != null) {
       return CompletableFuture.completedFuture(existing);
     }
-
     CompletableFuture<String> future = pending.computeIfAbsent(key, k -> new CompletableFuture<>());
-
     // Double-check in case deliver() was called between our get and computeIfAbsent
-    String deliveredAfter = getValueFromMongo(key);
+    String deliveredAfter = commands.get(key);
     if (deliveredAfter != null) {
       future.complete(deliveredAfter);
       pending.remove(key);
     }
-
     return future.orTimeout(timeout.toMillis(), TimeUnit.MILLISECONDS);
   }
 
   @Override
   public void delete(String key) {
-    Query query = new Query(Criteria.where(FIELD_KEY).is(key));
-    mongoTemplate.remove(query, collectionName);
+    commands.del(key);
     CompletableFuture<String> future = pending.remove(key);
     if (future != null) {
       future.cancel(false);
     }
-  }
-
-  private String getValueFromMongo(String key) {
-    Query query = new Query(Criteria.where(FIELD_KEY).is(key));
-    Document doc = mongoTemplate.findOne(query, Document.class, collectionName);
-    if (doc != null && doc.containsKey(FIELD_VALUE)) {
-      return doc.getString(FIELD_VALUE);
-    }
-    return null;
   }
 
   private void onNotification(String key, String payload) {

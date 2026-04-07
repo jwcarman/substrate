@@ -39,12 +39,12 @@ class MongoDbMailboxTest {
   @Mock private MongoTemplate mongoTemplate;
   @Mock private Notifier notifier;
 
-  private MongoDbMailbox mailbox;
+  private MongoDbMailboxSpi mailbox;
 
   @BeforeEach
   void setUp() {
     mailbox =
-        new MongoDbMailbox(
+        new MongoDbMailboxSpi(
             mongoTemplate,
             notifier,
             "substrate:mailbox:",

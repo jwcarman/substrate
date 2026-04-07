@@ -35,7 +35,7 @@ import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactor
 public class RedisMailboxAutoConfiguration {
 
   @Bean
-  public RedisMailbox redisMailbox(
+  public RedisMailboxSpi redisMailbox(
       RedisConnectionFactory connectionFactory,
       Notifier notifier,
       RedisMailboxProperties properties) {
@@ -43,7 +43,7 @@ public class RedisMailboxAutoConfiguration {
     RedisClient client = (RedisClient) lcf.getNativeClient();
     StatefulRedisConnection<String, String> connection = client.connect(StringCodec.UTF8);
 
-    return new RedisMailbox(
+    return new RedisMailboxSpi(
         connection.sync(), notifier, properties.prefix(), properties.defaultTtl());
   }
 }

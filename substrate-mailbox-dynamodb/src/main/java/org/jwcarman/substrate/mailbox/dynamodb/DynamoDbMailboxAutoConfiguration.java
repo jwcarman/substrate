@@ -31,10 +31,10 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 public class DynamoDbMailboxAutoConfiguration {
 
   @Bean
-  public DynamoDbMailbox dynamoDbMailbox(
+  public DynamoDbMailboxSpi dynamoDbMailbox(
       DynamoDbClient dynamoDbClient, Notifier notifier, DynamoDbMailboxProperties properties) {
-    DynamoDbMailbox mailbox =
-        new DynamoDbMailbox(
+    DynamoDbMailboxSpi mailbox =
+        new DynamoDbMailboxSpi(
             dynamoDbClient,
             notifier,
             properties.prefix(),

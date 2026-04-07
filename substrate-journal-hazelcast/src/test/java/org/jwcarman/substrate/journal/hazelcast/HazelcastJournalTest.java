@@ -31,18 +31,18 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
-class HazelcastJournalTest {
+class HazelcastJournalSpiTest {
 
   @Mock private HazelcastInstance hazelcastInstance;
   @Mock private Ringbuffer<String> ringbuffer;
   @Mock private IMap<String, Boolean> completedMap;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
-  private HazelcastJournal journal;
+  private HazelcastJournalSpi journal;
 
   @BeforeEach
   void setUp() {
-    journal = new HazelcastJournal(hazelcastInstance, objectMapper, "substrate:journal:", 100);
+    journal = new HazelcastJournalSpi(hazelcastInstance, objectMapper, "substrate:journal:", 100);
   }
 
   @Test

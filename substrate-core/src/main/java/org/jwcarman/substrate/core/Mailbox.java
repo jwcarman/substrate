@@ -13,17 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.substrate.spi;
+package org.jwcarman.substrate.core;
 
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
 public interface Mailbox {
-  void deliver(String key, String value);
+  void deliver(String value);
 
-  CompletableFuture<String> await(String key, Duration timeout);
+  CompletableFuture<String> await(Duration timeout);
 
-  void delete(String key);
+  void delete();
 
-  String mailboxKey(String name);
+  String key();
 }

@@ -30,9 +30,9 @@ import org.springframework.context.annotation.PropertySource;
 public class RabbitMqJournalAutoConfiguration {
 
   @Bean
-  public RabbitMqJournal rabbitMqJournal(
+  public RabbitMqJournalSpi rabbitMqJournal(
       Environment environment, RabbitMqJournalProperties properties) {
-    return new RabbitMqJournal(
+    return new RabbitMqJournalSpi(
         environment, properties.prefix(), properties.maxAge(), properties.maxLengthBytes());
   }
 }

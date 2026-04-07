@@ -35,10 +35,10 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
-import org.jwcarman.substrate.spi.AbstractJournal;
+import org.jwcarman.substrate.spi.AbstractJournalSpi;
 import org.jwcarman.substrate.spi.JournalEntry;
 
-public class RabbitMqJournal extends AbstractJournal implements AutoCloseable {
+public class RabbitMqJournalSpi extends AbstractJournalSpi implements AutoCloseable {
 
   private static final long CONSUME_TIMEOUT_MS = 200;
   private static final long PUBLISH_TIMEOUT_SECONDS = 5;
@@ -52,7 +52,7 @@ public class RabbitMqJournal extends AbstractJournal implements AutoCloseable {
   private final long maxLengthBytes;
   private final ConcurrentHashMap<String, Producer> producers = new ConcurrentHashMap<>();
 
-  public RabbitMqJournal(
+  public RabbitMqJournalSpi(
       Environment environment, String prefix, Duration maxAge, long maxLengthBytes) {
     super(prefix);
     this.environment = environment;

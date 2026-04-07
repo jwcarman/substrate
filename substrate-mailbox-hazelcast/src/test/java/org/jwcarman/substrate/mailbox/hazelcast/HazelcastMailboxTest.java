@@ -42,13 +42,13 @@ class HazelcastMailboxTest {
   @Mock private IMap<String, String> map;
   @Mock private Notifier notifier;
 
-  private HazelcastMailbox mailbox;
+  private HazelcastMailboxSpi mailbox;
 
   @BeforeEach
   void setUp() {
     when(hazelcastInstance.<String, String>getMap("substrate-mailbox")).thenReturn(map);
     mailbox =
-        new HazelcastMailbox(
+        new HazelcastMailboxSpi(
             hazelcastInstance,
             notifier,
             "substrate:mailbox:",

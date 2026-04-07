@@ -21,18 +21,18 @@ import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.memory.InMemoryJournal;
+import org.jwcarman.substrate.memory.InMemoryJournalSpi;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
 class JacksonJournalFactoryTest {
 
   private JacksonJournalFactory factory;
-  private InMemoryJournal journal;
+  private InMemoryJournalSpi journal;
 
   @BeforeEach
   void setUp() {
-    journal = new InMemoryJournal();
+    journal = new InMemoryJournalSpi();
     factory = new JacksonJournalFactory(journal, JsonMapper.builder().build());
   }
 

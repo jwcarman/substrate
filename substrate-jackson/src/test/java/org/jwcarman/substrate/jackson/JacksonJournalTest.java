@@ -23,17 +23,17 @@ import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.memory.InMemoryJournal;
+import org.jwcarman.substrate.memory.InMemoryJournalSpi;
 import tools.jackson.databind.json.JsonMapper;
 
 class JacksonJournalTest {
 
-  private InMemoryJournal journal;
+  private InMemoryJournalSpi journal;
   private JsonMapper objectMapper;
 
   @BeforeEach
   void setUp() {
-    journal = new InMemoryJournal();
+    journal = new InMemoryJournalSpi();
     objectMapper = JsonMapper.builder().build();
   }
 

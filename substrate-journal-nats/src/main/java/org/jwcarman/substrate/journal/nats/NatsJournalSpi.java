@@ -40,10 +40,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
-import org.jwcarman.substrate.spi.AbstractJournal;
+import org.jwcarman.substrate.spi.AbstractJournalSpi;
 import org.jwcarman.substrate.spi.JournalEntry;
 
-public class NatsJournal extends AbstractJournal {
+public class NatsJournalSpi extends AbstractJournalSpi {
 
   private static final String SUBJECT_PREFIX = "substrate.journal.";
   private static final Duration FETCH_TIMEOUT = Duration.ofMillis(500);
@@ -54,7 +54,7 @@ public class NatsJournal extends AbstractJournal {
   private final Connection connection;
   private final String streamName;
 
-  public NatsJournal(
+  public NatsJournalSpi(
       Connection connection, String prefix, String streamName, Duration maxAge, long maxMessages) {
     super(prefix);
     this.connection = connection;
@@ -136,19 +136,23 @@ public class NatsJournal extends AbstractJournal {
   @Override
   public void complete(String key) {
     try {
-      var kvm = connection.keyValueManagement();
-      try {
-        kvm.getStatus(COMPLETED_BUCKET);
-      } catch (JetStreamApiException _) {
-        kvm.create(
-            KeyValueConfiguration.builder().name(COMPLETED_BUCKET).maxHistoryPerKey(1).build());
-      }
+      ensureCompletedBucketExists();
       var kv = connection.keyValue(COMPLETED_BUCKET);
       kv.put(key.replace(':', '.'), "true".getBytes(StandardCharsets.UTF_8));
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to mark journal as complete", e);
     } catch (JetStreamApiException e) {
       throw new IllegalStateException("Failed to mark journal as complete", e);
+    }
+  }
+
+  private void ensureCompletedBucketExists() throws IOException, JetStreamApiException {
+    var kvm = connection.keyValueManagement();
+    try {
+      kvm.getStatus(COMPLETED_BUCKET);
+    } catch (JetStreamApiException _) {
+      kvm.create(
+          KeyValueConfiguration.builder().name(COMPLETED_BUCKET).maxHistoryPerKey(1).build());
     }
   }
 
@@ -254,7 +258,7 @@ public class NatsJournal extends AbstractJournal {
   private long getSubjectMessageCount(String subject) throws IOException, JetStreamApiException {
     StreamInfo info = jsm.getStreamInfo(streamName, StreamInfoOptions.filterSubjects(subject));
     List<Subject> subjects = info.getStreamState().getSubjects();
-    if (subjects == null || subjects.isEmpty()) {
+    if (subjects.isEmpty()) {
       return 0;
     }
     return subjects.getFirst().getCount();
@@ -266,7 +270,7 @@ public class NatsJournal extends AbstractJournal {
             ? new String(message.getData(), StandardCharsets.UTF_8)
             : null;
 
-    io.nats.client.impl.Headers headers = (io.nats.client.impl.Headers) message.getHeaders();
+    io.nats.client.impl.Headers headers = message.getHeaders();
     String timestampStr = headers != null ? getSingleHeader(headers, "timestamp") : null;
     Instant timestamp = timestampStr != null ? Instant.parse(timestampStr) : Instant.now();
 
