@@ -1,0 +1,281 @@
+/*
+ * Copyright © 2026 James Carman
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.jwcarman.substrate.journal.nats;
+
+import io.nats.client.Connection;
+import io.nats.client.JetStream;
+import io.nats.client.JetStreamApiException;
+import io.nats.client.JetStreamManagement;
+import io.nats.client.JetStreamSubscription;
+import io.nats.client.Message;
+import io.nats.client.PullSubscribeOptions;
+import io.nats.client.PurgeOptions;
+import io.nats.client.api.ConsumerConfiguration;
+import io.nats.client.api.DeliverPolicy;
+import io.nats.client.api.KeyValueConfiguration;
+import io.nats.client.api.RetentionPolicy;
+import io.nats.client.api.StorageType;
+import io.nats.client.api.StreamConfiguration;
+import io.nats.client.api.StreamInfo;
+import io.nats.client.api.StreamInfoOptions;
+import io.nats.client.api.Subject;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Stream;
+import org.jwcarman.substrate.spi.AbstractJournal;
+import org.jwcarman.substrate.spi.JournalEntry;
+
+public class NatsJournal extends AbstractJournal {
+
+  private static final String SUBJECT_PREFIX = "substrate.journal.";
+  private static final Duration FETCH_TIMEOUT = Duration.ofMillis(500);
+  private static final String COMPLETED_BUCKET = "substrate-journal-completed";
+
+  private final JetStream jetStream;
+  private final JetStreamManagement jsm;
+  private final Connection connection;
+  private final String streamName;
+
+  public NatsJournal(
+      Connection connection, String prefix, String streamName, Duration maxAge, long maxMessages) {
+    super(prefix);
+    this.connection = connection;
+    this.streamName = streamName;
+    try {
+      this.jetStream = connection.jetStream();
+      this.jsm = connection.jetStreamManagement();
+      ensureStreamExists(maxAge, maxMessages);
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to initialize NATS JetStream", e);
+    }
+  }
+
+  @Override
+  public String append(String key, String data) {
+    return append(key, data, null);
+  }
+
+  @Override
+  public String append(String key, String data, Duration ttl) {
+    try {
+      String subject = toSubject(key);
+      byte[] payload = data != null ? data.getBytes(StandardCharsets.UTF_8) : new byte[0];
+
+      io.nats.client.impl.NatsMessage message =
+          io.nats.client.impl.NatsMessage.builder()
+              .subject(subject)
+              .headers(
+                  new io.nats.client.impl.Headers()
+                      .add("timestamp", Instant.now().toString())
+                      .add("journalKey", key))
+              .data(payload)
+              .build();
+
+      var ack = jetStream.publish(message);
+      return String.valueOf(ack.getSeqno());
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to publish to NATS JetStream", e);
+    } catch (JetStreamApiException e) {
+      throw new IllegalStateException("Failed to publish to NATS JetStream", e);
+    }
+  }
+
+  @Override
+  public Stream<JournalEntry> readAfter(String key, String afterId) {
+    long startSeq = Long.parseLong(afterId) + 1;
+    String subject = toSubject(key);
+
+    try {
+      StreamInfo info = jsm.getStreamInfo(streamName);
+      long lastSeq = info.getStreamState().getLastSequence();
+      if (startSeq > lastSeq) {
+        return Stream.empty();
+      }
+      return fetchMessages(subject, DeliverPolicy.ByStartSequence, startSeq, key);
+    } catch (IOException | JetStreamApiException _) {
+      return Stream.empty();
+    }
+  }
+
+  @Override
+  public Stream<JournalEntry> readLast(String key, int count) {
+    String subject = toSubject(key);
+
+    try {
+      long subjectMessageCount = getSubjectMessageCount(subject);
+      if (subjectMessageCount == 0) {
+        return Stream.empty();
+      }
+
+      List<JournalEntry> allEntries = fetchAllForSubject(subject, key);
+      int start = Math.max(0, allEntries.size() - count);
+      return allEntries.subList(start, allEntries.size()).stream();
+    } catch (IOException | JetStreamApiException _) {
+      return Stream.empty();
+    }
+  }
+
+  @Override
+  public void complete(String key) {
+    try {
+      var kvm = connection.keyValueManagement();
+      try {
+        kvm.getStatus(COMPLETED_BUCKET);
+      } catch (JetStreamApiException _) {
+        kvm.create(
+            KeyValueConfiguration.builder().name(COMPLETED_BUCKET).maxHistoryPerKey(1).build());
+      }
+      var kv = connection.keyValue(COMPLETED_BUCKET);
+      kv.put(key.replace(':', '.'), "true".getBytes(StandardCharsets.UTF_8));
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to mark journal as complete", e);
+    } catch (JetStreamApiException e) {
+      throw new IllegalStateException("Failed to mark journal as complete", e);
+    }
+  }
+
+  @Override
+  public void delete(String key) {
+    String subject = toSubject(key);
+    try {
+      jsm.purgeStream(streamName, PurgeOptions.subject(subject));
+    } catch (IOException | JetStreamApiException _) {
+      // Stream or subject doesn't exist — safe to ignore
+    }
+  }
+
+  private void ensureStreamExists(Duration maxAge, long maxMessages) {
+    StreamConfiguration config =
+        StreamConfiguration.builder()
+            .name(streamName)
+            .subjects(SUBJECT_PREFIX + ">")
+            .retentionPolicy(RetentionPolicy.Limits)
+            .storageType(StorageType.File)
+            .maxAge(maxAge)
+            .maxMessages(maxMessages)
+            .build();
+    try {
+      jsm.addStream(config);
+    } catch (JetStreamApiException e) {
+      if (e.getApiErrorCode() == 10058) {
+        try {
+          jsm.updateStream(config);
+        } catch (IOException ex) {
+          throw new UncheckedIOException("Failed to update NATS JetStream stream", ex);
+        } catch (JetStreamApiException ex) {
+          throw new IllegalStateException("Failed to update NATS JetStream stream", ex);
+        }
+      } else {
+        throw new IllegalStateException("Failed to create NATS JetStream stream", e);
+      }
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to create NATS JetStream stream", e);
+    }
+  }
+
+  private String toSubject(String key) {
+    return SUBJECT_PREFIX + key.replace(':', '.');
+  }
+
+  private Stream<JournalEntry> fetchMessages(
+      String subject, DeliverPolicy deliverPolicy, long startSeq, String key) {
+    try {
+      ConsumerConfiguration.Builder ccBuilder =
+          ConsumerConfiguration.builder().filterSubject(subject).deliverPolicy(deliverPolicy);
+      if (deliverPolicy == DeliverPolicy.ByStartSequence) {
+        ccBuilder.startSequence(startSeq);
+      }
+
+      PullSubscribeOptions pullOptions =
+          PullSubscribeOptions.builder().stream(streamName)
+              .configuration(ccBuilder.build())
+              .build();
+
+      JetStreamSubscription sub = jetStream.subscribe(subject, pullOptions);
+
+      List<JournalEntry> entries = new ArrayList<>();
+      try {
+        List<Message> batch = sub.fetch(1000, FETCH_TIMEOUT);
+        for (Message msg : batch) {
+          entries.add(toJournalEntry(msg, key));
+        }
+      } finally {
+        sub.unsubscribe();
+      }
+      return entries.stream();
+    } catch (IOException | JetStreamApiException _) {
+      return Stream.empty();
+    }
+  }
+
+  private List<JournalEntry> fetchAllForSubject(String subject, String key)
+      throws IOException, JetStreamApiException {
+    PullSubscribeOptions pullOptions =
+        PullSubscribeOptions.builder().stream(streamName)
+            .configuration(
+                ConsumerConfiguration.builder()
+                    .filterSubject(subject)
+                    .deliverPolicy(DeliverPolicy.All)
+                    .build())
+            .build();
+
+    JetStreamSubscription sub = jetStream.subscribe(subject, pullOptions);
+
+    List<JournalEntry> entries = new ArrayList<>();
+    try {
+      List<Message> batch = sub.fetch(1000, FETCH_TIMEOUT);
+      for (Message msg : batch) {
+        entries.add(toJournalEntry(msg, key));
+      }
+    } finally {
+      sub.unsubscribe();
+    }
+    return entries;
+  }
+
+  private long getSubjectMessageCount(String subject) throws IOException, JetStreamApiException {
+    StreamInfo info = jsm.getStreamInfo(streamName, StreamInfoOptions.filterSubjects(subject));
+    List<Subject> subjects = info.getStreamState().getSubjects();
+    if (subjects == null || subjects.isEmpty()) {
+      return 0;
+    }
+    return subjects.getFirst().getCount();
+  }
+
+  private JournalEntry toJournalEntry(Message message, String key) {
+    String data =
+        message.getData() != null && message.getData().length > 0
+            ? new String(message.getData(), StandardCharsets.UTF_8)
+            : null;
+
+    io.nats.client.impl.Headers headers = (io.nats.client.impl.Headers) message.getHeaders();
+    String timestampStr = headers != null ? getSingleHeader(headers, "timestamp") : null;
+    Instant timestamp = timestampStr != null ? Instant.parse(timestampStr) : Instant.now();
+
+    return new JournalEntry(
+        String.valueOf(message.metaData().streamSequence()), key, data, timestamp);
+  }
+
+  private String getSingleHeader(io.nats.client.impl.Headers headers, String headerKey) {
+    List<String> values = headers.get(headerKey);
+    return values != null && !values.isEmpty() ? values.getFirst() : null;
+  }
+}

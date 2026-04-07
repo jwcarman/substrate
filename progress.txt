@@ -1,0 +1,8 @@
+LAST_RUN: 2026-04-07T05:56:27Z
+ITERATION: 10
+SPEC_COMPLETED: 010-sns-sqs-backend.md
+WHAT_WAS_DONE: Implemented substrate-notifier-sns module with AWS SNS/SQS-backed Notifier using ephemeral SQS queues for fan-out, virtual thread SQS polling, manual SNS JSON envelope parsing, and batch message deletion
+VERIFICATION: ./mvnw spotless:check — passed; ./mvnw verify — BUILD SUCCESS (all 22 modules pass; notifier-sns: 11 unit tests + 3 IT tests)
+STATUS: DONE
+NEXT_SPEC: none
+NOTES: Module uses AWS SDK v2 (sns + sqs) with BOM version 2.42.29 matching substrate-journal-dynamodb. SnsNotifier implements SmartLifecycle with virtual thread poller. Ephemeral SQS queue created per instance with IAM policy allowing SNS to send. Properties: topicArn (required, no default), autoCreateTopic (false), sqsMessageRetention (1m), sqsWaitTimeSeconds (20). Auto-config creates default SnsClient/SqsClient beans if missing. Testcontainers uses localstack:3.8 with sns+sqs services. Module added to parent POM and BOM.

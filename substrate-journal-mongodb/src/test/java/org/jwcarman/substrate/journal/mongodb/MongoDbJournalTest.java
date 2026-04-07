@@ -1,0 +1,127 @@
+/*
+ * Copyright © 2026 James Carman
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.jwcarman.substrate.journal.mongodb;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.time.Duration;
+import java.util.List;
+import org.bson.Document;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Query;
+
+@ExtendWith(MockitoExtension.class)
+class MongoDbJournalTest {
+
+  @Mock private MongoTemplate mongoTemplate;
+
+  private MongoDbJournal journal;
+
+  @BeforeEach
+  void setUp() {
+    journal =
+        new MongoDbJournal(
+            mongoTemplate, "substrate:journal:", "substrate_journal", Duration.ofHours(24));
+  }
+
+  @Test
+  void appendInsertsDocumentWithCorrectFields() {
+    journal.append("substrate:journal:test", "hello");
+
+    ArgumentCaptor<Document> captor = ArgumentCaptor.forClass(Document.class);
+    verify(mongoTemplate).insert(captor.capture(), eq("substrate_journal"));
+
+    Document doc = captor.getValue();
+    assertThat(doc.getString("key")).isEqualTo("substrate:journal:test");
+    assertThat(doc.getString("entryId"))
+        .matches("[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}");
+    assertThat(doc.getString("data")).isEqualTo("hello");
+    assertThat(doc.get("timestamp")).isNotNull();
+    assertThat(doc.get("expireAt")).isNotNull();
+  }
+
+  @Test
+  void appendReturnsUuidV7Id() {
+    String id = journal.append("substrate:journal:test", "hello");
+    assertThat(id).matches("[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}");
+  }
+
+  @Test
+  void appendWithZeroTtlOmitsExpireAtField() {
+    MongoDbJournal noTtlJournal =
+        new MongoDbJournal(mongoTemplate, "substrate:journal:", "substrate_journal", Duration.ZERO);
+    noTtlJournal.append("substrate:journal:test", "data");
+
+    ArgumentCaptor<Document> captor = ArgumentCaptor.forClass(Document.class);
+    verify(mongoTemplate).insert(captor.capture(), eq("substrate_journal"));
+
+    assertThat(captor.getValue().containsKey("expireAt")).isFalse();
+  }
+
+  @Test
+  void completeInsertsCompletionMarker() {
+    journal.complete("substrate:journal:test");
+
+    ArgumentCaptor<Document> captor = ArgumentCaptor.forClass(Document.class);
+    verify(mongoTemplate).insert(captor.capture(), eq("substrate_journal"));
+
+    Document doc = captor.getValue();
+    assertThat(doc.getString("key")).isEqualTo("substrate:journal:test");
+    assertThat(doc.getString("entryId")).isEqualTo("COMPLETED");
+  }
+
+  @Test
+  void readAfterQueriesWithCorrectCriteria() {
+    when(mongoTemplate.find(any(Query.class), eq(Document.class), eq("substrate_journal")))
+        .thenReturn(List.of());
+
+    journal.readAfter("substrate:journal:test", "00000000-0000-0000-0000-000000000000").toList();
+
+    verify(mongoTemplate).find(any(Query.class), eq(Document.class), eq("substrate_journal"));
+  }
+
+  @Test
+  void readLastQueriesCollection() {
+    when(mongoTemplate.find(any(Query.class), eq(Document.class), eq("substrate_journal")))
+        .thenReturn(List.of());
+
+    journal.readLast("substrate:journal:test", 5).toList();
+
+    verify(mongoTemplate).find(any(Query.class), eq(Document.class), eq("substrate_journal"));
+  }
+
+  @Test
+  void deleteRemovesMatchingDocuments() {
+    journal.delete("substrate:journal:test");
+
+    verify(mongoTemplate).remove(any(Query.class), eq("substrate_journal"));
+  }
+
+  @Test
+  void journalKeyUsesConfiguredPrefix() {
+    assertThat(journal.journalKey("my-stream")).isEqualTo("substrate:journal:my-stream");
+  }
+}

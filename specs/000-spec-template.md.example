@@ -1,0 +1,46 @@
+# [Short description of what this spec builds]
+
+<!--
+  Filename convention: [NNN]-[slug].md  e.g. 007-user-auth.md
+  Lower number = worked first.
+  Keep specs small. One focused feature or behavior per spec.
+  If a spec feels too big, split it into two files.
+-->
+
+## What to build
+
+<!--
+  Describe what to implement. Be concrete.
+  Include: what the behavior should be, not how to implement it.
+  The agent decides implementation details.
+
+  Bad:  "Add authentication"
+  Good: "Add JWT-based auth middleware. POST /auth/login accepts
+         { email, password }, returns a signed JWT on success or
+         401 on failure. All /api/* routes must validate the token."
+-->
+
+[DESCRIBE THE FEATURE]
+
+## Acceptance criteria
+
+<!--
+  Machine-checkable where possible.
+  The agent will not mark this done until these pass.
+
+  Prefer:  "pnpm test passes with a new test covering X"
+  Over:    "the feature works correctly"
+-->
+
+- [ ] [Specific, verifiable criterion]
+- [ ] [Specific, verifiable criterion]
+- [ ] All existing tests still pass
+
+## Implementation notes
+
+<!--
+  Optional. Hints, constraints, pointers to relevant existing code.
+  Leave blank if the spec is self-contained.
+-->
+
+[OPTIONAL NOTES]

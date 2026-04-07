@@ -1,0 +1,171 @@
+/*
+ * Copyright © 2026 James Carman
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.jwcarman.substrate.journal.hazelcast;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.hazelcast.config.Config;
+import com.hazelcast.core.Hazelcast;
+import com.hazelcast.core.HazelcastInstance;
+import java.util.List;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.jwcarman.substrate.spi.JournalEntry;
+import tools.jackson.databind.ObjectMapper;
+
+class HazelcastJournalIT {
+
+  private static HazelcastInstance hazelcast;
+  private HazelcastJournal journal;
+  private final ObjectMapper objectMapper = new ObjectMapper();
+
+  @BeforeAll
+  static void startHazelcast() {
+    Config config = new Config();
+    config.setClusterName("substrate-journal-test-" + System.nanoTime());
+    config.getNetworkConfig().getJoin().getAutoDetectionConfig().setEnabled(false);
+    hazelcast = Hazelcast.newHazelcastInstance(config);
+  }
+
+  @AfterAll
+  static void stopHazelcast() {
+    if (hazelcast != null) {
+      hazelcast.shutdown();
+    }
+  }
+
+  @BeforeEach
+  void setUp() {
+    journal = new HazelcastJournal(hazelcast, objectMapper, "substrate:journal:", 1000);
+  }
+
+  @Test
+  void appendReturnsSequenceId() {
+    String key = journal.journalKey("append-test-" + System.nanoTime());
+    String id = journal.append(key, "hello");
+
+    assertThat(id).matches("\\d+");
+  }
+
+  @Test
+  void appendReturnsMonotonicallyIncreasingIds() {
+    String key = journal.journalKey("mono-" + System.nanoTime());
+    String id1 = journal.append(key, "first");
+    String id2 = journal.append(key, "second");
+
+    assertThat(Long.parseLong(id2)).isGreaterThan(Long.parseLong(id1));
+  }
+
+  @Test
+  void readAfterReturnsEntriesInOrder() {
+    String key = journal.journalKey("read-after-" + System.nanoTime());
+    String id1 = journal.append(key, "payload1");
+    String id2 = journal.append(key, "payload2");
+    String id3 = journal.append(key, "payload3");
+
+    List<JournalEntry> entries = journal.readAfter(key, id1).toList();
+
+    assertThat(entries).hasSize(2);
+    assertThat(entries.get(0).id()).isEqualTo(id2);
+    assertThat(entries.get(0).data()).isEqualTo("payload2");
+    assertThat(entries.get(1).id()).isEqualTo(id3);
+    assertThat(entries.get(1).data()).isEqualTo("payload3");
+  }
+
+  @Test
+  void readAfterReturnsEmptyForUnknownKey() {
+    String key = journal.journalKey("nonexistent-" + System.nanoTime());
+    List<JournalEntry> entries = journal.readAfter(key, "0").toList();
+    assertThat(entries).isEmpty();
+  }
+
+  @Test
+  void readLastReturnsLastNInChronologicalOrder() {
+    String key = journal.journalKey("read-last-" + System.nanoTime());
+    journal.append(key, "first");
+    journal.append(key, "second");
+    journal.append(key, "third");
+    journal.append(key, "fourth");
+
+    List<JournalEntry> entries = journal.readLast(key, 2).toList();
+
+    assertThat(entries).hasSize(2);
+    assertThat(entries.get(0).data()).isEqualTo("third");
+    assertThat(entries.get(1).data()).isEqualTo("fourth");
+  }
+
+  @Test
+  void readLastReturnsEmptyForUnknownKey() {
+    String key = journal.journalKey("nonexistent-" + System.nanoTime());
+    List<JournalEntry> entries = journal.readLast(key, 5).toList();
+    assertThat(entries).isEmpty();
+  }
+
+  @Test
+  void readLastReturnsAllWhenCountExceedsSize() {
+    String key = journal.journalKey("small-" + System.nanoTime());
+    journal.append(key, "one");
+    journal.append(key, "two");
+
+    List<JournalEntry> entries = journal.readLast(key, 100).toList();
+
+    assertThat(entries).hasSize(2);
+    assertThat(entries.get(0).data()).isEqualTo("one");
+    assertThat(entries.get(1).data()).isEqualTo("two");
+  }
+
+  @Test
+  void deleteDestroysRingbuffer() {
+    String key = journal.journalKey("delete-" + System.nanoTime());
+    journal.append(key, "hello");
+    journal.append(key, "world");
+
+    journal.delete(key);
+
+    List<JournalEntry> entries = journal.readLast(key, 100).toList();
+    assertThat(entries).isEmpty();
+  }
+
+  @Test
+  void deleteDoesNotAffectOtherJournals() {
+    String key1 = journal.journalKey("a-" + System.nanoTime());
+    String key2 = journal.journalKey("b-" + System.nanoTime());
+    journal.append(key1, "a-event");
+    journal.append(key2, "b-event");
+
+    journal.delete(key1);
+
+    assertThat(journal.readLast(key1, 100).toList()).isEmpty();
+    assertThat(journal.readLast(key2, 100).toList()).hasSize(1);
+  }
+
+  @Test
+  void timestampIsPreserved() {
+    String key = journal.journalKey("time-" + System.nanoTime());
+    journal.append(key, "data");
+
+    List<JournalEntry> entries = journal.readLast(key, 1).toList();
+    assertThat(entries).hasSize(1);
+    assertThat(entries.getFirst().timestamp()).isNotNull();
+  }
+
+  @Test
+  void journalKeyUsesConfiguredPrefix() {
+    assertThat(journal.journalKey("my-stream")).isEqualTo("substrate:journal:my-stream");
+  }
+}

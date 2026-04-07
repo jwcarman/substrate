@@ -1,0 +1,81 @@
+/*
+ * Copyright © 2026 James Carman
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.jwcarman.substrate.mailbox.nats;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import io.nats.client.Connection;
+import io.nats.client.KeyValueManagement;
+import io.nats.client.api.KeyValueStatus;
+import org.junit.jupiter.api.Test;
+import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
+import org.jwcarman.substrate.memory.InMemoryMailbox;
+import org.jwcarman.substrate.spi.Mailbox;
+import org.jwcarman.substrate.spi.Notifier;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+class NatsMailboxAutoConfigurationTest {
+
+  @Test
+  void createsNatsMailboxBean() {
+    new ApplicationContextRunner()
+        .withConfiguration(AutoConfigurations.of(NatsMailboxAutoConfiguration.class))
+        .withUserConfiguration(MockNatsConfiguration.class)
+        .run(
+            context -> {
+              assertThat(context).hasSingleBean(NatsMailbox.class);
+              assertThat(context).hasSingleBean(Mailbox.class);
+            });
+  }
+
+  @Test
+  void natsMailboxSuppressesInMemoryFallback() {
+    new ApplicationContextRunner()
+        .withConfiguration(
+            AutoConfigurations.of(
+                NatsMailboxAutoConfiguration.class, SubstrateAutoConfiguration.class))
+        .withUserConfiguration(MockNatsConfiguration.class)
+        .run(
+            context -> {
+              assertThat(context).hasSingleBean(Mailbox.class);
+              assertThat(context.getBean(Mailbox.class)).isInstanceOf(NatsMailbox.class);
+              assertThat(context).doesNotHaveBean(InMemoryMailbox.class);
+            });
+  }
+
+  @Configuration(proxyBeanMethods = false)
+  static class MockNatsConfiguration {
+
+    @Bean
+    Connection connection() throws Exception {
+      Connection conn = mock(Connection.class);
+      KeyValueManagement kvm = mock(KeyValueManagement.class);
+      when(conn.keyValueManagement()).thenReturn(kvm);
+      when(kvm.getStatus("substrate-mailbox")).thenReturn(mock(KeyValueStatus.class));
+      return conn;
+    }
+
+    @Bean
+    Notifier notifier() {
+      return mock(Notifier.class);
+    }
+  }
+}
