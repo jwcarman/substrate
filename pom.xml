@@ -83,7 +83,7 @@
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
         <sonar.projectKey>jwcarman_substrate</sonar.projectKey>
         <sonar.coverage.exclusions>substrate-example/**</sonar.coverage.exclusions>
-        <codec.version>1.0.0-SNAPSHOT</codec.version>
+        <codec.version>0.1.0</codec.version>
     </properties>
 
     <dependencyManagement>
