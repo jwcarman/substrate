@@ -16,8 +16,10 @@
 package org.jwcarman.substrate.notifier.postgresql;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
+import java.sql.SQLException;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
@@ -61,8 +63,10 @@ class PostgresNotifierAutoConfigurationTest {
   static class MockDataSourceConfiguration {
 
     @Bean
-    DataSource dataSource() {
-      return mock(DataSource.class);
+    DataSource dataSource() throws SQLException {
+      DataSource ds = mock(DataSource.class);
+      given(ds.getConnection()).willThrow(new SQLException("mock DataSource"));
+      return ds;
     }
   }
 }
