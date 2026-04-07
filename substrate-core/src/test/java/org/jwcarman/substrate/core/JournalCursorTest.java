@@ -232,6 +232,72 @@ class JournalCursorTest {
   }
 
   @Test
+  void stackedNudgesAreBatchedEfficiently() {
+    // Rapidly append many entries — reader should batch them in a single SPI read
+    int count = 50;
+    try (JournalCursor<String> cursor = journal.read()) {
+      for (int i = 0; i < count; i++) {
+        journal.append("rapid-" + i);
+      }
+
+      List<String> received = new CopyOnWriteArrayList<>();
+      for (int i = 0; i < count; i++) {
+        cursor.poll(Duration.ofSeconds(5)).ifPresent(entry -> received.add(entry.data()));
+      }
+
+      assertThat(received).hasSize(count);
+      for (int i = 0; i < count; i++) {
+        assertThat(received.get(i)).isEqualTo("rapid-" + i);
+      }
+    }
+  }
+
+  @Test
+  void missedNudgeDataIsFoundByJustInCaseRead() {
+    // Append data before creating the cursor — the reader thread's "just in case"
+    // read on startup should find it without a nudge ever being received
+    journal.append("before-cursor");
+
+    try (JournalCursor<String> cursor = journal.readLast(Integer.MAX_VALUE)) {
+      Optional<JournalEntry<String>> entry = cursor.poll(Duration.ofSeconds(5));
+      assertThat(entry).isPresent();
+      assertThat(entry.get().data()).isEqualTo("before-cursor");
+    }
+  }
+
+  @Test
+  void backpressureSlowConsumerReceivesAllEntries() throws InterruptedException {
+    int count = 200;
+    List<String> received = new CopyOnWriteArrayList<>();
+
+    try (JournalCursor<String> cursor = journal.read()) {
+      // Producer appends rapidly
+      Thread producer =
+          Thread.ofVirtual()
+              .start(
+                  () -> {
+                    for (int i = 0; i < count; i++) {
+                      journal.append("bp-" + i);
+                    }
+                    journal.complete();
+                  });
+
+      // Slow consumer — small delay between polls to exercise backpressure
+      while (cursor.isOpen()) {
+        cursor.poll(Duration.ofSeconds(5)).ifPresent(entry -> received.add(entry.data()));
+        Thread.sleep(1);
+      }
+
+      producer.join(10000);
+    }
+
+    assertThat(received).hasSize(count);
+    for (int i = 0; i < count; i++) {
+      assertThat(received.get(i)).isEqualTo("bp-" + i);
+    }
+  }
+
+  @Test
   void tryWithResourcesCleanupWorks() {
     JournalCursor<String> cursor;
     try (JournalCursor<String> c = journal.read()) {

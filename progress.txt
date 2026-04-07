@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-07T15:42:00Z
-ITERATION: 17
-SPEC_COMPLETED: 016-blocking-cursor-api.md
-WHAT_WAS_DONE: Replaced reactive subscriber model with blocking cursor API — removed JournalSubscriber, Subscription, StreamJournalSubscriber; added JournalCursor<T> interface with poll(Duration)/isOpen()/lastId()/close(); implemented DefaultJournalCursor using Semaphore-based Notifier wake-ups; updated Journal<T> with read()/readAfter()/readLast() returning cursors; replaced Mailbox<T>.await(CompletableFuture) with poll(Duration) returning Optional<T>; changed JournalSpi readAfter/readLast to return List instead of Stream; updated all 8 backend JournalSpi implementations and all IT/unit tests
-VERIFICATION: ./mvnw verify -DskipITs — BUILD SUCCESS (all 23 modules pass); ./mvnw spotless:check — PASS
+LAST_RUN: 2026-04-07T15:49:00Z
+ITERATION: 18
+SPEC_COMPLETED: 017-semaphore-nudge-model.md
+WHAT_WAS_DONE: Refactored JournalCursor and Mailbox to use dedicated reader virtual threads — DefaultJournalCursor now uses a reader virtual thread that reads from SPI and pushes decoded entries into a bounded LinkedBlockingQueue (capacity 1024) with Semaphore(0) nudge signaling and drainPermits(); consumer poll() delegates to queue.poll(timeout); journal completion signaled via sealed QueueItem.Complete sentinel through the queue; DefaultMailbox now uses a reader virtual thread with CompletableFuture<T> — reader loops checking SPI on each nudge, completes the future when value found, consumer poll() delegates to future.get(timeout); both use "just in case" reads before waiting on semaphore; no synchronized blocks or Object.wait()
+VERIFICATION: ./mvnw verify -DskipITs — BUILD SUCCESS (all 23 modules pass); ./mvnw spotless:check — PASS; all 26 substrate-core tests pass including 3 new tests (stacked nudges, missed nudge, backpressure)
 STATUS: MORE_WORK
 NEXT_SPEC: none
-NOTES: JournalEntry<T> and RawJournalEntry names were already correct from spec 015. DefaultJournalCursor uses Semaphore(0) for virtual-thread-safe blocking (no synchronized/Object.wait). Cursor preload() method handles readLast() replay-then-live pattern. No CompletableFuture remains in consumer-facing API. All backend SPI implementations now return List instead of Stream for readAfter/readLast.
+NOTES: Used sealed interface QueueItem<T> (Entry/Complete) to avoid @SuppressWarnings("unchecked") on the queue — fully type-safe poison pill pattern. Preloaded entries (for readLast) are now passed as a constructor parameter to DefaultJournalCursor instead of a separate preload() method. Reader thread handles null readerId by calling readLast(key, MAX_VALUE) instead of readAfter. close() offers a Complete sentinel into the queue to immediately unblock consumers blocked on queue.poll(). Mailbox reader thread exits naturally when future.complete() is called. delete() cancels the future and releases the semaphore.

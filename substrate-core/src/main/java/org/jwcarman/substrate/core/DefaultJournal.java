@@ -78,10 +78,7 @@ public class DefaultJournal<T> implements Journal<T> {
   @Override
   public JournalCursor<T> readLast(int count) {
     List<RawJournalEntry> entries = journalSpi.readLast(key, count);
-    DefaultJournalCursor<T> cursor =
-        new DefaultJournalCursor<>(journalSpi, key, codec, notifier, null);
-    cursor.preload(entries);
-    return cursor;
+    return new DefaultJournalCursor<>(journalSpi, key, codec, notifier, null, entries);
   }
 
   @Override

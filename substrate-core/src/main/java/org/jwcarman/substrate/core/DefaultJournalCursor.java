@@ -18,42 +18,97 @@ package org.jwcarman.substrate.core;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.spi.JournalSpi;
-import org.jwcarman.substrate.spi.NotificationHandler;
 import org.jwcarman.substrate.spi.Notifier;
 import org.jwcarman.substrate.spi.RawJournalEntry;
 
 class DefaultJournalCursor<T> implements JournalCursor<T> {
 
-  private final JournalSpi journalSpi;
-  private final String key;
-  private final Codec<T> codec;
-  private final Semaphore semaphore = new Semaphore(0);
-  private final AtomicBoolean open = new AtomicBoolean(true);
-  private final NotificationHandler handler;
+  private static final Duration READER_POLL_TIMEOUT = Duration.ofSeconds(1);
+  private static final int QUEUE_CAPACITY = 1024;
 
-  private List<RawJournalEntry> buffer = List.of();
-  private int bufferIndex;
-  private String lastId;
+  private sealed interface QueueItem<T> {
+    record Entry<T>(JournalEntry<T> entry) implements QueueItem<T> {}
+
+    record Complete<T>() implements QueueItem<T> {}
+  }
+
+  private final AtomicBoolean open = new AtomicBoolean(true);
+  private final LinkedBlockingQueue<QueueItem<T>> queue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
+  private final Semaphore semaphore = new Semaphore(0);
+
+  private volatile String lastId;
 
   DefaultJournalCursor(
-      JournalSpi journalSpi, String key, Codec<T> codec, Notifier notifier, String afterId) {
-    this.journalSpi = journalSpi;
-    this.key = key;
-    this.codec = codec;
+      JournalSpi journalSpi,
+      String key,
+      Codec<T> codec,
+      Notifier notifier,
+      String afterId,
+      List<RawJournalEntry> preloadedEntries) {
     this.lastId = afterId;
 
-    this.handler =
+    // Seed the queue with preloaded entries and advance the reader's starting position
+    String readStart = afterId;
+    for (RawJournalEntry raw : preloadedEntries) {
+      queue.add(
+          new QueueItem.Entry<>(
+              new JournalEntry<>(raw.id(), raw.key(), codec.decode(raw.data()), raw.timestamp())));
+      readStart = raw.id();
+    }
+
+    final String readerStartId = readStart;
+
+    notifier.subscribe(
         (notifiedKey, payload) -> {
           if (key.equals(notifiedKey)) {
             semaphore.release();
           }
-        };
-    notifier.subscribe(handler);
+        });
+
+    Thread.ofVirtual()
+        .start(
+            () -> {
+              String readerId = readerStartId;
+              try {
+                while (open.get()) {
+                  List<RawJournalEntry> entries;
+                  if (readerId != null) {
+                    entries = journalSpi.readAfter(key, readerId);
+                  } else {
+                    entries = journalSpi.readLast(key, Integer.MAX_VALUE);
+                  }
+
+                  for (RawJournalEntry raw : entries) {
+                    JournalEntry<T> decoded =
+                        new JournalEntry<>(
+                            raw.id(), raw.key(), codec.decode(raw.data()), raw.timestamp());
+                    queue.put(new QueueItem.Entry<>(decoded));
+                    readerId = raw.id();
+                  }
+
+                  if (journalSpi.isComplete(key) && entries.isEmpty()) {
+                    queue.put(new QueueItem.Complete<>());
+                    return;
+                  }
+
+                  semaphore.tryAcquire(READER_POLL_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+                  semaphore.drainPermits();
+                }
+              } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+              }
+            });
+  }
+
+  DefaultJournalCursor(
+      JournalSpi journalSpi, String key, Codec<T> codec, Notifier notifier, String afterId) {
+    this(journalSpi, key, codec, notifier, afterId, List.of());
   }
 
   @Override
@@ -62,46 +117,26 @@ class DefaultJournalCursor<T> implements JournalCursor<T> {
       return Optional.empty();
     }
 
-    // Step 1: check buffer
-    if (bufferIndex < buffer.size()) {
-      return Optional.of(consumeNext());
-    }
-
-    // Step 2: fetch from SPI
-    if (fetchFromSpi()) {
-      return Optional.of(consumeNext());
-    }
-
-    // Step 3: check completion
-    if (journalSpi.isComplete(key)) {
-      open.set(false);
-      return Optional.empty();
-    }
-
-    // Step 4: wait for nudge, then retry
     try {
-      if (semaphore.tryAcquire(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
-        // Drain extra permits — we only need one wake-up
-        semaphore.drainPermits();
-
-        if (!open.get()) {
-          return Optional.empty();
-        }
-
-        if (fetchFromSpi()) {
-          return Optional.of(consumeNext());
-        }
-
-        if (journalSpi.isComplete(key)) {
-          open.set(false);
-        }
+      QueueItem<T> item = queue.poll(timeout.toMillis(), TimeUnit.MILLISECONDS);
+      if (item == null) {
+        return Optional.empty();
       }
+      return switch (item) {
+        case QueueItem.Entry<T> entry -> {
+          lastId = entry.entry().id();
+          yield Optional.of(entry.entry());
+        }
+        case QueueItem.Complete<T> _ -> {
+          open.set(false);
+          yield Optional.empty();
+        }
+      };
     } catch (InterruptedException _) {
       Thread.currentThread().interrupt();
       open.set(false);
+      return Optional.empty();
     }
-
-    return Optional.empty();
   }
 
   @Override
@@ -117,34 +152,9 @@ class DefaultJournalCursor<T> implements JournalCursor<T> {
   @Override
   public void close() {
     open.set(false);
+    // Wake the reader thread so it exits its loop
     semaphore.release();
-  }
-
-  void preload(List<RawJournalEntry> entries) {
-    if (!entries.isEmpty()) {
-      buffer = entries;
-      bufferIndex = 0;
-    }
-  }
-
-  private boolean fetchFromSpi() {
-    List<RawJournalEntry> entries;
-    if (lastId != null) {
-      entries = journalSpi.readAfter(key, lastId);
-    } else {
-      entries = journalSpi.readLast(key, Integer.MAX_VALUE);
-    }
-    if (!entries.isEmpty()) {
-      buffer = entries;
-      bufferIndex = 0;
-      return true;
-    }
-    return false;
-  }
-
-  private JournalEntry<T> consumeNext() {
-    RawJournalEntry raw = buffer.get(bufferIndex++);
-    lastId = raw.id();
-    return new JournalEntry<>(raw.id(), raw.key(), codec.decode(raw.data()), raw.timestamp());
+    // Wake the consumer if it's blocked on queue.poll()
+    queue.offer(new QueueItem.Complete<>());
   }
 }

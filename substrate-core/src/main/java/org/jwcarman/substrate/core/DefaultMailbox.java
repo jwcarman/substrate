@@ -17,24 +17,57 @@ package org.jwcarman.substrate.core;
 
 import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.spi.MailboxSpi;
 import org.jwcarman.substrate.spi.Notifier;
 
 public class DefaultMailbox<T> implements Mailbox<T> {
 
+  private static final Duration READER_POLL_TIMEOUT = Duration.ofSeconds(1);
+
   private final MailboxSpi mailboxSpi;
   private final String key;
   private final Codec<T> codec;
   private final Notifier notifier;
+  private final CompletableFuture<T> future = new CompletableFuture<>();
+  private final Semaphore semaphore = new Semaphore(0);
 
   public DefaultMailbox(MailboxSpi mailboxSpi, String key, Codec<T> codec, Notifier notifier) {
     this.mailboxSpi = mailboxSpi;
     this.key = key;
     this.codec = codec;
     this.notifier = notifier;
+
+    notifier.subscribe(
+        (notifiedKey, payload) -> {
+          if (key.equals(notifiedKey)) {
+            semaphore.release();
+          }
+        });
+
+    Thread.ofVirtual()
+        .start(
+            () -> {
+              try {
+                while (!future.isDone()) {
+                  // "Just in case" read
+                  Optional<byte[]> value = mailboxSpi.get(key);
+                  if (value.isPresent()) {
+                    future.complete(codec.decode(value.get()));
+                    return;
+                  }
+
+                  semaphore.tryAcquire(READER_POLL_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+                  semaphore.drainPermits();
+                }
+              } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+              }
+            });
   }
 
   @Override
@@ -45,40 +78,23 @@ public class DefaultMailbox<T> implements Mailbox<T> {
 
   @Override
   public Optional<T> poll(Duration timeout) {
-    // Check if value is already delivered
-    Optional<byte[]> existing = mailboxSpi.get(key);
-    if (existing.isPresent()) {
-      return Optional.of(codec.decode(existing.get()));
-    }
-
-    Semaphore semaphore = new Semaphore(0);
-
-    notifier.subscribe(
-        (notifiedKey, payload) -> {
-          if (key.equals(notifiedKey)) {
-            semaphore.release();
-          }
-        });
-
-    // Double-check in case deliver() was called between our get and subscribe
-    existing = mailboxSpi.get(key);
-    if (existing.isPresent()) {
-      return Optional.of(codec.decode(existing.get()));
-    }
-
     try {
-      if (semaphore.tryAcquire(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
-        return mailboxSpi.get(key).map(codec::decode);
-      }
+      T value = future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+      return Optional.of(value);
+    } catch (TimeoutException _) {
+      return Optional.empty();
     } catch (InterruptedException _) {
       Thread.currentThread().interrupt();
+      return Optional.empty();
+    } catch (java.util.concurrent.ExecutionException _) {
+      return Optional.empty();
     }
-
-    return Optional.empty();
   }
 
   @Override
   public void delete() {
+    future.cancel(false);
+    semaphore.release();
     mailboxSpi.delete(key);
   }
 
