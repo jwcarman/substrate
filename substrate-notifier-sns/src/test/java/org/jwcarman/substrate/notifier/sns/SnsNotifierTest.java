@@ -147,4 +147,58 @@ class SnsNotifierTest {
     assertThat(handler1).containsExactly("value");
     assertThat(handler2).containsExactly("value");
   }
+
+  @Test
+  void subscribeCancelRemovesHandler() {
+    List<String> received = new ArrayList<>();
+
+    var subscription = notifier.subscribe((key, payload) -> received.add(payload));
+    notifier.parseAndDispatch("key|first");
+    assertThat(received).containsExactly("first");
+
+    subscription.cancel();
+    notifier.parseAndDispatch("key|second");
+    assertThat(received).containsExactly("first");
+  }
+
+  @Test
+  void extractSnsMessageWithMalformedJsonNoMessageKey() {
+    String body = "{\"Type\": \"Notification\", \"TopicArn\": \"arn:aws:sns:us-east-1:123:test\"}";
+    assertThat(notifier.extractSnsMessage(body)).isEqualTo(body);
+  }
+
+  @Test
+  void extractSnsMessageWithMissingColonAfterMessageKey() {
+    String body = "{\"Message\" no-colon-here \"value\"}";
+    assertThat(notifier.extractSnsMessage(body)).isEqualTo(body);
+  }
+
+  @Test
+  void findClosingQuoteWithUnterminatedString() {
+    String body = "{\"Message\": \"unterminated value}";
+    assertThat(notifier.extractSnsMessage(body)).isEqualTo(body);
+  }
+
+  @Test
+  void unescapeWithTrailingBackslash() {
+    // A body where the Message value ends with a lone backslash
+    String body = "{\"Message\": \"trailing\\\\\"}";
+    String result = notifier.extractSnsMessage(body);
+    assertThat(result).isEqualTo("trailing\\");
+  }
+
+  @Test
+  void unescapeWithTrailingLoneBackslashInValue() {
+    // Construct a scenario where unescape encounters a trailing backslash.
+    // The extractSnsMessage unescapes the value between quotes.
+    // A JSON value like "abc\" would not have a closing quote, so we use
+    // a raw body where the extracted substring happens to end with a backslash.
+    // Since findClosingQuote skips \X pairs, "abc\\" is extracted as abc\ (the raw substring).
+    // Actually "abc\\" -> findClosingQuote sees \ at index 3, skips to 5 which is ", returns 5.
+    // Substring is abc\\, unescape produces abc\.
+    // Let's test a lone trailing backslash by directly testing parseAndDispatch with content.
+    String body = "{\"Message\": \"key|val\\\\\"}";
+    String result = notifier.extractSnsMessage(body);
+    assertThat(result).isEqualTo("key|val\\");
+  }
 }

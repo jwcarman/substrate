@@ -27,18 +27,26 @@ import static org.mockito.Mockito.when;
 
 import com.rabbitmq.stream.ConfirmationHandler;
 import com.rabbitmq.stream.ConfirmationStatus;
+import com.rabbitmq.stream.Consumer;
+import com.rabbitmq.stream.ConsumerBuilder;
 import com.rabbitmq.stream.Environment;
 import com.rabbitmq.stream.Message;
 import com.rabbitmq.stream.MessageBuilder;
+import com.rabbitmq.stream.OffsetSpecification;
 import com.rabbitmq.stream.Producer;
 import com.rabbitmq.stream.ProducerBuilder;
 import com.rabbitmq.stream.StreamCreator;
 import com.rabbitmq.stream.StreamException;
+import com.rabbitmq.stream.StreamStats;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.jwcarman.substrate.spi.RawJournalEntry;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -168,5 +176,170 @@ class RabbitMqJournalSpiTest {
             })
         .when(producer)
         .send(any(Message.class), any(ConfirmationHandler.class));
+  }
+
+  @Test
+  void isCompleteReturnsFalseForNonExistentStream() {
+    doThrow(new StreamException("stream does not exist"))
+        .when(environment)
+        .queryStreamStats("substrate-journal-test");
+
+    assertThat(journal.isComplete("substrate:journal:test")).isFalse();
+  }
+
+  @Test
+  void isCompleteReturnsTrueWhenCompletedMarkerExists() {
+    StreamStats stats = mock(StreamStats.class);
+    when(environment.queryStreamStats("substrate-journal-test")).thenReturn(stats);
+
+    ConsumerBuilder consumerBuilder = mock(ConsumerBuilder.class);
+    when(environment.consumerBuilder()).thenReturn(consumerBuilder);
+    when(consumerBuilder.stream(any())).thenReturn(consumerBuilder);
+    when(consumerBuilder.offset(any(OffsetSpecification.class))).thenReturn(consumerBuilder);
+
+    Consumer consumer = mock(Consumer.class);
+    doAnswer(
+            invocation -> {
+              com.rabbitmq.stream.MessageHandler handler = invocation.getArgument(0);
+              Message message = mock(Message.class);
+              Map<String, Object> props = Map.of("entryId", "__COMPLETED__");
+              when(message.getApplicationProperties()).thenReturn(props);
+              handler.handle(mock(com.rabbitmq.stream.MessageHandler.Context.class), message);
+              return consumerBuilder;
+            })
+        .when(consumerBuilder)
+        .messageHandler(any());
+    when(consumerBuilder.build()).thenReturn(consumer);
+
+    assertThat(journal.isComplete("substrate:journal:test")).isTrue();
+  }
+
+  @Test
+  void isCompleteReturnsFalseWhenNoCompletedMarker() {
+    StreamStats stats = mock(StreamStats.class);
+    when(environment.queryStreamStats("substrate-journal-test")).thenReturn(stats);
+
+    ConsumerBuilder consumerBuilder = mock(ConsumerBuilder.class);
+    when(environment.consumerBuilder()).thenReturn(consumerBuilder);
+    when(consumerBuilder.stream(any())).thenReturn(consumerBuilder);
+    when(consumerBuilder.offset(any(OffsetSpecification.class))).thenReturn(consumerBuilder);
+
+    Consumer consumer = mock(Consumer.class);
+    doAnswer(
+            invocation -> {
+              com.rabbitmq.stream.MessageHandler handler = invocation.getArgument(0);
+              Message message = mock(Message.class);
+              Map<String, Object> props =
+                  Map.of(
+                      "entryId", "some-entry-id",
+                      "journalKey", "substrate:journal:test",
+                      "timestamp", Instant.now().toString());
+              when(message.getApplicationProperties()).thenReturn(props);
+              handler.handle(mock(com.rabbitmq.stream.MessageHandler.Context.class), message);
+              return consumerBuilder;
+            })
+        .when(consumerBuilder)
+        .messageHandler(any());
+    when(consumerBuilder.build()).thenReturn(consumer);
+
+    assertThat(journal.isComplete("substrate:journal:test")).isFalse();
+  }
+
+  @Test
+  void deserializeEntryWithNullApplicationPropertiesSkipsEntry() {
+    StreamStats stats = mock(StreamStats.class);
+    when(environment.queryStreamStats("substrate-journal-test")).thenReturn(stats);
+
+    ConsumerBuilder consumerBuilder = mock(ConsumerBuilder.class);
+    when(environment.consumerBuilder()).thenReturn(consumerBuilder);
+    when(consumerBuilder.stream(any())).thenReturn(consumerBuilder);
+    when(consumerBuilder.offset(any(OffsetSpecification.class))).thenReturn(consumerBuilder);
+
+    Consumer consumer = mock(Consumer.class);
+    doAnswer(
+            invocation -> {
+              com.rabbitmq.stream.MessageHandler handler = invocation.getArgument(0);
+              Message message = mock(Message.class);
+              when(message.getApplicationProperties()).thenReturn(null);
+              handler.handle(mock(com.rabbitmq.stream.MessageHandler.Context.class), message);
+              return consumerBuilder;
+            })
+        .when(consumerBuilder)
+        .messageHandler(any());
+    when(consumerBuilder.build()).thenReturn(consumer);
+
+    List<RawJournalEntry> entries = journal.readAfter("substrate:journal:test", "0");
+
+    assertThat(entries).isEmpty();
+  }
+
+  @Test
+  void deserializeEntryWithMissingTimestampUsesCurrentTime() {
+    StreamStats stats = mock(StreamStats.class);
+    when(environment.queryStreamStats("substrate-journal-test")).thenReturn(stats);
+
+    ConsumerBuilder consumerBuilder = mock(ConsumerBuilder.class);
+    when(environment.consumerBuilder()).thenReturn(consumerBuilder);
+    when(consumerBuilder.stream(any())).thenReturn(consumerBuilder);
+    when(consumerBuilder.offset(any(OffsetSpecification.class))).thenReturn(consumerBuilder);
+
+    Consumer consumer = mock(Consumer.class);
+    Instant before = Instant.now();
+    doAnswer(
+            invocation -> {
+              com.rabbitmq.stream.MessageHandler handler = invocation.getArgument(0);
+              Message message = mock(Message.class);
+              Map<String, Object> props =
+                  Map.of("entryId", "test-entry-1", "journalKey", "substrate:journal:test");
+              when(message.getApplicationProperties()).thenReturn(props);
+              when(message.getBodyAsBinary()).thenReturn("data".getBytes(StandardCharsets.UTF_8));
+              handler.handle(mock(com.rabbitmq.stream.MessageHandler.Context.class), message);
+              return consumerBuilder;
+            })
+        .when(consumerBuilder)
+        .messageHandler(any());
+    when(consumerBuilder.build()).thenReturn(consumer);
+
+    List<RawJournalEntry> entries = journal.readLast("substrate:journal:test", 10);
+    Instant after = Instant.now();
+
+    assertThat(entries).hasSize(1);
+    assertThat(entries.getFirst().id()).isEqualTo("test-entry-1");
+    assertThat(entries.getFirst().timestamp()).isBetween(before, after);
+  }
+
+  @Test
+  void deserializeEntryWithNullBodyUsesEmptyByteArray() {
+    StreamStats stats = mock(StreamStats.class);
+    when(environment.queryStreamStats("substrate-journal-test")).thenReturn(stats);
+
+    ConsumerBuilder consumerBuilder = mock(ConsumerBuilder.class);
+    when(environment.consumerBuilder()).thenReturn(consumerBuilder);
+    when(consumerBuilder.stream(any())).thenReturn(consumerBuilder);
+    when(consumerBuilder.offset(any(OffsetSpecification.class))).thenReturn(consumerBuilder);
+
+    Consumer consumer = mock(Consumer.class);
+    doAnswer(
+            invocation -> {
+              com.rabbitmq.stream.MessageHandler handler = invocation.getArgument(0);
+              Message message = mock(Message.class);
+              Map<String, Object> props =
+                  Map.of(
+                      "entryId", "test-entry-1",
+                      "journalKey", "substrate:journal:test",
+                      "timestamp", Instant.now().toString());
+              when(message.getApplicationProperties()).thenReturn(props);
+              when(message.getBodyAsBinary()).thenReturn(null);
+              handler.handle(mock(com.rabbitmq.stream.MessageHandler.Context.class), message);
+              return consumerBuilder;
+            })
+        .when(consumerBuilder)
+        .messageHandler(any());
+    when(consumerBuilder.build()).thenReturn(consumer);
+
+    List<RawJournalEntry> entries = journal.readLast("substrate:journal:test", 10);
+
+    assertThat(entries).hasSize(1);
+    assertThat(entries.getFirst().data()).isEmpty();
   }
 }

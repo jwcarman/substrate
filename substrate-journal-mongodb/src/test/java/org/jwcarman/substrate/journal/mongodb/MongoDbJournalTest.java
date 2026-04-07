@@ -23,12 +23,14 @@ import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Date;
 import java.util.List;
 import org.bson.Document;
 import org.bson.types.Binary;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.jwcarman.substrate.spi.RawJournalEntry;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -127,5 +129,41 @@ class MongoDbJournalSpiTest {
   @Test
   void journalKeyUsesConfiguredPrefix() {
     assertThat(journal.journalKey("my-stream")).isEqualTo("substrate:journal:my-stream");
+  }
+
+  @Test
+  void mapDocumentWithNullTimestampFieldReturnsNullTimestamp() {
+    Document doc = new Document();
+    doc.put("key", "substrate:journal:test");
+    doc.put("entryId", "entry-1");
+    doc.put("data", new Binary("hello".getBytes(StandardCharsets.UTF_8)));
+    // No timestamp field
+
+    when(mongoTemplate.find(any(Query.class), eq(Document.class), eq("substrate_journal")))
+        .thenReturn(List.of(doc));
+
+    List<RawJournalEntry> entries =
+        journal.readAfter("substrate:journal:test", "00000000-0000-0000-0000-000000000000");
+
+    assertThat(entries).hasSize(1);
+    assertThat(entries.getFirst().timestamp()).isNull();
+  }
+
+  @Test
+  void mapDocumentWithNullDataFieldReturnsEmptyByteArray() {
+    Document doc = new Document();
+    doc.put("key", "substrate:journal:test");
+    doc.put("entryId", "entry-1");
+    doc.put("timestamp", new Date());
+    // No data field
+
+    when(mongoTemplate.find(any(Query.class), eq(Document.class), eq("substrate_journal")))
+        .thenReturn(List.of(doc));
+
+    List<RawJournalEntry> entries =
+        journal.readAfter("substrate:journal:test", "00000000-0000-0000-0000-000000000000");
+
+    assertThat(entries).hasSize(1);
+    assertThat(entries.getFirst().data()).isEmpty();
   }
 }

@@ -182,6 +182,38 @@ class PostgresJournalSpiIT {
     assertThat(count).isEqualTo(1);
   }
 
+  @Test
+  void isCompleteReturnsFalseForNonCompletedJournal() {
+    String key = journal.journalKey("incomplete-test");
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+
+    assertThat(journal.isComplete(key)).isFalse();
+  }
+
+  @Test
+  void isCompleteReturnsTrueAfterComplete() {
+    String key = journal.journalKey("is-complete-test");
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+    journal.complete(key);
+
+    assertThat(journal.isComplete(key)).isTrue();
+  }
+
+  @Test
+  void trimRemovesOldEntriesAfter100Appends() {
+    PostgresJournalSpi smallJournal =
+        new PostgresJournalSpi(jdbcTemplate, "substrate:journal:", 10);
+
+    String key = smallJournal.journalKey("trim-100-test");
+    for (int i = 0; i < 100; i++) {
+      smallJournal.append(key, ("event-" + i).getBytes(StandardCharsets.UTF_8));
+    }
+
+    List<RawJournalEntry> entries = smallJournal.readLast(key, 100);
+    assertThat(entries).hasSizeLessThanOrEqualTo(10);
+    assertThat(new String(entries.getLast().data(), StandardCharsets.UTF_8)).isEqualTo("event-99");
+  }
+
   private DataSource createDataSource() {
     DriverManagerDataSource ds = new DriverManagerDataSource();
     ds.setUrl(POSTGRES.getJdbcUrl());

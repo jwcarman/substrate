@@ -141,11 +141,10 @@ class DefaultMailboxTest {
     Thread.ofVirtual()
         .start(
             () -> {
-              try {
-                Thread.sleep(100);
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-              }
+              await()
+                  .pollDelay(Duration.ofMillis(100))
+                  .atMost(Duration.ofSeconds(1))
+                  .until(() -> true);
               mailbox.deliver("async-value");
             });
 

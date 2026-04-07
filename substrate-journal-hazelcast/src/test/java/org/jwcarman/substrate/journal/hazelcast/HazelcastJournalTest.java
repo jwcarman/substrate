@@ -16,6 +16,9 @@
 package org.jwcarman.substrate.journal.hazelcast;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -24,9 +27,12 @@ import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.map.IMap;
 import com.hazelcast.ringbuffer.Ringbuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.jwcarman.substrate.spi.RawJournalEntry;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.ObjectMapper;
@@ -80,7 +86,103 @@ class HazelcastJournalSpiTest {
   }
 
   @Test
+  void isCompleteReturnsFalseWhenMapReturnsFalse() {
+    when(hazelcastInstance.<String, Boolean>getMap("substrate-journal-completed"))
+        .thenReturn(completedMap);
+    when(completedMap.get("test-key")).thenReturn(null);
+
+    assertThat(journal.isComplete("test-key")).isFalse();
+  }
+
+  @Test
+  void isCompleteReturnsTrueWhenMapReturnsTrue() {
+    when(hazelcastInstance.<String, Boolean>getMap("substrate-journal-completed"))
+        .thenReturn(completedMap);
+    when(completedMap.get("test-key")).thenReturn(Boolean.TRUE);
+
+    assertThat(journal.isComplete("test-key")).isTrue();
+  }
+
+  @Test
   void journalKeyUsesConfiguredPrefix() {
     assertThat(journal.journalKey("my-stream")).isEqualTo("substrate:journal:my-stream");
+  }
+
+  @Test
+  void readAfterReturnsEmptyListWhenReadManyAsyncThrowsException() {
+    when(hazelcastInstance.<String>getRingbuffer("test-key")).thenReturn(ringbuffer);
+    when(ringbuffer.tailSequence()).thenReturn(10L);
+    when(ringbuffer.headSequence()).thenReturn(0L);
+    CompletableFuture<com.hazelcast.ringbuffer.ReadResultSet<String>> failedFuture =
+        new CompletableFuture<>();
+    failedFuture.completeExceptionally(new RuntimeException("read failed"));
+    when(ringbuffer.readManyAsync(anyLong(), anyInt(), anyInt(), any())).thenReturn(failedFuture);
+
+    List<RawJournalEntry> entries = journal.readAfter("test-key", "0");
+
+    assertThat(entries).isEmpty();
+  }
+
+  @Test
+  void readLastReturnsEmptyListWhenExceptionOccurs() {
+    when(hazelcastInstance.<String>getRingbuffer("test-key")).thenReturn(ringbuffer);
+    when(ringbuffer.tailSequence()).thenReturn(5L);
+    when(ringbuffer.headSequence()).thenReturn(0L);
+    CompletableFuture<com.hazelcast.ringbuffer.ReadResultSet<String>> failedFuture =
+        new CompletableFuture<>();
+    failedFuture.completeExceptionally(new RuntimeException("read failed"));
+    when(ringbuffer.readManyAsync(anyLong(), anyInt(), anyInt(), any())).thenReturn(failedFuture);
+
+    List<RawJournalEntry> entries = journal.readLast("test-key", 5);
+
+    assertThat(entries).isEmpty();
+  }
+
+  @Test
+  void deserializeWithCorruptJsonReturnsEmptyList() {
+    when(hazelcastInstance.<String>getRingbuffer("test-key")).thenReturn(ringbuffer);
+    when(ringbuffer.tailSequence()).thenReturn(0L);
+    when(ringbuffer.headSequence()).thenReturn(0L);
+
+    var resultSet =
+        new com.hazelcast.ringbuffer.ReadResultSet<String>() {
+          @Override
+          public int readCount() {
+            return 1;
+          }
+
+          @Override
+          public String get(int index) {
+            return "not valid json at all";
+          }
+
+          @Override
+          public long getSequence(int index) {
+            return 0;
+          }
+
+          @Override
+          public long getNextSequenceToReadFrom() {
+            return 1;
+          }
+
+          @Override
+          public int size() {
+            return 1;
+          }
+
+          @Override
+          public java.util.Iterator<String> iterator() {
+            return List.of("not valid json at all").iterator();
+          }
+        };
+
+    CompletableFuture<com.hazelcast.ringbuffer.ReadResultSet<String>> future =
+        CompletableFuture.completedFuture(resultSet);
+    when(ringbuffer.readManyAsync(anyLong(), anyInt(), anyInt(), any())).thenReturn(future);
+
+    // deserialize throws IllegalStateException, which readAfter catches and returns empty list
+    List<RawJournalEntry> entries = journal.readAfter("test-key", "-1");
+    assertThat(entries).isEmpty();
   }
 }

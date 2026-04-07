@@ -166,6 +166,23 @@ class HazelcastJournalSpiIT {
   }
 
   @Test
+  void isCompleteReturnsFalseForNonCompletedJournal() {
+    String key = journal.journalKey("incomplete-" + System.nanoTime());
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+
+    assertThat(journal.isComplete(key)).isFalse();
+  }
+
+  @Test
+  void isCompleteReturnsTrueAfterComplete() {
+    String key = journal.journalKey("is-complete-" + System.nanoTime());
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+    journal.complete(key);
+
+    assertThat(journal.isComplete(key)).isTrue();
+  }
+
+  @Test
   void journalKeyUsesConfiguredPrefix() {
     assertThat(journal.journalKey("my-stream")).isEqualTo("substrate:journal:my-stream");
   }

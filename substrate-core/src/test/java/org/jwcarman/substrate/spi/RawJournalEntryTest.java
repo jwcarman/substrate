@@ -83,7 +83,7 @@ class RawJournalEntryTest {
   void hashCodeSameForEqualEntries() {
     RawJournalEntry entry1 = new RawJournalEntry("id1", "key1", "data".getBytes(UTF_8), NOW);
     RawJournalEntry entry2 = new RawJournalEntry("id1", "key1", "data".getBytes(UTF_8), NOW);
-    assertThat(entry1.hashCode()).isEqualTo(entry2.hashCode());
+    assertThat(entry1).hasSameHashCodeAs(entry2);
   }
 
   @Test
@@ -98,10 +98,7 @@ class RawJournalEntryTest {
     byte[] data = "hello".getBytes(UTF_8);
     RawJournalEntry entry = new RawJournalEntry("id1", "key1", data, NOW);
     String str = entry.toString();
-    assertThat(str).contains("id1");
-    assertThat(str).contains("key1");
-    assertThat(str).contains(NOW.toString());
-    assertThat(str).startsWith("RawJournalEntry[");
+    assertThat(str).startsWith("RawJournalEntry[").contains("id1", "key1", NOW.toString());
   }
 
   @Test

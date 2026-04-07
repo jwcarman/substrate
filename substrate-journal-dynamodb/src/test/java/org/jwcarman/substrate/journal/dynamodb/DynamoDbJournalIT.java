@@ -238,6 +238,23 @@ class DynamoDbJournalSpiIT {
   }
 
   @Test
+  void isCompleteReturnsFalseForNonCompletedJournal() {
+    String key = journal.journalKey("incomplete");
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+
+    assertThat(journal.isComplete(key)).isFalse();
+  }
+
+  @Test
+  void isCompleteReturnsTrueAfterComplete() {
+    String key = journal.journalKey("is-complete");
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+    journal.complete(key);
+
+    assertThat(journal.isComplete(key)).isTrue();
+  }
+
+  @Test
   void readAfterExcludesCompletionMarker() {
     String key = journal.journalKey("completed-read-after");
     String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8));
