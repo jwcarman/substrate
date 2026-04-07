@@ -116,4 +116,49 @@ class DefaultMailboxTest {
 
     assertThat(spi.get(KEY)).isEmpty();
   }
+
+  @Test
+  void deleteBeforeDeliveryCancelsFuture() {
+    mailbox.delete();
+
+    Optional<String> result = mailbox.poll(Duration.ofMillis(50));
+    assertThat(result).isEmpty();
+  }
+
+  @Test
+  void deleteRemovesValueFromSpi() {
+    mailbox.deliver("value");
+    assertThat(spi.get(KEY)).isPresent();
+
+    mailbox.delete();
+
+    assertThat(spi.get(KEY)).isEmpty();
+  }
+
+  @Test
+  void pollReturnsValueWhenNotificationArrivesForMatchingKey() {
+    // Deliver from a separate thread after a brief delay
+    Thread.ofVirtual()
+        .start(
+            () -> {
+              try {
+                Thread.sleep(100);
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+              }
+              mailbox.deliver("async-value");
+            });
+
+    Optional<String> result = mailbox.poll(Duration.ofSeconds(5));
+    assertThat(result).contains("async-value");
+  }
+
+  @Test
+  void notificationForDifferentKeyDoesNotTriggerRead() {
+    // Send a notification for a different key - should not wake up the reader
+    notifier.notify("some-other-key", "payload");
+
+    Optional<String> result = mailbox.poll(Duration.ofMillis(200));
+    assertThat(result).isEmpty();
+  }
 }

@@ -59,6 +59,59 @@ class SnsNotifierAutoConfigurationTest {
   }
 
   @Test
+  void usesExistingSnsClientBeanWhenProvided() {
+    new ApplicationContextRunner()
+        .withConfiguration(AutoConfigurations.of(SnsNotifierAutoConfiguration.class))
+        .withUserConfiguration(MockAwsConfiguration.class)
+        .withPropertyValues("substrate.notifier.sns.topic-arn=arn:aws:sns:us-east-1:123456789:test")
+        .run(
+            context -> {
+              assertThat(context).hasSingleBean(SnsClient.class);
+              // The bean should be the one from MockAwsConfiguration, not auto-created
+              assertThat(context.getBean(SnsClient.class)).isNotNull();
+            });
+  }
+
+  @Test
+  void usesExistingSqsClientBeanWhenProvided() {
+    new ApplicationContextRunner()
+        .withConfiguration(AutoConfigurations.of(SnsNotifierAutoConfiguration.class))
+        .withUserConfiguration(MockAwsConfiguration.class)
+        .withPropertyValues("substrate.notifier.sns.topic-arn=arn:aws:sns:us-east-1:123456789:test")
+        .run(
+            context -> {
+              assertThat(context).hasSingleBean(SqsClient.class);
+              // The bean should be the one from MockAwsConfiguration, not auto-created
+              assertThat(context.getBean(SqsClient.class)).isNotNull();
+            });
+  }
+
+  @Test
+  void autoCreatesTopicWhenAutoCreateTopicEnabledAndNoTopicArn() {
+    SnsClient mockSnsClient = mock(SnsClient.class);
+    when(mockSnsClient.createTopic(any(java.util.function.Consumer.class)))
+        .thenReturn(
+            software.amazon.awssdk.services.sns.model.CreateTopicResponse.builder()
+                .topicArn("arn:aws:sns:us-east-1:123456789:substrate-notifications")
+                .build());
+    when(mockSnsClient.subscribe(any(SubscribeRequest.class)))
+        .thenReturn(
+            SubscribeResponse.builder()
+                .subscriptionArn("arn:aws:sns:us-east-1:123456789:test:sub-123")
+                .build());
+
+    new ApplicationContextRunner()
+        .withConfiguration(AutoConfigurations.of(SnsNotifierAutoConfiguration.class))
+        .withBean(SnsClient.class, () -> mockSnsClient)
+        .withUserConfiguration(MockSqsOnlyConfiguration.class)
+        .withPropertyValues("substrate.notifier.sns.auto-create-topic=true")
+        .run(
+            context -> {
+              assertThat(context).hasSingleBean(SnsNotifier.class);
+            });
+  }
+
+  @Test
   void snsNotifierSuppressesInMemoryFallback() {
     new ApplicationContextRunner()
         .withConfiguration(
@@ -72,6 +125,33 @@ class SnsNotifierAutoConfigurationTest {
               assertThat(context.getBean(Notifier.class)).isInstanceOf(SnsNotifier.class);
               assertThat(context).doesNotHaveBean(InMemoryNotifier.class);
             });
+  }
+
+  @Configuration(proxyBeanMethods = false)
+  static class MockSqsOnlyConfiguration {
+
+    @Bean
+    SqsClient sqsClient() {
+      SqsClient client = mock(SqsClient.class);
+      when(client.createQueue(any(CreateQueueRequest.class)))
+          .thenReturn(
+              CreateQueueResponse.builder()
+                  .queueUrl("http://localhost:4566/000000000000/test-queue")
+                  .build());
+      when(client.getQueueAttributes(any(GetQueueAttributesRequest.class)))
+          .thenReturn(
+              GetQueueAttributesResponse.builder()
+                  .attributes(
+                      Map.of(
+                          QueueAttributeName.QUEUE_ARN,
+                          "arn:aws:sqs:us-east-1:000000000000:test-queue"))
+                  .build());
+      when(client.setQueueAttributes(any(SetQueueAttributesRequest.class)))
+          .thenReturn(SetQueueAttributesResponse.builder().build());
+      when(client.receiveMessage(any(ReceiveMessageRequest.class)))
+          .thenReturn(ReceiveMessageResponse.builder().build());
+      return client;
+    }
   }
 
   @Configuration(proxyBeanMethods = false)

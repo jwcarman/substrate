@@ -85,7 +85,7 @@ public class DefaultMailbox<T> implements Mailbox<T> {
     try {
       T value = future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
       return Optional.of(value);
-    } catch (TimeoutException _) {
+    } catch (TimeoutException | java.util.concurrent.CancellationException _) {
       return Optional.empty();
     } catch (InterruptedException | java.util.concurrent.ExecutionException _) {
       Thread.currentThread().interrupt();
