@@ -33,6 +33,7 @@ import org.jwcarman.substrate.spi.JournalSpi;
 import org.jwcarman.substrate.spi.MailboxSpi;
 import org.jwcarman.substrate.spi.NotificationHandler;
 import org.jwcarman.substrate.spi.Notifier;
+import org.jwcarman.substrate.spi.NotifierSubscription;
 import org.jwcarman.substrate.spi.RawJournalEntry;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -274,6 +275,8 @@ class SubstrateAutoConfigurationTest {
     public void notify(String key, String payload) {}
 
     @Override
-    public void subscribe(NotificationHandler handler) {}
+    public NotifierSubscription subscribe(NotificationHandler handler) {
+      return () -> {};
+    }
   }
 }

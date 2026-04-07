@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.spi.JournalSpi;
 import org.jwcarman.substrate.spi.Notifier;
+import org.jwcarman.substrate.spi.NotifierSubscription;
 import org.jwcarman.substrate.spi.RawJournalEntry;
 
 class DefaultJournalCursor<T> implements JournalCursor<T> {
@@ -42,6 +43,7 @@ class DefaultJournalCursor<T> implements JournalCursor<T> {
   private final LinkedBlockingQueue<QueueItem<T>> queue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
   private final Semaphore semaphore = new Semaphore(0);
   private final Thread readerThread;
+  private final NotifierSubscription notifierSubscription;
 
   private volatile String lastId;
 
@@ -54,9 +56,14 @@ class DefaultJournalCursor<T> implements JournalCursor<T> {
       List<RawJournalEntry> preloadedEntries) {
     this.lastId = afterId;
 
-    // Seed the queue with preloaded entries and advance the reader's starting position
+    // Seed the queue with preloaded entries (capped at queue capacity) and advance the
+    // reader's starting position
     String readStart = afterId;
-    for (RawJournalEntry raw : preloadedEntries) {
+    int preloadLimit = Math.min(preloadedEntries.size(), QUEUE_CAPACITY);
+    // If there are more preloaded entries than capacity, skip to the last QUEUE_CAPACITY entries
+    int startIndex = preloadedEntries.size() - preloadLimit;
+    for (int i = startIndex; i < preloadedEntries.size(); i++) {
+      RawJournalEntry raw = preloadedEntries.get(i);
       queue.add(
           new QueueItem.Entry<>(
               new JournalEntry<>(raw.id(), raw.key(), codec.decode(raw.data()), raw.timestamp())));
@@ -65,12 +72,13 @@ class DefaultJournalCursor<T> implements JournalCursor<T> {
 
     final String readerStartId = readStart;
 
-    notifier.subscribe(
-        (notifiedKey, payload) -> {
-          if (key.equals(notifiedKey)) {
-            semaphore.release();
-          }
-        });
+    notifierSubscription =
+        notifier.subscribe(
+            (notifiedKey, payload) -> {
+              if (key.equals(notifiedKey)) {
+                semaphore.release();
+              }
+            });
 
     readerThread =
         Thread.ofVirtual()
@@ -154,8 +162,12 @@ class DefaultJournalCursor<T> implements JournalCursor<T> {
   @Override
   public void close() {
     open.set(false);
+    // Unregister from Notifier to prevent memory leak
+    notifierSubscription.cancel();
     // Interrupt unblocks the reader thread from put() or tryAcquire()
     readerThread.interrupt();
+    // Clear queue to ensure the Complete sentinel can be offered (fixes full-queue case)
+    queue.clear();
     // Wake the consumer if it's blocked on queue.poll()
     queue.offer(new QueueItem.Complete<>());
   }

@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.jwcarman.substrate.spi.NotificationHandler;
 import org.jwcarman.substrate.spi.Notifier;
+import org.jwcarman.substrate.spi.NotifierSubscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.SmartLifecycle;
@@ -82,8 +83,9 @@ public class SnsNotifier implements Notifier, SmartLifecycle {
   }
 
   @Override
-  public void subscribe(NotificationHandler handler) {
+  public NotifierSubscription subscribe(NotificationHandler handler) {
     handlers.add(handler);
+    return () -> handlers.remove(handler);
   }
 
   @Override

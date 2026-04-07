@@ -50,6 +50,7 @@ class DefaultJournalTest {
     lenient()
         .when(codec.decode(any(byte[].class)))
         .thenAnswer(inv -> new String((byte[]) inv.getArgument(0), UTF_8));
+    lenient().when(notifier.subscribe(any())).thenReturn(() -> {});
     journal = new DefaultJournal<>(spi, KEY, codec, notifier);
   }
 

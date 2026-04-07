@@ -24,6 +24,7 @@ import java.util.concurrent.TimeoutException;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.spi.MailboxSpi;
 import org.jwcarman.substrate.spi.Notifier;
+import org.jwcarman.substrate.spi.NotifierSubscription;
 
 public class DefaultMailbox<T> implements Mailbox<T> {
 
@@ -35,6 +36,7 @@ public class DefaultMailbox<T> implements Mailbox<T> {
   private final Notifier notifier;
   private final CompletableFuture<T> future = new CompletableFuture<>();
   private final Semaphore semaphore = new Semaphore(0);
+  private final NotifierSubscription notifierSubscription;
 
   public DefaultMailbox(MailboxSpi mailboxSpi, String key, Codec<T> codec, Notifier notifier) {
     this.mailboxSpi = mailboxSpi;
@@ -42,12 +44,13 @@ public class DefaultMailbox<T> implements Mailbox<T> {
     this.codec = codec;
     this.notifier = notifier;
 
-    notifier.subscribe(
-        (notifiedKey, payload) -> {
-          if (key.equals(notifiedKey)) {
-            semaphore.release();
-          }
-        });
+    notifierSubscription =
+        notifier.subscribe(
+            (notifiedKey, payload) -> {
+              if (key.equals(notifiedKey)) {
+                semaphore.release();
+              }
+            });
 
     Thread.ofVirtual()
         .start(
@@ -94,6 +97,7 @@ public class DefaultMailbox<T> implements Mailbox<T> {
   @Override
   public void delete() {
     future.cancel(false);
+    notifierSubscription.cancel();
     semaphore.release();
     mailboxSpi.delete(key);
   }

@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.jwcarman.substrate.spi.NotificationHandler;
 import org.jwcarman.substrate.spi.Notifier;
+import org.jwcarman.substrate.spi.NotifierSubscription;
 
 public class InMemoryNotifier implements Notifier {
 
@@ -32,7 +33,8 @@ public class InMemoryNotifier implements Notifier {
   }
 
   @Override
-  public void subscribe(NotificationHandler handler) {
+  public NotifierSubscription subscribe(NotificationHandler handler) {
     handlers.add(handler);
+    return () -> handlers.remove(handler);
   }
 }

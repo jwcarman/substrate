@@ -23,6 +23,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.jwcarman.substrate.spi.NotificationHandler;
 import org.jwcarman.substrate.spi.Notifier;
+import org.jwcarman.substrate.spi.NotifierSubscription;
 import org.springframework.context.SmartLifecycle;
 
 public class RedisNotifier extends RedisPubSubAdapter<String, String>
@@ -54,8 +55,9 @@ public class RedisNotifier extends RedisPubSubAdapter<String, String>
   }
 
   @Override
-  public void subscribe(NotificationHandler handler) {
+  public NotifierSubscription subscribe(NotificationHandler handler) {
     handlers.add(handler);
+    return () -> handlers.remove(handler);
   }
 
   @Override

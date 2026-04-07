@@ -15,8 +15,7 @@
  */
 package org.jwcarman.substrate.spi;
 
-public interface Notifier {
-  void notify(String key, String payload);
-
-  NotifierSubscription subscribe(NotificationHandler handler);
+@FunctionalInterface
+public interface NotifierSubscription {
+  void cancel();
 }
