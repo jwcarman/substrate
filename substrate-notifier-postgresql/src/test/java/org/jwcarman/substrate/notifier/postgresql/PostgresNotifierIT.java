@@ -47,6 +47,7 @@ class PostgresNotifierIT {
     JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
     notifier = new PostgresNotifier(jdbcTemplate, dataSource, "substrate_notify", 500);
     notifier.start();
+    await().atMost(Duration.ofSeconds(5)).until(notifier::isListening);
   }
 
   @AfterEach
@@ -120,15 +121,31 @@ class PostgresNotifierIT {
   }
 
   @Test
-  void reconnectsAfterConnectionLoss() {
+  void reconnectsAfterConnectionLoss() throws Exception {
     List<String> received = new CopyOnWriteArrayList<>();
     notifier.subscribe((key, payload) -> received.add(payload));
 
+    // Send a notification before the connection drop to verify baseline
     notifier.notify("key", "before");
-
     await()
         .atMost(Duration.ofSeconds(5))
         .untilAsserted(() -> assertThat(received).contains("before"));
+
+    // Kill all backend connections to force a reconnect
+    JdbcTemplate adminJdbc = new JdbcTemplate(createDataSource());
+    adminJdbc.execute(
+        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+            + "WHERE pid <> pg_backend_pid() AND datname = current_database()");
+
+    // Wait for the listener to detect the loss and reconnect
+    await().atMost(Duration.ofSeconds(10)).until(() -> !notifier.isListening());
+    await().atMost(Duration.ofSeconds(10)).until(notifier::isListening);
+
+    // Send a notification after reconnection
+    notifier.notify("key", "after");
+    await()
+        .atMost(Duration.ofSeconds(5))
+        .untilAsserted(() -> assertThat(received).contains("after"));
   }
 
   private DataSource createDataSource() {

@@ -48,6 +48,7 @@ public class PostgresNotifier implements Notifier, SmartLifecycle {
   private final List<NotificationHandler> handlers = new CopyOnWriteArrayList<>();
 
   private final AtomicBoolean running = new AtomicBoolean(false);
+  private final AtomicBoolean listening = new AtomicBoolean(false);
   private final AtomicReference<Thread> listenerThread = new AtomicReference<>();
   private final AtomicReference<Connection> listenConnection = new AtomicReference<>();
 
@@ -103,6 +104,10 @@ public class PostgresNotifier implements Notifier, SmartLifecycle {
     return running.get();
   }
 
+  public boolean isListening() {
+    return listening.get();
+  }
+
   private void listenLoop() {
     while (running.get()) {
       try {
@@ -119,8 +124,13 @@ public class PostgresNotifier implements Notifier, SmartLifecycle {
 
         log.info("Listening on PostgreSQL channel '{}'", channel);
 
+        boolean firstPoll = true;
         while (running.get()) {
           PGNotification[] notifications = pgConnection.getNotifications(pollTimeoutMillis);
+          if (firstPoll) {
+            listening.set(true);
+            firstPoll = false;
+          }
           if (notifications != null) {
             for (PGNotification notification : notifications) {
               dispatchNotification(notification.getParameter());
@@ -128,6 +138,7 @@ public class PostgresNotifier implements Notifier, SmartLifecycle {
           }
         }
       } catch (SQLException e) {
+        listening.set(false);
         if (running.get()) {
           log.warn("PostgreSQL LISTEN connection lost, reconnecting", e);
           closeListenConnection();
