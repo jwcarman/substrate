@@ -118,7 +118,7 @@ class JournalSubscriptionTest {
     JournalSubscriber<String> subscriber =
         new JournalSubscriber<>() {
           @Override
-          public void onEntry(TypedJournalEntry<String> entry) {
+          public void onEntry(JournalEntry<String> entry) {
             received.add(entry.data());
           }
 
@@ -156,7 +156,7 @@ class JournalSubscriptionTest {
                 journal.complete();
               });
 
-      List<String> collected = streamSub.stream().map(TypedJournalEntry::data).toList();
+      List<String> collected = streamSub.stream().map(JournalEntry::data).toList();
 
       assertThat(collected).containsExactly("a", "b", "c");
       sub.cancel();

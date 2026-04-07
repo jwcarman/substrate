@@ -23,9 +23,9 @@ public interface Journal<T> {
 
   String append(T data, Duration ttl);
 
-  Stream<TypedJournalEntry<T>> readAfter(String afterId);
+  Stream<JournalEntry<T>> readAfter(String afterId);
 
-  Stream<TypedJournalEntry<T>> readLast(int count);
+  Stream<JournalEntry<T>> readLast(int count);
 
   void complete();
 

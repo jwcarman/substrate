@@ -26,11 +26,10 @@ import io.lettuce.core.api.sync.RedisCommands;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
-import java.util.concurrent.CompletableFuture;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.jwcarman.substrate.spi.Notifier;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -38,17 +37,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class RedisMailboxTest {
 
   @Mock private RedisCommands<String, String> commands;
-  @Mock private Notifier notifier;
 
   private RedisMailboxSpi mailbox;
 
   @BeforeEach
   void setUp() {
-    mailbox = new RedisMailboxSpi(commands, notifier, "substrate:mailbox:", Duration.ofMinutes(5));
+    mailbox = new RedisMailboxSpi(commands, "substrate:mailbox:", Duration.ofMinutes(5));
   }
 
   @Test
-  void deliverSetsValueWithTtlAndNotifies() {
+  void deliverSetsValueWithTtl() {
     mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8));
 
     verify(commands)
@@ -56,42 +54,35 @@ class RedisMailboxTest {
             eq("substrate:mailbox:test"),
             eq(Base64.getEncoder().encodeToString("hello".getBytes(StandardCharsets.UTF_8))),
             any(SetArgs.class));
-    verify(notifier).notify("substrate:mailbox:test", "substrate:mailbox:test");
   }
 
   @Test
-  void awaitReturnsImmediatelyWhenValueExists() {
+  void getReturnsValueWhenExists() {
     when(commands.get("substrate:mailbox:test"))
         .thenReturn(
             Base64.getEncoder().encodeToString("existing-value".getBytes(StandardCharsets.UTF_8)));
 
-    CompletableFuture<byte[]> future =
-        mailbox.await("substrate:mailbox:test", Duration.ofSeconds(5));
+    Optional<byte[]> result = mailbox.get("substrate:mailbox:test");
 
-    assertThat(future.join()).isEqualTo("existing-value".getBytes(StandardCharsets.UTF_8));
+    assertThat(result).isPresent();
+    assertThat(result.get()).isEqualTo("existing-value".getBytes(StandardCharsets.UTF_8));
   }
 
   @Test
-  void awaitReturnsPendingFutureWhenValueDoesNotExist() {
+  void getReturnsEmptyWhenValueDoesNotExist() {
     when(commands.get("substrate:mailbox:test")).thenReturn(null);
 
-    CompletableFuture<byte[]> future =
-        mailbox.await("substrate:mailbox:test", Duration.ofSeconds(5));
+    Optional<byte[]> result = mailbox.get("substrate:mailbox:test");
 
-    assertThat(future).isNotDone();
+    assertThat(result).isEmpty();
   }
 
   @Test
-  void deleteRemovesKeyAndCancelsPendingFuture() {
-    when(commands.get("substrate:mailbox:test")).thenReturn(null);
-    CompletableFuture<byte[]> future =
-        mailbox.await("substrate:mailbox:test", Duration.ofSeconds(30));
-
+  void deleteRemovesKey() {
     when(commands.del("substrate:mailbox:test")).thenReturn(1L);
     mailbox.delete("substrate:mailbox:test");
 
     verify(commands).del("substrate:mailbox:test");
-    assertThat(future).isCancelled();
   }
 
   @Test

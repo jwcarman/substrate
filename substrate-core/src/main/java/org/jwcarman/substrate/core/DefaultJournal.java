@@ -20,9 +20,9 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 import org.jwcarman.codec.spi.Codec;
-import org.jwcarman.substrate.spi.JournalEntry;
 import org.jwcarman.substrate.spi.JournalSpi;
 import org.jwcarman.substrate.spi.Notifier;
+import org.jwcarman.substrate.spi.RawJournalEntry;
 
 public class DefaultJournal<T> implements Journal<T> {
 
@@ -55,12 +55,12 @@ public class DefaultJournal<T> implements Journal<T> {
   }
 
   @Override
-  public Stream<TypedJournalEntry<T>> readAfter(String afterId) {
+  public Stream<JournalEntry<T>> readAfter(String afterId) {
     return journalSpi.readAfter(key, afterId).map(this::toTyped);
   }
 
   @Override
-  public Stream<TypedJournalEntry<T>> readLast(int count) {
+  public Stream<JournalEntry<T>> readLast(int count) {
     return journalSpi.readLast(key, count).map(this::toTyped);
   }
 
@@ -82,8 +82,7 @@ public class DefaultJournal<T> implements Journal<T> {
 
   @Override
   public Subscription subscribe(JournalSubscriber<T> subscriber) {
-    // Snapshot the current tail so we only receive new entries
-    List<JournalEntry> lastEntries = journalSpi.readLast(key, 1).toList();
+    List<RawJournalEntry> lastEntries = journalSpi.readLast(key, 1).toList();
     String tailId = lastEntries.isEmpty() ? null : lastEntries.getLast().id();
     return startSubscription(tailId, subscriber);
   }
@@ -97,7 +96,6 @@ public class DefaultJournal<T> implements Journal<T> {
     Object monitor = new Object();
     AtomicBoolean woken = new AtomicBoolean(false);
 
-    // Register notifier BEFORE starting the reader to avoid missing signals
     notifier.subscribe(
         (notifiedKey, payload) -> {
           if (key.equals(notifiedKey)) {
@@ -121,19 +119,19 @@ public class DefaultJournal<T> implements Journal<T> {
     String cursor = initialCursor;
     try {
       while (!Thread.currentThread().isInterrupted()) {
-        List<JournalEntry> entries;
+        List<RawJournalEntry> entries;
         if (cursor != null) {
           entries = journalSpi.readAfter(key, cursor).toList();
         } else {
           entries = journalSpi.readLast(key, Integer.MAX_VALUE).toList();
         }
 
-        for (JournalEntry entry : entries) {
+        for (RawJournalEntry entry : entries) {
           subscriber.onEntry(toTyped(entry));
           cursor = entry.id();
         }
 
-        if (journalSpi.isCompleted(key)) {
+        if (journalSpi.isComplete(key)) {
           subscriber.onComplete();
           return;
         }
@@ -149,8 +147,8 @@ public class DefaultJournal<T> implements Journal<T> {
     }
   }
 
-  private TypedJournalEntry<T> toTyped(JournalEntry entry) {
-    return new TypedJournalEntry<>(
+  private JournalEntry<T> toTyped(RawJournalEntry entry) {
+    return new JournalEntry<>(
         entry.id(), entry.key(), codec.decode(entry.data()), entry.timestamp());
   }
 }

@@ -26,7 +26,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
 import org.jwcarman.substrate.spi.AbstractJournalSpi;
-import org.jwcarman.substrate.spi.JournalEntry;
+import org.jwcarman.substrate.spi.RawJournalEntry;
 
 public class InMemoryJournalSpi extends AbstractJournalSpi {
 
@@ -57,13 +57,13 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
       throw new IllegalStateException("Journal '" + key + "' is completed");
     }
     String entryId = counter.incrementAndGet() + "-0";
-    JournalEntry entry = new JournalEntry(entryId, key, data, Instant.now());
+    RawJournalEntry entry = new RawJournalEntry(entryId, key, data, Instant.now());
     journals.computeIfAbsent(key, k -> new BoundedEntryList(maxLen)).add(entry);
     return entryId;
   }
 
   @Override
-  public Stream<JournalEntry> readAfter(String key, String afterId) {
+  public Stream<RawJournalEntry> readAfter(String key, String afterId) {
     BoundedEntryList list = journals.get(key);
     if (list == null) {
       return Stream.empty();
@@ -73,12 +73,12 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<JournalEntry> readLast(String key, int count) {
+  public Stream<RawJournalEntry> readLast(String key, int count) {
     BoundedEntryList list = journals.get(key);
     if (list == null) {
       return Stream.empty();
     }
-    List<JournalEntry> snapshot = list.snapshot();
+    List<RawJournalEntry> snapshot = list.snapshot();
     int start = Math.max(0, snapshot.size() - count);
     return snapshot.subList(start, snapshot.size()).stream();
   }
@@ -89,7 +89,7 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public boolean isCompleted(String key) {
+  public boolean isComplete(String key) {
     return completed.contains(key);
   }
 
@@ -107,20 +107,20 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
   private static final class BoundedEntryList {
 
     private final int maxSize;
-    private final LinkedList<JournalEntry> entries = new LinkedList<>();
+    private final LinkedList<RawJournalEntry> entries = new LinkedList<>();
 
     BoundedEntryList(int maxSize) {
       this.maxSize = maxSize;
     }
 
-    synchronized void add(JournalEntry entry) {
+    synchronized void add(RawJournalEntry entry) {
       entries.addLast(entry);
       while (entries.size() > maxSize) {
         entries.removeFirst();
       }
     }
 
-    synchronized List<JournalEntry> snapshot() {
+    synchronized List<RawJournalEntry> snapshot() {
       return new ArrayList<>(entries);
     }
   }

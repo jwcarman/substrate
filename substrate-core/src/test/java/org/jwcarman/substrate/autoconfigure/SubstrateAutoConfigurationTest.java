@@ -18,7 +18,7 @@ package org.jwcarman.substrate.autoconfigure;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
+import java.util.Optional;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,11 +29,11 @@ import org.jwcarman.substrate.core.MailboxFactory;
 import org.jwcarman.substrate.memory.InMemoryJournalSpi;
 import org.jwcarman.substrate.memory.InMemoryMailboxSpi;
 import org.jwcarman.substrate.memory.InMemoryNotifier;
-import org.jwcarman.substrate.spi.JournalEntry;
 import org.jwcarman.substrate.spi.JournalSpi;
 import org.jwcarman.substrate.spi.MailboxSpi;
 import org.jwcarman.substrate.spi.NotificationHandler;
 import org.jwcarman.substrate.spi.Notifier;
+import org.jwcarman.substrate.spi.RawJournalEntry;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -223,12 +223,12 @@ class SubstrateAutoConfigurationTest {
     }
 
     @Override
-    public Stream<JournalEntry> readAfter(String key, String afterId) {
+    public Stream<RawJournalEntry> readAfter(String key, String afterId) {
       return Stream.empty();
     }
 
     @Override
-    public Stream<JournalEntry> readLast(String key, int count) {
+    public Stream<RawJournalEntry> readLast(String key, int count) {
       return Stream.empty();
     }
 
@@ -239,7 +239,7 @@ class SubstrateAutoConfigurationTest {
     public void delete(String key) {}
 
     @Override
-    public boolean isCompleted(String key) {
+    public boolean isComplete(String key) {
       return false;
     }
 
@@ -255,8 +255,8 @@ class SubstrateAutoConfigurationTest {
     public void deliver(String key, byte[] value) {}
 
     @Override
-    public CompletableFuture<byte[]> await(String key, Duration timeout) {
-      return CompletableFuture.completedFuture(new byte[0]);
+    public Optional<byte[]> get(String key) {
+      return Optional.empty();
     }
 
     @Override

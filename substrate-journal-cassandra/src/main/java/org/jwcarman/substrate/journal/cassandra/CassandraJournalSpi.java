@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.jwcarman.substrate.spi.AbstractJournalSpi;
-import org.jwcarman.substrate.spi.JournalEntry;
+import org.jwcarman.substrate.spi.RawJournalEntry;
 
 public class CassandraJournalSpi extends AbstractJournalSpi {
 
@@ -169,11 +169,11 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<JournalEntry> readAfter(String key, String afterId) {
+  public Stream<RawJournalEntry> readAfter(String key, String afterId) {
     UUID afterUuid = UUID.fromString(afterId);
     ResultSet rs = session.execute(readAfterStatement.bind(key, afterUuid));
 
-    List<JournalEntry> entries = new ArrayList<>();
+    List<RawJournalEntry> entries = new ArrayList<>();
     for (Row row : rs) {
       if (!COMPLETED_DATA.equals(row.getByteBuffer(FIELD_DATA))) {
         entries.add(mapRow(key, row));
@@ -183,11 +183,11 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<JournalEntry> readLast(String key, int count) {
+  public Stream<RawJournalEntry> readLast(String key, int count) {
     // Request extra to account for possible completion marker
     ResultSet rs = session.execute(readLastStatement.bind(key, count + 1));
 
-    List<JournalEntry> entries = new ArrayList<>();
+    List<RawJournalEntry> entries = new ArrayList<>();
     for (Row row : rs) {
       if (!COMPLETED_DATA.equals(row.getByteBuffer(FIELD_DATA))) {
         entries.add(mapRow(key, row));
@@ -217,7 +217,7 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public boolean isCompleted(String key) {
+  public boolean isComplete(String key) {
     ResultSet rs =
         session.execute(
             "SELECT " + FIELD_DATA + " FROM " + tableName + " WHERE " + FIELD_KEY + " = ?", key);
@@ -234,12 +234,12 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
     session.execute(deleteStatement.bind(key));
   }
 
-  private JournalEntry mapRow(String key, Row row) {
+  private RawJournalEntry mapRow(String key, Row row) {
     UUID entryId = row.getUuid(FIELD_ENTRY_ID);
     ByteBuffer buffer = row.getByteBuffer(FIELD_DATA);
     byte[] data = buffer != null ? toByteArray(buffer) : new byte[0];
     Instant timestamp = row.getInstant(FIELD_TIMESTAMP);
-    return new JournalEntry(entryId.toString(), key, data, timestamp);
+    return new RawJournalEntry(entryId.toString(), key, data, timestamp);
   }
 
   private static byte[] toByteArray(ByteBuffer buffer) {

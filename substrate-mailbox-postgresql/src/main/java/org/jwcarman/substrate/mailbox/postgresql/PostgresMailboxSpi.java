@@ -15,28 +15,18 @@
  */
 package org.jwcarman.substrate.mailbox.postgresql;
 
-import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
+import java.util.Optional;
 import org.jwcarman.substrate.spi.AbstractMailboxSpi;
-import org.jwcarman.substrate.spi.Notifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 public class PostgresMailboxSpi extends AbstractMailboxSpi {
 
   private final JdbcTemplate jdbcTemplate;
-  private final Notifier notifier;
-  private final ConcurrentMap<String, CompletableFuture<byte[]>> pending =
-      new ConcurrentHashMap<>();
 
-  public PostgresMailboxSpi(JdbcTemplate jdbcTemplate, Notifier notifier, String prefix) {
+  public PostgresMailboxSpi(JdbcTemplate jdbcTemplate, String prefix) {
     super(prefix);
     this.jdbcTemplate = jdbcTemplate;
-    this.notifier = notifier;
-    this.notifier.subscribe(this::onNotification);
   }
 
   @Override
@@ -46,48 +36,18 @@ public class PostgresMailboxSpi extends AbstractMailboxSpi {
             + " ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, created_at = NOW()",
         key,
         value);
-    notifier.notify(key, key);
   }
 
   @Override
-  public CompletableFuture<byte[]> await(String key, Duration timeout) {
-    byte[] existing = lookupValue(key);
-    if (existing != null) {
-      return CompletableFuture.completedFuture(existing);
-    }
-    CompletableFuture<byte[]> future = pending.computeIfAbsent(key, k -> new CompletableFuture<>());
-    // Double-check in case deliver() was called between our lookup and computeIfAbsent
-    byte[] deliveredAfter = lookupValue(key);
-    if (deliveredAfter != null) {
-      future.complete(deliveredAfter);
-      pending.remove(key);
-    }
-    return future.orTimeout(timeout.toMillis(), TimeUnit.MILLISECONDS);
+  public Optional<byte[]> get(String key) {
+    List<byte[]> results =
+        jdbcTemplate.queryForList(
+            "SELECT value FROM substrate_mailbox WHERE key = ?", byte[].class, key);
+    return results.isEmpty() ? Optional.empty() : Optional.of(results.getFirst());
   }
 
   @Override
   public void delete(String key) {
     jdbcTemplate.update("DELETE FROM substrate_mailbox WHERE key = ?", key);
-    CompletableFuture<byte[]> future = pending.remove(key);
-    if (future != null) {
-      future.cancel(false);
-    }
-  }
-
-  private byte[] lookupValue(String key) {
-    List<byte[]> results =
-        jdbcTemplate.queryForList(
-            "SELECT value FROM substrate_mailbox WHERE key = ?", byte[].class, key);
-    return results.isEmpty() ? null : results.getFirst();
-  }
-
-  private void onNotification(String key, String payload) {
-    CompletableFuture<byte[]> future = pending.remove(key);
-    if (future != null) {
-      byte[] value = lookupValue(key);
-      if (value != null) {
-        future.complete(value);
-      }
-    }
   }
 }

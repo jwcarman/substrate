@@ -19,7 +19,6 @@ import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.codec.StringCodec;
 import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.spi.Notifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -36,14 +35,11 @@ public class RedisMailboxAutoConfiguration {
 
   @Bean
   public RedisMailboxSpi redisMailbox(
-      RedisConnectionFactory connectionFactory,
-      Notifier notifier,
-      RedisMailboxProperties properties) {
+      RedisConnectionFactory connectionFactory, RedisMailboxProperties properties) {
     LettuceConnectionFactory lcf = (LettuceConnectionFactory) connectionFactory;
     RedisClient client = (RedisClient) lcf.getNativeClient();
     StatefulRedisConnection<String, String> connection = client.connect(StringCodec.UTF8);
 
-    return new RedisMailboxSpi(
-        connection.sync(), notifier, properties.prefix(), properties.defaultTtl());
+    return new RedisMailboxSpi(connection.sync(), properties.prefix(), properties.defaultTtl());
   }
 }

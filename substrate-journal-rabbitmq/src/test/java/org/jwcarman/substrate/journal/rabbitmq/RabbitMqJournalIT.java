@@ -24,7 +24,7 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.spi.JournalEntry;
+import org.jwcarman.substrate.spi.RawJournalEntry;
 import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -90,7 +90,7 @@ class RabbitMqJournalSpiIT {
     String id2 = journal.append(key, "payload2".getBytes(StandardCharsets.UTF_8));
     String id3 = journal.append(key, "payload3".getBytes(StandardCharsets.UTF_8));
 
-    List<JournalEntry> entries = journal.readAfter(key, id1).toList();
+    List<RawJournalEntry> entries = journal.readAfter(key, id1).toList();
 
     assertThat(entries).hasSize(2);
     assertThat(entries.get(0).id()).isEqualTo(id2);
@@ -102,7 +102,7 @@ class RabbitMqJournalSpiIT {
   @Test
   void readAfterReturnsEmptyForUnknownKey() {
     String key = journal.journalKey("nonexistent-" + System.nanoTime());
-    List<JournalEntry> entries = journal.readAfter(key, "0").toList();
+    List<RawJournalEntry> entries = journal.readAfter(key, "0").toList();
     assertThat(entries).isEmpty();
   }
 
@@ -114,7 +114,7 @@ class RabbitMqJournalSpiIT {
     journal.append(key, "third".getBytes(StandardCharsets.UTF_8));
     journal.append(key, "fourth".getBytes(StandardCharsets.UTF_8));
 
-    List<JournalEntry> entries = journal.readLast(key, 2).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 2).toList();
 
     assertThat(entries).hasSize(2);
     assertThat(new String(entries.get(0).data(), StandardCharsets.UTF_8)).isEqualTo("third");
@@ -124,7 +124,7 @@ class RabbitMqJournalSpiIT {
   @Test
   void readLastReturnsEmptyForUnknownKey() {
     String key = journal.journalKey("nonexistent-" + System.nanoTime());
-    List<JournalEntry> entries = journal.readLast(key, 5).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 5).toList();
     assertThat(entries).isEmpty();
   }
 
@@ -134,7 +134,7 @@ class RabbitMqJournalSpiIT {
     journal.append(key, "one".getBytes(StandardCharsets.UTF_8));
     journal.append(key, "two".getBytes(StandardCharsets.UTF_8));
 
-    List<JournalEntry> entries = journal.readLast(key, 100).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 100).toList();
 
     assertThat(entries).hasSize(2);
     assertThat(new String(entries.get(0).data(), StandardCharsets.UTF_8)).isEqualTo("one");
@@ -148,7 +148,7 @@ class RabbitMqJournalSpiIT {
     journal.append(key, "data2".getBytes(StandardCharsets.UTF_8));
     journal.complete(key);
 
-    List<JournalEntry> entries = journal.readLast(key, 100).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 100).toList();
 
     assertThat(entries).hasSize(2);
     assertThat(new String(entries.get(0).data(), StandardCharsets.UTF_8)).isEqualTo("data1");
@@ -163,7 +163,7 @@ class RabbitMqJournalSpiIT {
 
     journal.delete(key);
 
-    List<JournalEntry> entries = journal.readLast(key, 100).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 100).toList();
     assertThat(entries).isEmpty();
   }
 
@@ -185,7 +185,7 @@ class RabbitMqJournalSpiIT {
     String key = journal.journalKey("time-" + System.nanoTime());
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
 
-    List<JournalEntry> entries = journal.readLast(key, 1).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 1).toList();
     assertThat(entries).hasSize(1);
     assertThat(entries.getFirst().timestamp()).isNotNull();
   }

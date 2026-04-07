@@ -28,7 +28,7 @@ public class StreamJournalSubscriber<T> implements JournalSubscriber<T>, AutoClo
 
   private static final int DEFAULT_CAPACITY = 1024;
 
-  private final BlockingQueue<TypedJournalEntry<T>> queue;
+  private final BlockingQueue<JournalEntry<T>> queue;
   private final AtomicBoolean closed = new AtomicBoolean(false);
 
   public StreamJournalSubscriber() {
@@ -40,7 +40,7 @@ public class StreamJournalSubscriber<T> implements JournalSubscriber<T>, AutoClo
   }
 
   @Override
-  public void onEntry(TypedJournalEntry<T> entry) {
+  public void onEntry(JournalEntry<T> entry) {
     if (closed.get()) {
       return;
     }
@@ -56,15 +56,14 @@ public class StreamJournalSubscriber<T> implements JournalSubscriber<T>, AutoClo
     closed.set(true);
   }
 
-  public Stream<TypedJournalEntry<T>> stream() {
-    Spliterator<TypedJournalEntry<T>> spliterator =
+  public Stream<JournalEntry<T>> stream() {
+    Spliterator<JournalEntry<T>> spliterator =
         new Spliterators.AbstractSpliterator<>(Long.MAX_VALUE, Spliterator.ORDERED) {
           @Override
-          public boolean tryAdvance(Consumer<? super TypedJournalEntry<T>> action) {
+          public boolean tryAdvance(Consumer<? super JournalEntry<T>> action) {
             try {
               while (!closed.get() || !queue.isEmpty()) {
-                TypedJournalEntry<T> entry =
-                    queue.poll(100, java.util.concurrent.TimeUnit.MILLISECONDS);
+                JournalEntry<T> entry = queue.poll(100, java.util.concurrent.TimeUnit.MILLISECONDS);
                 if (entry != null) {
                   action.accept(entry);
                   return true;

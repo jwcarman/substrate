@@ -15,18 +15,14 @@
  */
 package org.jwcarman.substrate.memory;
 
-import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
 import org.jwcarman.substrate.spi.AbstractMailboxSpi;
 
 public class InMemoryMailboxSpi extends AbstractMailboxSpi {
 
-  private final ConcurrentMap<String, CompletableFuture<byte[]>> pending =
-      new ConcurrentHashMap<>();
-  private final ConcurrentMap<String, byte[]> delivered = new ConcurrentHashMap<>();
+  private final ConcurrentMap<String, byte[]> store = new ConcurrentHashMap<>();
 
   public InMemoryMailboxSpi() {
     super("substrate:mailbox:");
@@ -34,34 +30,16 @@ public class InMemoryMailboxSpi extends AbstractMailboxSpi {
 
   @Override
   public void deliver(String key, byte[] value) {
-    delivered.put(key, value);
-    CompletableFuture<byte[]> future = pending.remove(key);
-    if (future != null) {
-      future.complete(value);
-    }
+    store.put(key, value);
   }
 
   @Override
-  public CompletableFuture<byte[]> await(String key, Duration timeout) {
-    byte[] existing = delivered.get(key);
-    if (existing != null) {
-      return CompletableFuture.completedFuture(existing);
-    }
-    CompletableFuture<byte[]> future = pending.computeIfAbsent(key, k -> new CompletableFuture<>());
-    // Check again in case deliver() was called between our get and computeIfAbsent
-    byte[] deliveredAfter = delivered.get(key);
-    if (deliveredAfter != null) {
-      future.complete(deliveredAfter);
-    }
-    return future.orTimeout(timeout.toMillis(), TimeUnit.MILLISECONDS);
+  public Optional<byte[]> get(String key) {
+    return Optional.ofNullable(store.get(key));
   }
 
   @Override
   public void delete(String key) {
-    delivered.remove(key);
-    CompletableFuture<byte[]> future = pending.remove(key);
-    if (future != null) {
-      future.cancel(false);
-    }
+    store.remove(key);
   }
 }

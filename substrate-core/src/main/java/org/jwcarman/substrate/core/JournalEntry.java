@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.substrate.spi;
+package org.jwcarman.substrate.core;
 
 import java.time.Instant;
 
-public record JournalEntry(String id, String key, byte[] data, Instant timestamp) {}
+public record JournalEntry<T>(String id, String key, T data, Instant timestamp) {}

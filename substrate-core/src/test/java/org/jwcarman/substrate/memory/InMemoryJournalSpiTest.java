@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.spi.JournalEntry;
+import org.jwcarman.substrate.spi.RawJournalEntry;
 
 class InMemoryJournalSpiTest {
 
@@ -50,7 +50,7 @@ class InMemoryJournalSpiTest {
     String id2 = journal.append(KEY, "data2".getBytes(UTF_8));
     String id3 = journal.append(KEY, "data3".getBytes(UTF_8));
 
-    List<JournalEntry> entries = journal.readAfter(KEY, id1).toList();
+    List<RawJournalEntry> entries = journal.readAfter(KEY, id1).toList();
 
     assertEquals(2, entries.size());
     assertEquals(id2, entries.get(0).id());
@@ -62,14 +62,14 @@ class InMemoryJournalSpiTest {
     journal.append(KEY, "data1".getBytes(UTF_8));
     journal.append(KEY, "data2".getBytes(UTF_8));
 
-    List<JournalEntry> entries = journal.readAfter(KEY, "0-0").toList();
+    List<RawJournalEntry> entries = journal.readAfter(KEY, "0-0").toList();
 
     assertEquals(2, entries.size());
   }
 
   @Test
   void readAfterOnNonExistentKeyReturnsEmpty() {
-    List<JournalEntry> entries = journal.readAfter("nonexistent", "0-0").toList();
+    List<RawJournalEntry> entries = journal.readAfter("nonexistent", "0-0").toList();
 
     assertTrue(entries.isEmpty());
   }
@@ -81,7 +81,7 @@ class InMemoryJournalSpiTest {
     journal.append(KEY, "data3".getBytes(UTF_8));
     journal.append(KEY, "data4".getBytes(UTF_8));
 
-    List<JournalEntry> entries = journal.readLast(KEY, 2).toList();
+    List<RawJournalEntry> entries = journal.readLast(KEY, 2).toList();
 
     assertEquals(2, entries.size());
     assertArrayEquals("data3".getBytes(UTF_8), entries.get(0).data());
@@ -93,14 +93,14 @@ class InMemoryJournalSpiTest {
     journal.append(KEY, "data1".getBytes(UTF_8));
     journal.append(KEY, "data2".getBytes(UTF_8));
 
-    List<JournalEntry> entries = journal.readLast(KEY, 10).toList();
+    List<RawJournalEntry> entries = journal.readLast(KEY, 10).toList();
 
     assertEquals(2, entries.size());
   }
 
   @Test
   void readLastOnNonExistentKeyReturnsEmpty() {
-    List<JournalEntry> entries = journal.readLast("nonexistent", 5).toList();
+    List<RawJournalEntry> entries = journal.readLast("nonexistent", 5).toList();
 
     assertTrue(entries.isEmpty());
   }
@@ -115,7 +115,7 @@ class InMemoryJournalSpiTest {
     smallJournal.append(KEY, "data4".getBytes(UTF_8));
     smallJournal.append(KEY, "data5".getBytes(UTF_8));
 
-    List<JournalEntry> entries = smallJournal.readAfter(KEY, "0-0").toList();
+    List<RawJournalEntry> entries = smallJournal.readAfter(KEY, "0-0").toList();
 
     assertEquals(3, entries.size());
     assertArrayEquals("data3".getBytes(UTF_8), entries.get(0).data());
@@ -129,7 +129,7 @@ class InMemoryJournalSpiTest {
 
     journal.delete(KEY);
 
-    List<JournalEntry> entries = journal.readAfter(KEY, "0-0").toList();
+    List<RawJournalEntry> entries = journal.readAfter(KEY, "0-0").toList();
     assertTrue(entries.isEmpty());
   }
 
@@ -137,10 +137,10 @@ class InMemoryJournalSpiTest {
   void appendPreservesEntryFields() {
     String id = journal.append(KEY, "myData".getBytes(UTF_8));
 
-    List<JournalEntry> entries = journal.readAfter(KEY, "0-0").toList();
+    List<RawJournalEntry> entries = journal.readAfter(KEY, "0-0").toList();
 
     assertEquals(1, entries.size());
-    JournalEntry stored = entries.getFirst();
+    RawJournalEntry stored = entries.getFirst();
     assertEquals(id, stored.id());
     assertEquals(KEY, stored.key());
     assertArrayEquals("myData".getBytes(UTF_8), stored.data());
@@ -151,7 +151,7 @@ class InMemoryJournalSpiTest {
   void readAfterHandlesIdWithoutDash() {
     journal.append(KEY, "data1".getBytes(UTF_8));
 
-    List<JournalEntry> entries = journal.readAfter(KEY, "0").toList();
+    List<RawJournalEntry> entries = journal.readAfter(KEY, "0").toList();
 
     assertEquals(1, entries.size());
   }

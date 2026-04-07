@@ -16,21 +16,17 @@
 package org.jwcarman.substrate.mailbox.nats;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.await;
 
 import io.nats.client.Connection;
 import io.nats.client.Nats;
 import io.nats.client.Options;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.notifier.nats.NatsNotifier;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -43,7 +39,6 @@ class NatsMailboxIT {
       new GenericContainer<>("nats:latest").withCommand("--jetstream").withExposedPorts(4222);
 
   private static Connection connection;
-  private NatsNotifier notifier;
   private NatsMailboxSpi mailbox;
 
   @BeforeAll
@@ -61,54 +56,32 @@ class NatsMailboxIT {
 
   @BeforeEach
   void setUp() {
-    notifier = new NatsNotifier(connection, "substrate:notify:");
-    notifier.start();
     mailbox =
         new NatsMailboxSpi(
             connection,
-            notifier,
             "substrate:mailbox:",
             "substrate-mailbox-" + System.nanoTime(),
             Duration.ofMinutes(5));
   }
 
-  @AfterEach
-  void tearDown() {
-    if (notifier != null && notifier.isRunning()) {
-      notifier.stop();
-    }
-  }
-
   @Test
-  void deliverAndAwaitFullLifecycle() throws Exception {
+  void deliverThenGetReturnsValue() {
     String key = mailbox.mailboxKey("test-" + System.nanoTime());
 
     mailbox.deliver(key, "hello".getBytes(StandardCharsets.UTF_8));
 
-    CompletableFuture<byte[]> future = mailbox.await(key, Duration.ofSeconds(5));
-    assertThat(new String(future.get(5, TimeUnit.SECONDS), StandardCharsets.UTF_8))
-        .isEqualTo("hello");
+    Optional<byte[]> result = mailbox.get(key);
+    assertThat(result).isPresent();
+    assertThat(new String(result.get(), StandardCharsets.UTF_8)).isEqualTo("hello");
   }
 
   @Test
-  void awaitResolvesWhenDeliveredAfterWaiting() {
-    String key = mailbox.mailboxKey("async-" + System.nanoTime());
+  void getReturnsEmptyWhenNotDelivered() {
+    String key = mailbox.mailboxKey("absent-" + System.nanoTime());
 
-    CompletableFuture<byte[]> future = mailbox.await(key, Duration.ofSeconds(10));
+    Optional<byte[]> result = mailbox.get(key);
 
-    // Deliver after a short delay
-    CompletableFuture.runAsync(
-        () -> {
-          await().pollDelay(Duration.ofMillis(200)).atMost(Duration.ofSeconds(1)).until(() -> true);
-          mailbox.deliver(key, "delayed-value".getBytes(StandardCharsets.UTF_8));
-        });
-
-    await()
-        .atMost(Duration.ofSeconds(10))
-        .untilAsserted(
-            () ->
-                assertThat(future.join())
-                    .isEqualTo("delayed-value".getBytes(StandardCharsets.UTF_8)));
+    assertThat(result).isEmpty();
   }
 
   @Test
@@ -118,11 +91,8 @@ class NatsMailboxIT {
     mailbox.deliver(key, "to-delete".getBytes(StandardCharsets.UTF_8));
     mailbox.delete(key);
 
-    // After deletion, a new await should not find the value
-    CompletableFuture<byte[]> future = mailbox.await(key, Duration.ofMillis(500));
-    assertThat(future)
-        .failsWithin(Duration.ofSeconds(2))
-        .withThrowableOfType(java.util.concurrent.ExecutionException.class);
+    Optional<byte[]> result = mailbox.get(key);
+    assertThat(result).isEmpty();
   }
 
   @Test

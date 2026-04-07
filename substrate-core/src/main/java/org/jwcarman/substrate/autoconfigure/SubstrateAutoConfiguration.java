@@ -75,8 +75,9 @@ public class SubstrateAutoConfiguration {
   }
 
   @Bean
-  @ConditionalOnBean({MailboxSpi.class, CodecFactory.class})
-  public MailboxFactory mailboxFactory(MailboxSpi mailboxSpi, CodecFactory codecFactory) {
-    return new MailboxFactory(mailboxSpi, codecFactory);
+  @ConditionalOnBean({MailboxSpi.class, CodecFactory.class, Notifier.class})
+  public MailboxFactory mailboxFactory(
+      MailboxSpi mailboxSpi, CodecFactory codecFactory, Notifier notifier) {
+    return new MailboxFactory(mailboxSpi, codecFactory, notifier);
   }
 }

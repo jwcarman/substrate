@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
 import org.jwcarman.substrate.spi.AbstractJournalSpi;
-import org.jwcarman.substrate.spi.JournalEntry;
+import org.jwcarman.substrate.spi.RawJournalEntry;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 public class PostgresJournalSpi extends AbstractJournalSpi {
@@ -63,9 +63,9 @@ public class PostgresJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<JournalEntry> readAfter(String key, String afterId) {
+  public Stream<RawJournalEntry> readAfter(String key, String afterId) {
     long cursor = Long.parseLong(afterId);
-    List<JournalEntry> entries =
+    List<RawJournalEntry> entries =
         jdbcTemplate.query(
             "SELECT id, key, data, timestamp FROM substrate_journal_entries"
                 + " WHERE key = ? AND id > ? ORDER BY id",
@@ -76,8 +76,8 @@ public class PostgresJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<JournalEntry> readLast(String key, int count) {
-    List<JournalEntry> entries =
+  public Stream<RawJournalEntry> readLast(String key, int count) {
+    List<RawJournalEntry> entries =
         jdbcTemplate.query(
             "SELECT id, key, data, timestamp FROM substrate_journal_entries"
                 + " WHERE key = ? ORDER BY id DESC LIMIT ?",
@@ -96,7 +96,7 @@ public class PostgresJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public boolean isCompleted(String key) {
+  public boolean isComplete(String key) {
     Integer count =
         jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM substrate_journal_completed WHERE key = ?", Integer.class, key);
@@ -118,8 +118,8 @@ public class PostgresJournalSpi extends AbstractJournalSpi {
         maxLen);
   }
 
-  private JournalEntry mapRow(ResultSet rs, int rowNum) throws SQLException {
-    return new JournalEntry(
+  private RawJournalEntry mapRow(ResultSet rs, int rowNum) throws SQLException {
+    return new RawJournalEntry(
         String.valueOf(rs.getLong("id")),
         rs.getString("key"),
         rs.getBytes("data"),

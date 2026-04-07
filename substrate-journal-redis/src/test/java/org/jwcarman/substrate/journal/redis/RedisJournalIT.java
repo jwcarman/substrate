@@ -28,7 +28,7 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.spi.JournalEntry;
+import org.jwcarman.substrate.spi.RawJournalEntry;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -71,7 +71,7 @@ class RedisJournalSpiIT {
     String id2 = journal.append(key, "second".getBytes(StandardCharsets.UTF_8));
     String id3 = journal.append(key, "third".getBytes(StandardCharsets.UTF_8));
 
-    List<JournalEntry> entries = journal.readAfter(key, id1).toList();
+    List<RawJournalEntry> entries = journal.readAfter(key, id1).toList();
 
     assertThat(entries).hasSize(2);
     assertThat(entries.get(0).id()).isEqualTo(id2);
@@ -89,7 +89,7 @@ class RedisJournalSpiIT {
     journal.append(key, "b".getBytes(StandardCharsets.UTF_8));
     journal.append(key, "c".getBytes(StandardCharsets.UTF_8));
 
-    List<JournalEntry> entries = journal.readLast(key, 2).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 2).toList();
 
     assertThat(entries).hasSize(2);
     assertThat(new String(entries.get(0).data(), StandardCharsets.UTF_8)).isEqualTo("b");
@@ -98,7 +98,7 @@ class RedisJournalSpiIT {
 
   @Test
   void readAfterReturnsEmptyForNonexistentStream() {
-    List<JournalEntry> entries = journal.readAfter("nonexistent:key", "0-0").toList();
+    List<RawJournalEntry> entries = journal.readAfter("nonexistent:key", "0-0").toList();
     assertThat(entries).isEmpty();
   }
 
@@ -108,7 +108,7 @@ class RedisJournalSpiIT {
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
     journal.delete(key);
 
-    List<JournalEntry> entries = journal.readAfter(key, "0-0").toList();
+    List<RawJournalEntry> entries = journal.readAfter(key, "0-0").toList();
     assertThat(entries).isEmpty();
   }
 

@@ -28,9 +28,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.codec.spi.Codec;
-import org.jwcarman.substrate.spi.JournalEntry;
 import org.jwcarman.substrate.spi.JournalSpi;
 import org.jwcarman.substrate.spi.Notifier;
+import org.jwcarman.substrate.spi.RawJournalEntry;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -85,7 +85,7 @@ class DefaultJournalTest {
 
   @Test
   void readAfterDelegatesToSpiWithBoundKey() {
-    JournalEntry entry = new JournalEntry("1", KEY, "data".getBytes(UTF_8), Instant.now());
+    RawJournalEntry entry = new RawJournalEntry("1", KEY, "data".getBytes(UTF_8), Instant.now());
     when(spi.readAfter(KEY, "0")).thenReturn(Stream.of(entry));
 
     var entries = journal.readAfter("0").toList();
@@ -97,7 +97,7 @@ class DefaultJournalTest {
 
   @Test
   void readLastDelegatesToSpiWithBoundKey() {
-    JournalEntry entry = new JournalEntry("1", KEY, "data".getBytes(UTF_8), Instant.now());
+    RawJournalEntry entry = new RawJournalEntry("1", KEY, "data".getBytes(UTF_8), Instant.now());
     when(spi.readLast(KEY, 5)).thenReturn(Stream.of(entry));
 
     var entries = journal.readLast(5).toList();

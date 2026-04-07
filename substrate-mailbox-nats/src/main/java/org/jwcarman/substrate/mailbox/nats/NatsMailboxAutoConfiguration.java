@@ -17,7 +17,6 @@ package org.jwcarman.substrate.mailbox.nats;
 
 import io.nats.client.Connection;
 import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.spi.Notifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -31,13 +30,8 @@ import org.springframework.context.annotation.PropertySource;
 public class NatsMailboxAutoConfiguration {
 
   @Bean
-  public NatsMailboxSpi natsMailbox(
-      Connection connection, Notifier notifier, NatsMailboxProperties properties) {
+  public NatsMailboxSpi natsMailbox(Connection connection, NatsMailboxProperties properties) {
     return new NatsMailboxSpi(
-        connection,
-        notifier,
-        properties.prefix(),
-        properties.bucketName(),
-        properties.defaultTtl());
+        connection, properties.prefix(), properties.bucketName(), properties.defaultTtl());
   }
 }

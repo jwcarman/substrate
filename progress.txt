@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-07T15:00:00Z
-ITERATION: 15
-SPEC_COMPLETED: 014-journal-subscribers.md
-WHAT_WAS_DONE: Added reactive subscription model to Journal<T> with JournalSubscriber<T>, Subscription, and StreamJournalSubscriber<T>; integrated Notifier into DefaultJournal for wake-up signals on append/complete; added isCompleted to JournalSpi with implementations in all 9 backends
+LAST_RUN: 2026-04-07T15:25:00Z
+ITERATION: 16
+SPEC_COMPLETED: 015-simplify-spis.md
+WHAT_WAS_DONE: Refactored SPIs to be pure storage operations — renamed JournalEntry to RawJournalEntry (SPI) and TypedJournalEntry to JournalEntry (core), replaced MailboxSpi.await() with Optional<byte[]> get(), renamed isCompleted() to isComplete(), moved all Notifier orchestration to DefaultJournal and DefaultMailbox in core, simplified all 7 backend MailboxSpi implementations to pure key-value stores with no Notifier/threading/futures
 VERIFICATION: ./mvnw verify — BUILD SUCCESS (all modules pass); ./mvnw spotless:check — PASS
 STATUS: MORE_WORK
-NEXT_SPEC: 015-simplify-spis.md
-NOTES: Added boolean isCompleted(String key) to JournalSpi interface (not a default method — all 9 backend implementations updated). DefaultJournal now requires a Notifier constructor parameter. JournalFactory and SubstrateAutoConfiguration updated to inject Notifier. The reader thread uses Object monitor wait/notify with an AtomicBoolean flag to avoid lost signals. For the tail-only subscribe case, the current last entry ID is snapshotted before starting the reader thread. StreamJournalSubscriber uses a bounded LinkedBlockingQueue (default 1024) with a polling spliterator that terminates when closed or completed.
+NEXT_SPEC: none
+NOTES: MailboxFactory now takes Notifier as third constructor parameter. SubstrateAutoConfiguration updated to wire Notifier into MailboxFactory. All 6 backend mailbox auto-configurations no longer inject Notifier into SPI constructors. DefaultMailbox.await() uses Notifier subscribe + spi.get() pattern with double-check and CompletableFuture.orTimeout(). InMemoryMailboxSpi is now a trivial ConcurrentHashMap wrapper. All backend mailbox IT tests simplified to test deliver/get/delete only — async behavior tested in core DefaultMailboxTest.

@@ -17,7 +17,7 @@ package org.jwcarman.substrate.core;
 
 @FunctionalInterface
 public interface JournalSubscriber<T> {
-  void onEntry(TypedJournalEntry<T> entry);
+  void onEntry(JournalEntry<T> entry);
 
   default void onComplete() {}
 }

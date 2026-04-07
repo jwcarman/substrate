@@ -16,20 +16,17 @@
 package org.jwcarman.substrate.mailbox.redis;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.await;
 
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
 import io.lettuce.core.api.sync.RedisCommands;
 import io.lettuce.core.codec.StringCodec;
-import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.notifier.redis.RedisNotifier;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -42,7 +39,6 @@ class RedisMailboxIT {
       new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
 
   private RedisClient client;
-  private RedisNotifier notifier;
   private RedisMailboxSpi mailbox;
 
   @BeforeEach
@@ -54,50 +50,35 @@ class RedisMailboxIT {
                 .withPort(REDIS.getFirstMappedPort())
                 .build());
 
-    StatefulRedisPubSubConnection<String, String> pubSubConnection =
-        client.connectPubSub(StringCodec.UTF8);
-    var publishConnection = client.connect(StringCodec.UTF8);
-
-    notifier = new RedisNotifier(pubSubConnection, publishConnection.sync(), "substrate:notify:");
-    notifier.start();
-
     RedisCommands<String, String> commands = client.connect(StringCodec.UTF8).sync();
-    mailbox = new RedisMailboxSpi(commands, notifier, "substrate:mailbox:", Duration.ofMinutes(5));
+    mailbox = new RedisMailboxSpi(commands, "substrate:mailbox:", Duration.ofMinutes(5));
   }
 
   @AfterEach
   void tearDown() {
-    if (notifier != null && notifier.isRunning()) {
-      notifier.stop();
-    }
     if (client != null) {
       client.shutdown();
     }
   }
 
   @Test
-  void deliverThenAwaitReturnsImmediately() {
+  void deliverThenGetReturnsValue() {
     String key = mailbox.mailboxKey("deliver-first");
     mailbox.deliver(key, "hello".getBytes(StandardCharsets.UTF_8));
 
-    CompletableFuture<byte[]> future = mailbox.await(key, Duration.ofSeconds(5));
+    Optional<byte[]> result = mailbox.get(key);
 
-    assertThat(future.join()).isEqualTo("hello".getBytes(StandardCharsets.UTF_8));
+    assertThat(result).isPresent();
+    assertThat(result.get()).isEqualTo("hello".getBytes(StandardCharsets.UTF_8));
   }
 
   @Test
-  void awaitThenDeliverResolvesViaPubSub() {
-    String key = mailbox.mailboxKey("await-first");
-    CompletableFuture<byte[]> future = mailbox.await(key, Duration.ofSeconds(10));
+  void getReturnsEmptyWhenNotDelivered() {
+    String key = mailbox.mailboxKey("empty-test");
 
-    mailbox.deliver(key, "delayed-value".getBytes(StandardCharsets.UTF_8));
+    Optional<byte[]> result = mailbox.get(key);
 
-    await()
-        .atMost(Duration.ofSeconds(5))
-        .untilAsserted(
-            () ->
-                assertThat(future.join())
-                    .isEqualTo("delayed-value".getBytes(StandardCharsets.UTF_8)));
+    assertThat(result).isEmpty();
   }
 
   @Test
@@ -106,18 +87,7 @@ class RedisMailboxIT {
     mailbox.deliver(key, "to-delete".getBytes(StandardCharsets.UTF_8));
     mailbox.delete(key);
 
-    RedisCommands<String, String> commands = client.connect(StringCodec.UTF8).sync();
-    assertThat(commands.get(key)).isNull();
-  }
-
-  @Test
-  void deleteCancelsPendingFuture() {
-    String key = mailbox.mailboxKey("cancel-test");
-    CompletableFuture<byte[]> future = mailbox.await(key, Duration.ofSeconds(30));
-
-    mailbox.delete(key);
-
-    assertThat(future).isCancelled();
+    assertThat(mailbox.get(key)).isEmpty();
   }
 
   @Test

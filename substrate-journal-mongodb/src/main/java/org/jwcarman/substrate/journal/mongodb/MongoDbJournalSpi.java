@@ -24,7 +24,7 @@ import java.util.stream.Stream;
 import org.bson.Document;
 import org.bson.types.Binary;
 import org.jwcarman.substrate.spi.AbstractJournalSpi;
-import org.jwcarman.substrate.spi.JournalEntry;
+import org.jwcarman.substrate.spi.RawJournalEntry;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.CompoundIndexDefinition;
@@ -88,7 +88,7 @@ public class MongoDbJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<JournalEntry> readAfter(String key, String afterId) {
+  public Stream<RawJournalEntry> readAfter(String key, String afterId) {
     Query query =
         new Query(Criteria.where(FIELD_KEY).is(key).and(FIELD_ENTRY_ID).gt(afterId))
             .with(Sort.by(Sort.Direction.ASC, FIELD_ENTRY_ID));
@@ -100,7 +100,7 @@ public class MongoDbJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<JournalEntry> readLast(String key, int count) {
+  public Stream<RawJournalEntry> readLast(String key, int count) {
     // Request extra to account for possible COMPLETED marker
     Query query =
         new Query(Criteria.where(FIELD_KEY).is(key))
@@ -108,7 +108,7 @@ public class MongoDbJournalSpi extends AbstractJournalSpi {
             .limit(count + 1);
 
     List<Document> docs = mongoTemplate.find(query, Document.class, collectionName);
-    List<JournalEntry> entries = new ArrayList<>();
+    List<RawJournalEntry> entries = new ArrayList<>();
     for (Document doc : docs) {
       if (!COMPLETED_ENTRY_ID.equals(doc.getString(FIELD_ENTRY_ID))) {
         entries.add(mapDocument(doc));
@@ -132,7 +132,7 @@ public class MongoDbJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public boolean isCompleted(String key) {
+  public boolean isComplete(String key) {
     Query query =
         new Query(Criteria.where(FIELD_KEY).is(key).and(FIELD_ENTRY_ID).is(COMPLETED_ENTRY_ID));
     return mongoTemplate.exists(query, collectionName);
@@ -144,12 +144,12 @@ public class MongoDbJournalSpi extends AbstractJournalSpi {
     mongoTemplate.remove(query, collectionName);
   }
 
-  private JournalEntry mapDocument(Document doc) {
+  private RawJournalEntry mapDocument(Document doc) {
     Date date = doc.get(FIELD_TIMESTAMP, Date.class);
     Instant timestamp = date != null ? date.toInstant() : null;
     Binary binary = doc.get(FIELD_DATA, Binary.class);
     byte[] data = binary != null ? binary.getData() : new byte[0];
-    return new JournalEntry(
+    return new RawJournalEntry(
         doc.getString(FIELD_ENTRY_ID), doc.getString(FIELD_KEY), data, timestamp);
   }
 }

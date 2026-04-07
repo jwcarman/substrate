@@ -16,12 +16,9 @@
 package org.jwcarman.substrate.memory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.time.Duration;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.CompletableFuture;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -37,51 +34,20 @@ class InMemoryMailboxSpiTest {
   }
 
   @Test
-  void deliverThenAwaitReturnsImmediately() {
+  void deliverThenGetReturnsValue() {
     mailbox.deliver(KEY, "hello".getBytes(UTF_8));
 
-    CompletableFuture<byte[]> future = mailbox.await(KEY, Duration.ofSeconds(1));
+    Optional<byte[]> result = mailbox.get(KEY);
 
-    assertTrue(future.isDone());
-    assertArrayEquals("hello".getBytes(UTF_8), future.join());
+    assertTrue(result.isPresent());
+    assertArrayEquals("hello".getBytes(UTF_8), result.get());
   }
 
   @Test
-  void awaitThenDeliverCompletesAsync() {
-    CompletableFuture<byte[]> future = mailbox.await(KEY, Duration.ofSeconds(5));
+  void getReturnsEmptyWhenNotDelivered() {
+    Optional<byte[]> result = mailbox.get(KEY);
 
-    assertFalse(future.isDone());
-
-    mailbox.deliver(KEY, "world".getBytes(UTF_8));
-
-    await().atMost(Duration.ofSeconds(2)).until(future::isDone);
-    assertArrayEquals("world".getBytes(UTF_8), future.join());
-  }
-
-  @Test
-  void awaitTimesOut() {
-    CompletableFuture<byte[]> future = mailbox.await(KEY, Duration.ofMillis(50));
-
-    await()
-        .atMost(Duration.ofSeconds(2))
-        .until(
-            () -> {
-              if (!future.isDone()) return false;
-              return future.isCompletedExceptionally();
-            });
-
-    assertTrue(future.isCompletedExceptionally());
-    assertThrows(Exception.class, future::join);
-  }
-
-  @Test
-  void deleteCancelsPendingFuture() {
-    CompletableFuture<byte[]> future = mailbox.await(KEY, Duration.ofSeconds(30));
-
-    mailbox.delete(KEY);
-
-    assertTrue(future.isCancelled());
-    assertThrows(CancellationException.class, future::join);
+    assertTrue(result.isEmpty());
   }
 
   @Test
@@ -90,16 +56,11 @@ class InMemoryMailboxSpiTest {
 
     mailbox.delete(KEY);
 
-    CompletableFuture<byte[]> future = mailbox.await(KEY, Duration.ofMillis(50));
+    assertTrue(mailbox.get(KEY).isEmpty());
+  }
 
-    await()
-        .atMost(Duration.ofSeconds(2))
-        .until(
-            () -> {
-              if (!future.isDone()) return false;
-              return future.isCompletedExceptionally();
-            });
-
-    assertTrue(future.isCompletedExceptionally());
+  @Test
+  void mailboxKeyAppliesPrefix() {
+    assertEquals("substrate:mailbox:my-key", mailbox.mailboxKey("my-key"));
   }
 }

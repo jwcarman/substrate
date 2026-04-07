@@ -41,7 +41,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 import org.jwcarman.substrate.spi.AbstractJournalSpi;
-import org.jwcarman.substrate.spi.JournalEntry;
+import org.jwcarman.substrate.spi.RawJournalEntry;
 
 public class NatsJournalSpi extends AbstractJournalSpi {
 
@@ -98,7 +98,7 @@ public class NatsJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<JournalEntry> readAfter(String key, String afterId) {
+  public Stream<RawJournalEntry> readAfter(String key, String afterId) {
     long startSeq = Long.parseLong(afterId) + 1;
     String subject = toSubject(key);
 
@@ -115,7 +115,7 @@ public class NatsJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<JournalEntry> readLast(String key, int count) {
+  public Stream<RawJournalEntry> readLast(String key, int count) {
     String subject = toSubject(key);
 
     try {
@@ -124,7 +124,7 @@ public class NatsJournalSpi extends AbstractJournalSpi {
         return Stream.empty();
       }
 
-      List<JournalEntry> allEntries = fetchAllForSubject(subject, key);
+      List<RawJournalEntry> allEntries = fetchAllForSubject(subject, key);
       int start = Math.max(0, allEntries.size() - count);
       return allEntries.subList(start, allEntries.size()).stream();
     } catch (IOException | JetStreamApiException _) {
@@ -156,7 +156,7 @@ public class NatsJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public boolean isCompleted(String key) {
+  public boolean isComplete(String key) {
     try {
       ensureCompletedBucketExists();
       var kv = connection.keyValue(COMPLETED_BUCKET);
@@ -210,7 +210,7 @@ public class NatsJournalSpi extends AbstractJournalSpi {
     return SUBJECT_PREFIX + key.replace(':', '.');
   }
 
-  private Stream<JournalEntry> fetchMessages(
+  private Stream<RawJournalEntry> fetchMessages(
       String subject, DeliverPolicy deliverPolicy, long startSeq, String key) {
     try {
       ConsumerConfiguration.Builder ccBuilder =
@@ -226,7 +226,7 @@ public class NatsJournalSpi extends AbstractJournalSpi {
 
       JetStreamSubscription sub = jetStream.subscribe(subject, pullOptions);
 
-      List<JournalEntry> entries = new ArrayList<>();
+      List<RawJournalEntry> entries = new ArrayList<>();
       try {
         List<Message> batch = sub.fetch(1000, FETCH_TIMEOUT);
         for (Message msg : batch) {
@@ -241,7 +241,7 @@ public class NatsJournalSpi extends AbstractJournalSpi {
     }
   }
 
-  private List<JournalEntry> fetchAllForSubject(String subject, String key)
+  private List<RawJournalEntry> fetchAllForSubject(String subject, String key)
       throws IOException, JetStreamApiException {
     PullSubscribeOptions pullOptions =
         PullSubscribeOptions.builder().stream(streamName)
@@ -254,7 +254,7 @@ public class NatsJournalSpi extends AbstractJournalSpi {
 
     JetStreamSubscription sub = jetStream.subscribe(subject, pullOptions);
 
-    List<JournalEntry> entries = new ArrayList<>();
+    List<RawJournalEntry> entries = new ArrayList<>();
     try {
       List<Message> batch = sub.fetch(1000, FETCH_TIMEOUT);
       for (Message msg : batch) {
@@ -275,14 +275,14 @@ public class NatsJournalSpi extends AbstractJournalSpi {
     return subjects.getFirst().getCount();
   }
 
-  private JournalEntry toJournalEntry(Message message, String key) {
+  private RawJournalEntry toJournalEntry(Message message, String key) {
     byte[] data = message.getData() != null ? message.getData() : new byte[0];
 
     io.nats.client.impl.Headers headers = message.getHeaders();
     String timestampStr = headers != null ? getSingleHeader(headers, "timestamp") : null;
     Instant timestamp = timestampStr != null ? Instant.parse(timestampStr) : Instant.now();
 
-    return new JournalEntry(
+    return new RawJournalEntry(
         String.valueOf(message.metaData().streamSequence()), key, data, timestamp);
   }
 

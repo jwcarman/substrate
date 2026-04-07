@@ -19,12 +19,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
+import java.util.Optional;
 import org.jwcarman.substrate.spi.AbstractMailboxSpi;
-import org.jwcarman.substrate.spi.Notifier;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
@@ -43,24 +39,15 @@ public class DynamoDbMailboxSpi extends AbstractMailboxSpi {
   private static final String FIELD_TTL = "ttl";
 
   private final DynamoDbClient client;
-  private final Notifier notifier;
   private final String tableName;
   private final Duration defaultTtl;
-  private final ConcurrentMap<String, CompletableFuture<byte[]>> pending =
-      new ConcurrentHashMap<>();
 
   public DynamoDbMailboxSpi(
-      DynamoDbClient client,
-      Notifier notifier,
-      String prefix,
-      String tableName,
-      Duration defaultTtl) {
+      DynamoDbClient client, String prefix, String tableName, Duration defaultTtl) {
     super(prefix);
     this.client = client;
-    this.notifier = notifier;
     this.tableName = tableName;
     this.defaultTtl = defaultTtl;
-    this.notifier.subscribe(this::onNotification);
   }
 
   public void createTable() {
@@ -89,26 +76,21 @@ public class DynamoDbMailboxSpi extends AbstractMailboxSpi {
     }
 
     client.putItem(PutItemRequest.builder().tableName(tableName).item(item).build());
-    notifier.notify(key, key);
   }
 
   @Override
-  public CompletableFuture<byte[]> await(String key, Duration timeout) {
-    byte[] existing = getValueFromDynamo(key);
-    if (existing != null) {
-      return CompletableFuture.completedFuture(existing);
+  public Optional<byte[]> get(String key) {
+    GetItemResponse response =
+        client.getItem(
+            GetItemRequest.builder()
+                .tableName(tableName)
+                .key(Map.of(FIELD_KEY, AttributeValue.builder().s(key).build()))
+                .build());
+
+    if (response.hasItem() && response.item().containsKey(FIELD_VALUE)) {
+      return Optional.of(response.item().get(FIELD_VALUE).b().asByteArray());
     }
-
-    CompletableFuture<byte[]> future = pending.computeIfAbsent(key, k -> new CompletableFuture<>());
-
-    // Double-check in case deliver() was called between our get and computeIfAbsent
-    byte[] deliveredAfter = getValueFromDynamo(key);
-    if (deliveredAfter != null) {
-      future.complete(deliveredAfter);
-      pending.remove(key);
-    }
-
-    return future.orTimeout(timeout.toMillis(), TimeUnit.MILLISECONDS);
+    return Optional.empty();
   }
 
   @Override
@@ -118,33 +100,5 @@ public class DynamoDbMailboxSpi extends AbstractMailboxSpi {
             .tableName(tableName)
             .key(Map.of(FIELD_KEY, AttributeValue.builder().s(key).build()))
             .build());
-    CompletableFuture<byte[]> future = pending.remove(key);
-    if (future != null) {
-      future.cancel(false);
-    }
-  }
-
-  private byte[] getValueFromDynamo(String key) {
-    GetItemResponse response =
-        client.getItem(
-            GetItemRequest.builder()
-                .tableName(tableName)
-                .key(Map.of(FIELD_KEY, AttributeValue.builder().s(key).build()))
-                .build());
-
-    if (response.hasItem() && response.item().containsKey(FIELD_VALUE)) {
-      return response.item().get(FIELD_VALUE).b().asByteArray();
-    }
-    return null;
-  }
-
-  private void onNotification(String key, String payload) {
-    CompletableFuture<byte[]> future = pending.remove(key);
-    if (future != null) {
-      byte[] value = getValueFromDynamo(key);
-      if (value != null) {
-        future.complete(value);
-      }
-    }
   }
 }

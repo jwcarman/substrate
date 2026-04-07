@@ -16,16 +16,12 @@
 package org.jwcarman.substrate.mailbox.dynamodb;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.await;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.memory.InMemoryNotifier;
-import org.jwcarman.substrate.spi.Notifier;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.localstack.LocalStackContainer;
@@ -46,7 +42,6 @@ class DynamoDbMailboxIT {
           .withServices("dynamodb");
 
   private DynamoDbMailboxSpi mailbox;
-  private Notifier notifier;
 
   @BeforeEach
   void setUp() {
@@ -66,42 +61,30 @@ class DynamoDbMailboxIT {
       // table doesn't exist yet
     }
 
-    notifier = new InMemoryNotifier();
     mailbox =
         new DynamoDbMailboxSpi(
-            client, notifier, "substrate:mailbox:", "substrate_mailbox", Duration.ofMinutes(5));
+            client, "substrate:mailbox:", "substrate_mailbox", Duration.ofMinutes(5));
     mailbox.createTable();
   }
 
   @Test
-  void deliverAndAwaitFullLifecycle() throws Exception {
+  void deliverThenGetReturnsValue() {
     String key = mailbox.mailboxKey("test-" + System.nanoTime());
 
     mailbox.deliver(key, "hello".getBytes(StandardCharsets.UTF_8));
 
-    CompletableFuture<byte[]> future = mailbox.await(key, Duration.ofSeconds(5));
-    assertThat(new String(future.get(5, TimeUnit.SECONDS), StandardCharsets.UTF_8))
-        .isEqualTo("hello");
+    Optional<byte[]> result = mailbox.get(key);
+    assertThat(result).isPresent();
+    assertThat(new String(result.get(), StandardCharsets.UTF_8)).isEqualTo("hello");
   }
 
   @Test
-  void awaitResolvesWhenDeliveredAfterWaiting() {
-    String key = mailbox.mailboxKey("async-" + System.nanoTime());
+  void getReturnsEmptyWhenNotDelivered() {
+    String key = mailbox.mailboxKey("absent-" + System.nanoTime());
 
-    CompletableFuture<byte[]> future = mailbox.await(key, Duration.ofSeconds(10));
+    Optional<byte[]> result = mailbox.get(key);
 
-    CompletableFuture.runAsync(
-        () -> {
-          await().pollDelay(Duration.ofMillis(200)).atMost(Duration.ofSeconds(1)).until(() -> true);
-          mailbox.deliver(key, "delayed-value".getBytes(StandardCharsets.UTF_8));
-        });
-
-    await()
-        .atMost(Duration.ofSeconds(10))
-        .untilAsserted(
-            () ->
-                assertThat(future.join())
-                    .isEqualTo("delayed-value".getBytes(StandardCharsets.UTF_8)));
+    assertThat(result).isEmpty();
   }
 
   @Test
@@ -111,10 +94,8 @@ class DynamoDbMailboxIT {
     mailbox.deliver(key, "to-delete".getBytes(StandardCharsets.UTF_8));
     mailbox.delete(key);
 
-    CompletableFuture<byte[]> future = mailbox.await(key, Duration.ofMillis(500));
-    assertThat(future)
-        .failsWithin(Duration.ofSeconds(2))
-        .withThrowableOfType(java.util.concurrent.ExecutionException.class);
+    Optional<byte[]> result = mailbox.get(key);
+    assertThat(result).isEmpty();
   }
 
   @Test

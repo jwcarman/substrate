@@ -15,13 +15,12 @@
  */
 package org.jwcarman.substrate.spi;
 
-import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
+import java.util.Optional;
 
 public interface MailboxSpi {
   void deliver(String key, byte[] value);
 
-  CompletableFuture<byte[]> await(String key, Duration timeout);
+  Optional<byte[]> get(String key);
 
   void delete(String key);
 

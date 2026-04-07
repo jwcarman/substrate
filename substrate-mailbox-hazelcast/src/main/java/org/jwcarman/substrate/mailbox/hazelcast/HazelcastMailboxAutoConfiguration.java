@@ -17,7 +17,6 @@ package org.jwcarman.substrate.mailbox.hazelcast;
 
 import com.hazelcast.core.HazelcastInstance;
 import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.spi.Notifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -32,14 +31,8 @@ public class HazelcastMailboxAutoConfiguration {
 
   @Bean
   public HazelcastMailboxSpi hazelcastMailbox(
-      HazelcastInstance hazelcastInstance,
-      Notifier notifier,
-      HazelcastMailboxProperties properties) {
+      HazelcastInstance hazelcastInstance, HazelcastMailboxProperties properties) {
     return new HazelcastMailboxSpi(
-        hazelcastInstance,
-        notifier,
-        properties.prefix(),
-        properties.mapName(),
-        properties.defaultTtl());
+        hazelcastInstance, properties.prefix(), properties.mapName(), properties.defaultTtl());
   }
 }

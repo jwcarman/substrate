@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 import org.jwcarman.substrate.spi.AbstractJournalSpi;
-import org.jwcarman.substrate.spi.JournalEntry;
+import org.jwcarman.substrate.spi.RawJournalEntry;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
@@ -100,8 +100,8 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<JournalEntry> readAfter(String key, String afterId) {
-    List<JournalEntry> entries = new ArrayList<>();
+  public Stream<RawJournalEntry> readAfter(String key, String afterId) {
+    List<RawJournalEntry> entries = new ArrayList<>();
     Map<String, AttributeValue> exclusiveStartKey = null;
 
     do {
@@ -134,7 +134,7 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<JournalEntry> readLast(String key, int count) {
+  public Stream<RawJournalEntry> readLast(String key, int count) {
     // Request count + 1 to account for possible COMPLETED marker
     QueryResponse response =
         client.query(
@@ -147,7 +147,7 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
                 .limit(count + 1)
                 .build());
 
-    List<JournalEntry> entries = new ArrayList<>();
+    List<RawJournalEntry> entries = new ArrayList<>();
     for (Map<String, AttributeValue> item : response.items()) {
       if (!COMPLETED_ENTRY_ID.equals(item.get(FIELD_ENTRY_ID).s())) {
         entries.add(mapItem(item, key));
@@ -173,7 +173,7 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public boolean isCompleted(String key) {
+  public boolean isComplete(String key) {
     QueryResponse response =
         client.query(
             QueryRequest.builder()
@@ -233,10 +233,10 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
     } while (exclusiveStartKey != null);
   }
 
-  private JournalEntry mapItem(Map<String, AttributeValue> item, String key) {
+  private RawJournalEntry mapItem(Map<String, AttributeValue> item, String key) {
     byte[] data =
         item.containsKey(FIELD_DATA) ? item.get(FIELD_DATA).b().asByteArray() : new byte[0];
     Instant timestamp = Instant.parse(item.get(FIELD_TIMESTAMP).s());
-    return new JournalEntry(item.get(FIELD_ENTRY_ID).s(), key, data, timestamp);
+    return new RawJournalEntry(item.get(FIELD_ENTRY_ID).s(), key, data, timestamp);
   }
 }

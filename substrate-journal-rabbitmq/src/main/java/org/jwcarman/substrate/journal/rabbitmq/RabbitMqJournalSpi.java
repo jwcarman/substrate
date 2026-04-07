@@ -36,7 +36,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import org.jwcarman.substrate.spi.AbstractJournalSpi;
-import org.jwcarman.substrate.spi.JournalEntry;
+import org.jwcarman.substrate.spi.RawJournalEntry;
 
 public class RabbitMqJournalSpi extends AbstractJournalSpi implements AutoCloseable {
 
@@ -79,13 +79,13 @@ public class RabbitMqJournalSpi extends AbstractJournalSpi implements AutoClosea
   }
 
   @Override
-  public Stream<JournalEntry> readAfter(String key, String afterId) {
+  public Stream<RawJournalEntry> readAfter(String key, String afterId) {
     return consumeAll(key).stream().filter(entry -> entry.id().compareTo(afterId) > 0);
   }
 
   @Override
-  public Stream<JournalEntry> readLast(String key, int count) {
-    List<JournalEntry> all = consumeAll(key);
+  public Stream<RawJournalEntry> readLast(String key, int count) {
+    List<RawJournalEntry> all = consumeAll(key);
     int start = Math.max(0, all.size() - count);
     return all.subList(start, all.size()).stream();
   }
@@ -111,8 +111,8 @@ public class RabbitMqJournalSpi extends AbstractJournalSpi implements AutoClosea
   }
 
   @Override
-  public boolean isCompleted(String key) {
-    List<JournalEntry> entries = consumeAll(key);
+  public boolean isComplete(String key) {
+    List<RawJournalEntry> entries = consumeAll(key);
     // consumeAll filters out COMPLETED markers, so check the raw stream
     String streamName = toStreamName(key);
     if (!streamExists(streamName)) {
@@ -220,13 +220,13 @@ public class RabbitMqJournalSpi extends AbstractJournalSpi implements AutoClosea
     }
   }
 
-  private List<JournalEntry> consumeAll(String key) {
+  private List<RawJournalEntry> consumeAll(String key) {
     String streamName = toStreamName(key);
     if (!streamExists(streamName)) {
       return List.of();
     }
 
-    BlockingQueue<JournalEntry> queue = new LinkedBlockingQueue<>();
+    BlockingQueue<RawJournalEntry> queue = new LinkedBlockingQueue<>();
     Consumer consumer;
     try {
       consumer =
@@ -238,9 +238,9 @@ public class RabbitMqJournalSpi extends AbstractJournalSpi implements AutoClosea
       return List.of();
     }
 
-    List<JournalEntry> entries = new ArrayList<>();
+    List<RawJournalEntry> entries = new ArrayList<>();
     try {
-      JournalEntry entry;
+      RawJournalEntry entry;
       while ((entry = queue.poll(CONSUME_TIMEOUT_MS, TimeUnit.MILLISECONDS)) != null) {
         entries.add(entry);
       }
@@ -253,7 +253,7 @@ public class RabbitMqJournalSpi extends AbstractJournalSpi implements AutoClosea
     return Collections.unmodifiableList(entries);
   }
 
-  private void deserializeEntry(Message message, String key, BlockingQueue<JournalEntry> queue) {
+  private void deserializeEntry(Message message, String key, BlockingQueue<RawJournalEntry> queue) {
     var props = message.getApplicationProperties();
     if (props == null) {
       return;
@@ -269,7 +269,7 @@ public class RabbitMqJournalSpi extends AbstractJournalSpi implements AutoClosea
 
     byte[] data = message.getBodyAsBinary() != null ? message.getBodyAsBinary() : new byte[0];
 
-    queue.add(new JournalEntry(entryId, key, data, timestamp));
+    queue.add(new RawJournalEntry(entryId, key, data, timestamp));
   }
 
   private boolean streamExists(String streamName) {

@@ -23,7 +23,7 @@ import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.spi.JournalEntry;
+import org.jwcarman.substrate.spi.RawJournalEntry;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.localstack.LocalStackContainer;
@@ -94,7 +94,7 @@ class DynamoDbJournalSpiIT {
     String id2 = journal.append(key, "payload2".getBytes(StandardCharsets.UTF_8));
     String id3 = journal.append(key, "payload3".getBytes(StandardCharsets.UTF_8));
 
-    List<JournalEntry> entries = journal.readAfter(key, id1).toList();
+    List<RawJournalEntry> entries = journal.readAfter(key, id1).toList();
 
     assertThat(entries).hasSize(2);
     assertThat(entries.get(0).id()).isEqualTo(id2);
@@ -106,7 +106,7 @@ class DynamoDbJournalSpiIT {
   @Test
   void readAfterReturnsEmptyForUnknownKey() {
     String key = journal.journalKey("nonexistent");
-    List<JournalEntry> entries =
+    List<RawJournalEntry> entries =
         journal.readAfter(key, "00000000-0000-0000-0000-000000000000").toList();
     assertThat(entries).isEmpty();
   }
@@ -119,7 +119,7 @@ class DynamoDbJournalSpiIT {
     journal.append(key, "third".getBytes(StandardCharsets.UTF_8));
     journal.append(key, "fourth".getBytes(StandardCharsets.UTF_8));
 
-    List<JournalEntry> entries = journal.readLast(key, 2).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 2).toList();
 
     assertThat(entries).hasSize(2);
     assertThat(new String(entries.get(0).data(), StandardCharsets.UTF_8)).isEqualTo("third");
@@ -129,7 +129,7 @@ class DynamoDbJournalSpiIT {
   @Test
   void readLastReturnsEmptyForUnknownKey() {
     String key = journal.journalKey("nonexistent");
-    List<JournalEntry> entries = journal.readLast(key, 5).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 5).toList();
     assertThat(entries).isEmpty();
   }
 
@@ -139,7 +139,7 @@ class DynamoDbJournalSpiIT {
     journal.append(key, "one".getBytes(StandardCharsets.UTF_8));
     journal.append(key, "two".getBytes(StandardCharsets.UTF_8));
 
-    List<JournalEntry> entries = journal.readLast(key, 100).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 100).toList();
 
     assertThat(entries).hasSize(2);
     assertThat(new String(entries.get(0).data(), StandardCharsets.UTF_8)).isEqualTo("one");
@@ -153,7 +153,7 @@ class DynamoDbJournalSpiIT {
     journal.complete(key);
 
     // COMPLETED marker should not appear in readAfter or readLast
-    List<JournalEntry> entries = journal.readLast(key, 100).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 100).toList();
     assertThat(entries).hasSize(1);
     assertThat(new String(entries.getFirst().data(), StandardCharsets.UTF_8)).isEqualTo("data");
   }
@@ -166,7 +166,7 @@ class DynamoDbJournalSpiIT {
 
     journal.delete(key);
 
-    List<JournalEntry> entries = journal.readLast(key, 100).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 100).toList();
     assertThat(entries).isEmpty();
   }
 
@@ -188,7 +188,7 @@ class DynamoDbJournalSpiIT {
     String key = journal.journalKey("time");
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
 
-    List<JournalEntry> entries = journal.readLast(key, 1).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 1).toList();
     assertThat(entries).hasSize(1);
     assertThat(entries.getFirst().timestamp()).isNotNull();
   }
@@ -199,7 +199,7 @@ class DynamoDbJournalSpiIT {
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
 
     // Verify entry was stored and can be read back
-    List<JournalEntry> entries = journal.readLast(key, 1).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 1).toList();
     assertThat(entries).hasSize(1);
   }
 
@@ -212,7 +212,7 @@ class DynamoDbJournalSpiIT {
 
     journal.delete(key);
 
-    List<JournalEntry> entries = journal.readLast(key, 100).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 100).toList();
     assertThat(entries).isEmpty();
   }
 
@@ -234,7 +234,7 @@ class DynamoDbJournalSpiIT {
         journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofMinutes(10));
 
     assertThat(id).isNotEmpty();
-    List<JournalEntry> entries = journal.readLast(key, 1).toList();
+    List<RawJournalEntry> entries = journal.readLast(key, 1).toList();
     assertThat(entries).hasSize(1);
   }
 
@@ -244,7 +244,7 @@ class DynamoDbJournalSpiIT {
     String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8));
     journal.complete(key);
 
-    List<JournalEntry> entries = journal.readAfter(key, id1).toList();
+    List<RawJournalEntry> entries = journal.readAfter(key, id1).toList();
     assertThat(entries).isEmpty();
   }
 }

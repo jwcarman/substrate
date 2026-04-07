@@ -16,39 +16,44 @@
 package org.jwcarman.substrate.core;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
 
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.codec.spi.Codec;
-import org.jwcarman.substrate.spi.MailboxSpi;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.jwcarman.substrate.memory.InMemoryMailboxSpi;
+import org.jwcarman.substrate.memory.InMemoryNotifier;
 
-@ExtendWith(MockitoExtension.class)
 class DefaultMailboxTest {
 
   private static final String KEY = "substrate:mailbox:test";
 
-  @Mock private MailboxSpi spi;
-  @Mock private Codec<String> codec;
+  private static final Codec<String> STRING_CODEC =
+      new Codec<>() {
+        @Override
+        public byte[] encode(String value) {
+          return value.getBytes(UTF_8);
+        }
+
+        @Override
+        public String decode(byte[] bytes) {
+          return new String(bytes, UTF_8);
+        }
+      };
+
+  private InMemoryMailboxSpi spi;
+  private InMemoryNotifier notifier;
   private DefaultMailbox<String> mailbox;
 
   @BeforeEach
   void setUp() {
-    lenient()
-        .when(codec.encode(anyString()))
-        .thenAnswer(inv -> ((String) inv.getArgument(0)).getBytes(UTF_8));
-    lenient()
-        .when(codec.decode(any(byte[].class)))
-        .thenAnswer(inv -> new String((byte[]) inv.getArgument(0), UTF_8));
-    mailbox = new DefaultMailbox<>(spi, KEY, codec);
+    spi = new InMemoryMailboxSpi();
+    notifier = new InMemoryNotifier();
+    mailbox = new DefaultMailbox<>(spi, KEY, STRING_CODEC, notifier);
   }
 
   @Test
@@ -57,29 +62,58 @@ class DefaultMailboxTest {
   }
 
   @Test
-  void deliverDelegatesToSpiWithBoundKey() {
+  void deliverStoresValueAndNotifies() {
     mailbox.deliver("hello");
 
-    verify(spi).deliver(KEY, "hello".getBytes(UTF_8));
+    assertTrue(spi.get(KEY).isPresent());
+    assertArrayEquals("hello".getBytes(UTF_8), spi.get(KEY).get());
   }
 
   @Test
-  void awaitDelegatesToSpiWithBoundKey() {
-    Duration timeout = Duration.ofSeconds(5);
-    CompletableFuture<byte[]> spiFuture =
-        CompletableFuture.completedFuture("result".getBytes(UTF_8));
-    when(spi.await(KEY, timeout)).thenReturn(spiFuture);
+  void awaitReturnsImmediatelyIfAlreadyDelivered() {
+    mailbox.deliver("hello");
 
-    CompletableFuture<String> result = mailbox.await(timeout);
+    CompletableFuture<String> result = mailbox.await(Duration.ofSeconds(1));
 
-    assertEquals("result", result.join());
-    verify(spi).await(KEY, timeout);
+    assertTrue(result.isDone());
+    assertEquals("hello", result.join());
   }
 
   @Test
-  void deleteDelegatesToSpiWithBoundKey() {
+  void awaitCompletesWhenValueDeliveredLater() {
+    CompletableFuture<String> result = mailbox.await(Duration.ofSeconds(5));
+
+    assertFalse(result.isDone());
+
+    mailbox.deliver("world");
+
+    await().atMost(Duration.ofSeconds(2)).until(result::isDone);
+    assertEquals("world", result.join());
+  }
+
+  @Test
+  void awaitTimesOut() {
+    CompletableFuture<String> result = mailbox.await(Duration.ofMillis(50));
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .until(
+            () -> {
+              if (!result.isDone()) return false;
+              return result.isCompletedExceptionally();
+            });
+
+    assertTrue(result.isCompletedExceptionally());
+    assertInstanceOf(
+        TimeoutException.class, assertThrows(Exception.class, result::join).getCause());
+  }
+
+  @Test
+  void deleteDelegatesToSpi() {
+    mailbox.deliver("hello");
+
     mailbox.delete();
 
-    verify(spi).delete(KEY);
+    assertTrue(spi.get(KEY).isEmpty());
   }
 }

@@ -17,7 +17,6 @@ package org.jwcarman.substrate.mailbox.postgresql;
 
 import javax.sql.DataSource;
 import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.spi.Notifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -35,7 +34,7 @@ public class PostgresMailboxAutoConfiguration {
 
   @Bean
   public PostgresMailboxSpi postgresMailbox(
-      DataSource dataSource, Notifier notifier, PostgresMailboxProperties properties) {
+      DataSource dataSource, PostgresMailboxProperties properties) {
     if (properties.autoCreateSchema()) {
       ResourceDatabasePopulator populator = new ResourceDatabasePopulator();
       populator.addScript(new ClassPathResource("db/substrate/postgresql/V1__create_mailbox.sql"));
@@ -43,6 +42,6 @@ public class PostgresMailboxAutoConfiguration {
     }
 
     JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
-    return new PostgresMailboxSpi(jdbcTemplate, notifier, properties.prefix());
+    return new PostgresMailboxSpi(jdbcTemplate, properties.prefix());
   }
 }

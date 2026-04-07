@@ -23,12 +23,12 @@ import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Optional;
 import org.bson.Document;
 import org.bson.types.Binary;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.jwcarman.substrate.spi.Notifier;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -39,7 +39,6 @@ import org.springframework.data.mongodb.core.query.Update;
 class MongoDbMailboxTest {
 
   @Mock private MongoTemplate mongoTemplate;
-  @Mock private Notifier notifier;
 
   private MongoDbMailboxSpi mailbox;
 
@@ -47,11 +46,7 @@ class MongoDbMailboxTest {
   void setUp() {
     mailbox =
         new MongoDbMailboxSpi(
-            mongoTemplate,
-            notifier,
-            "substrate:mailbox:",
-            "substrate_mailbox",
-            Duration.ofMinutes(5));
+            mongoTemplate, "substrate:mailbox:", "substrate_mailbox", Duration.ofMinutes(5));
   }
 
   @Test
@@ -60,15 +55,14 @@ class MongoDbMailboxTest {
   }
 
   @Test
-  void deliverUpsertsDocumentAndNotifies() {
+  void deliverUpsertsDocument() {
     mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8));
 
     verify(mongoTemplate).upsert(any(Query.class), any(Update.class), eq("substrate_mailbox"));
-    verify(notifier).notify("substrate:mailbox:test", "substrate:mailbox:test");
   }
 
   @Test
-  void awaitReturnsExistingValue() {
+  void getReturnsValueWhenPresent() {
     Document doc = new Document();
     doc.put("key", "substrate:mailbox:test");
     doc.put("value", new Binary("existing-value".getBytes(StandardCharsets.UTF_8)));
@@ -76,9 +70,20 @@ class MongoDbMailboxTest {
     when(mongoTemplate.findOne(any(Query.class), eq(Document.class), eq("substrate_mailbox")))
         .thenReturn(doc);
 
-    var future = mailbox.await("substrate:mailbox:test", Duration.ofSeconds(5));
+    Optional<byte[]> result = mailbox.get("substrate:mailbox:test");
 
-    assertThat(future.join()).isEqualTo("existing-value".getBytes(StandardCharsets.UTF_8));
+    assertThat(result).isPresent();
+    assertThat(result.get()).isEqualTo("existing-value".getBytes(StandardCharsets.UTF_8));
+  }
+
+  @Test
+  void getReturnsEmptyWhenAbsent() {
+    when(mongoTemplate.findOne(any(Query.class), eq(Document.class), eq("substrate_mailbox")))
+        .thenReturn(null);
+
+    Optional<byte[]> result = mailbox.get("substrate:mailbox:test");
+
+    assertThat(result).isEmpty();
   }
 
   @Test

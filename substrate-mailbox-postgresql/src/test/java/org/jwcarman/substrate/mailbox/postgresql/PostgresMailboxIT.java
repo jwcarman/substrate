@@ -16,16 +16,12 @@
 package org.jwcarman.substrate.mailbox.postgresql;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.await;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
+import java.util.Optional;
 import javax.sql.DataSource;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.notifier.postgresql.PostgresNotifier;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
@@ -40,7 +36,6 @@ class PostgresMailboxIT {
   static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
 
   private DataSource dataSource;
-  private PostgresNotifier notifier;
   private PostgresMailboxSpi mailbox;
   private JdbcTemplate jdbcTemplate;
 
@@ -55,42 +50,27 @@ class PostgresMailboxIT {
 
     jdbcTemplate.update("DELETE FROM substrate_mailbox");
 
-    notifier = new PostgresNotifier(jdbcTemplate, dataSource, "substrate_notify", 500);
-    notifier.start();
-
-    mailbox = new PostgresMailboxSpi(jdbcTemplate, notifier, "substrate:mailbox:");
-  }
-
-  @AfterEach
-  void tearDown() {
-    if (notifier != null && notifier.isRunning()) {
-      notifier.stop();
-    }
+    mailbox = new PostgresMailboxSpi(jdbcTemplate, "substrate:mailbox:");
   }
 
   @Test
-  void deliverThenAwaitReturnsImmediately() {
+  void deliverThenGetReturnsValue() {
     String key = mailbox.mailboxKey("deliver-first");
     mailbox.deliver(key, "hello".getBytes(StandardCharsets.UTF_8));
 
-    CompletableFuture<byte[]> future = mailbox.await(key, Duration.ofSeconds(5));
+    Optional<byte[]> result = mailbox.get(key);
 
-    assertThat(future.join()).isEqualTo("hello".getBytes(StandardCharsets.UTF_8));
+    assertThat(result).isPresent();
+    assertThat(result.get()).isEqualTo("hello".getBytes(StandardCharsets.UTF_8));
   }
 
   @Test
-  void awaitThenDeliverResolvesViaNotification() {
-    String key = mailbox.mailboxKey("await-first");
-    CompletableFuture<byte[]> future = mailbox.await(key, Duration.ofSeconds(10));
+  void getReturnsEmptyWhenNotDelivered() {
+    String key = mailbox.mailboxKey("never-delivered");
 
-    mailbox.deliver(key, "delayed-value".getBytes(StandardCharsets.UTF_8));
+    Optional<byte[]> result = mailbox.get(key);
 
-    await()
-        .atMost(Duration.ofSeconds(5))
-        .untilAsserted(
-            () ->
-                assertThat(future.join())
-                    .isEqualTo("delayed-value".getBytes(StandardCharsets.UTF_8)));
+    assertThat(result).isEmpty();
   }
 
   @Test
@@ -99,20 +79,13 @@ class PostgresMailboxIT {
     mailbox.deliver(key, "to-delete".getBytes(StandardCharsets.UTF_8));
     mailbox.delete(key);
 
+    Optional<byte[]> result = mailbox.get(key);
+    assertThat(result).isEmpty();
+
     Integer count =
         jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM substrate_mailbox WHERE key = ?", Integer.class, key);
     assertThat(count).isZero();
-  }
-
-  @Test
-  void deleteCancelsPendingFuture() {
-    String key = mailbox.mailboxKey("cancel-test");
-    CompletableFuture<byte[]> future = mailbox.await(key, Duration.ofSeconds(30));
-
-    mailbox.delete(key);
-
-    assertThat(future).isCancelled();
   }
 
   @Test

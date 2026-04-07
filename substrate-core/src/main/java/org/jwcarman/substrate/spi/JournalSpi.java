@@ -23,15 +23,15 @@ public interface JournalSpi {
 
   String append(String key, byte[] data, Duration ttl);
 
-  Stream<JournalEntry> readAfter(String key, String afterId);
+  Stream<RawJournalEntry> readAfter(String key, String afterId);
 
-  Stream<JournalEntry> readLast(String key, int count);
+  Stream<RawJournalEntry> readLast(String key, int count);
 
   void complete(String key);
 
   void delete(String key);
 
-  boolean isCompleted(String key);
+  boolean isComplete(String key);
 
   String journalKey(String name);
 }

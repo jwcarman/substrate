@@ -16,8 +16,6 @@
 package org.jwcarman.substrate.mailbox.hazelcast;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -26,13 +24,11 @@ import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.map.IMap;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.jwcarman.substrate.spi.Notifier;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -41,7 +37,6 @@ class HazelcastMailboxTest {
 
   @Mock private HazelcastInstance hazelcastInstance;
   @Mock private IMap<String, byte[]> map;
-  @Mock private Notifier notifier;
 
   private HazelcastMailboxSpi mailbox;
 
@@ -50,15 +45,11 @@ class HazelcastMailboxTest {
     when(hazelcastInstance.<String, byte[]>getMap("substrate-mailbox")).thenReturn(map);
     mailbox =
         new HazelcastMailboxSpi(
-            hazelcastInstance,
-            notifier,
-            "substrate:mailbox:",
-            "substrate-mailbox",
-            Duration.ofMinutes(5));
+            hazelcastInstance, "substrate:mailbox:", "substrate-mailbox", Duration.ofMinutes(5));
   }
 
   @Test
-  void deliverPutsValueInMapWithTtlAndNotifies() {
+  void deliverPutsValueInMapWithTtl() {
     mailbox.deliver("test-key", "test-value".getBytes(StandardCharsets.UTF_8));
 
     verify(map)
@@ -67,27 +58,25 @@ class HazelcastMailboxTest {
             eq("test-value".getBytes(StandardCharsets.UTF_8)),
             eq(Duration.ofMinutes(5).toMillis()),
             eq(TimeUnit.MILLISECONDS));
-    verify(notifier).notify("test-key", "test-key");
   }
 
   @Test
-  void awaitReturnsImmediatelyIfValueExists() throws Exception {
+  void getReturnsValueWhenPresent() {
     when(map.get("test-key")).thenReturn("existing-value".getBytes(StandardCharsets.UTF_8));
 
-    CompletableFuture<byte[]> future = mailbox.await("test-key", Duration.ofSeconds(5));
+    Optional<byte[]> result = mailbox.get("test-key");
 
-    assertThat(new String(future.get(1, TimeUnit.SECONDS), StandardCharsets.UTF_8))
-        .isEqualTo("existing-value");
+    assertThat(result).isPresent();
+    assertThat(result.get()).isEqualTo("existing-value".getBytes(StandardCharsets.UTF_8));
   }
 
   @Test
-  void awaitRegistersEntryListenerWhenValueAbsent() {
+  void getReturnsEmptyWhenAbsent() {
     when(map.get("test-key")).thenReturn(null);
-    when(map.addEntryListener(any(), eq("test-key"), anyBoolean())).thenReturn(UUID.randomUUID());
 
-    mailbox.await("test-key", Duration.ofSeconds(5));
+    Optional<byte[]> result = mailbox.get("test-key");
 
-    verify(map).addEntryListener(any(), eq("test-key"), anyBoolean());
+    assertThat(result).isEmpty();
   }
 
   @Test

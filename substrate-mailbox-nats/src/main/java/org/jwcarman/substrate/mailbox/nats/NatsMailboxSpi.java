@@ -19,31 +19,22 @@ import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;
 import io.nats.client.api.KeyValueConfiguration;
 import io.nats.client.api.KeyValueEntry;
-import io.nats.client.impl.NatsKeyValueWatchSubscription;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Duration;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.Optional;
 import org.jwcarman.substrate.spi.AbstractMailboxSpi;
-import org.jwcarman.substrate.spi.Notifier;
 
 public class NatsMailboxSpi extends AbstractMailboxSpi {
 
   private final Connection connection;
-  private final Notifier notifier;
   private final String bucketName;
   private final Duration defaultTtl;
 
   public NatsMailboxSpi(
-      Connection connection,
-      Notifier notifier,
-      String prefix,
-      String bucketName,
-      Duration defaultTtl) {
+      Connection connection, String prefix, String bucketName, Duration defaultTtl) {
     super(prefix);
     this.connection = connection;
-    this.notifier = notifier;
     this.bucketName = bucketName;
     this.defaultTtl = defaultTtl;
     ensureBucketExists();
@@ -54,7 +45,6 @@ public class NatsMailboxSpi extends AbstractMailboxSpi {
     try {
       var kv = connection.keyValue(bucketName);
       kv.put(toKvKey(key), value);
-      notifier.notify(key, key);
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to deliver to NATS KV", e);
     } catch (JetStreamApiException e) {
@@ -63,53 +53,18 @@ public class NatsMailboxSpi extends AbstractMailboxSpi {
   }
 
   @Override
-  public CompletableFuture<byte[]> await(String key, Duration timeout) {
+  public Optional<byte[]> get(String key) {
     try {
       var kv = connection.keyValue(bucketName);
-      String kvKey = toKvKey(key);
-
-      // Check if value already exists
-      KeyValueEntry existing = kv.get(kvKey);
-      if (existing != null) {
-        return CompletableFuture.completedFuture(existing.getValue());
+      KeyValueEntry entry = kv.get(toKvKey(key));
+      if (entry != null && entry.getValue() != null) {
+        return Optional.of(entry.getValue());
       }
-
-      CompletableFuture<byte[]> future = new CompletableFuture<>();
-
-      NatsKeyValueWatchSubscription watcher =
-          kv.watch(
-              kvKey,
-              new io.nats.client.api.KeyValueWatcher() {
-                @Override
-                public void watch(KeyValueEntry entry) {
-                  if (entry != null && entry.getValue() != null) {
-                    future.complete(entry.getValue());
-                  }
-                }
-
-                @Override
-                public void endOfData() {
-                  // Initial values processed
-                }
-              },
-              io.nats.client.api.KeyValueWatchOption.UPDATES_ONLY);
-
-      // Double-check in case deliver() was called between our get and watch
-      KeyValueEntry deliveredAfter = kv.get(kvKey);
-      if (deliveredAfter != null) {
-        future.complete(deliveredAfter.getValue());
-      }
-
-      return future
-          .orTimeout(timeout.toMillis(), TimeUnit.MILLISECONDS)
-          .whenComplete((result, ex) -> watcher.unsubscribe());
+      return Optional.empty();
     } catch (IOException e) {
-      throw new UncheckedIOException("Failed to await from NATS KV", e);
+      throw new UncheckedIOException("Failed to get from NATS KV", e);
     } catch (JetStreamApiException e) {
-      throw new IllegalStateException("Failed to await from NATS KV", e);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      return CompletableFuture.failedFuture(e);
+      throw new IllegalStateException("Failed to get from NATS KV", e);
     }
   }
 
@@ -149,7 +104,6 @@ public class NatsMailboxSpi extends AbstractMailboxSpi {
     }
   }
 
-  // NATS KV keys cannot contain colons or dots — use dashes
   private String toKvKey(String key) {
     return key.replace(':', '-').replace('.', '-');
   }

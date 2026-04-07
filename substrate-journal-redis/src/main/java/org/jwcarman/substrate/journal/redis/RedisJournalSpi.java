@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 import org.jwcarman.substrate.spi.AbstractJournalSpi;
-import org.jwcarman.substrate.spi.JournalEntry;
+import org.jwcarman.substrate.spi.RawJournalEntry;
 
 public class RedisJournalSpi extends AbstractJournalSpi {
 
@@ -74,7 +74,7 @@ public class RedisJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<JournalEntry> readAfter(String key, String afterId) {
+  public Stream<RawJournalEntry> readAfter(String key, String afterId) {
     List<StreamMessage<String, String>> messages =
         commands.xread(XReadArgs.Builder.count(READ_BATCH_SIZE), StreamOffset.from(key, afterId));
     if (messages == null || messages.isEmpty()) {
@@ -84,7 +84,7 @@ public class RedisJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<JournalEntry> readLast(String key, int count) {
+  public Stream<RawJournalEntry> readLast(String key, int count) {
     List<StreamMessage<String, String>> messages =
         commands.xrevrange(key, Range.unbounded(), Limit.create(0, count));
     return messages.reversed().stream().map(msg -> toJournalEntry(key, msg));
@@ -96,7 +96,7 @@ public class RedisJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public boolean isCompleted(String key) {
+  public boolean isComplete(String key) {
     return commands.get(key + COMPLETED_SUFFIX) != null;
   }
 
@@ -105,12 +105,12 @@ public class RedisJournalSpi extends AbstractJournalSpi {
     commands.del(key, key + COMPLETED_SUFFIX);
   }
 
-  private JournalEntry toJournalEntry(String key, StreamMessage<String, String> message) {
+  private RawJournalEntry toJournalEntry(String key, StreamMessage<String, String> message) {
     Map<String, String> body = message.getBody();
     String encodedData = body.get(FIELD_DATA);
     byte[] data = encodedData != null ? Base64.getDecoder().decode(encodedData) : new byte[0];
     String timestampStr = body.get(FIELD_TIMESTAMP);
     Instant timestamp = timestampStr != null ? Instant.parse(timestampStr) : Instant.now();
-    return new JournalEntry(message.getId(), key, data, timestamp);
+    return new RawJournalEntry(message.getId(), key, data, timestamp);
   }
 }

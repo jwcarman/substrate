@@ -23,10 +23,10 @@ import static org.mockito.Mockito.when;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.jwcarman.substrate.spi.Notifier;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -42,7 +42,6 @@ import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 class DynamoDbMailboxTest {
 
   @Mock private DynamoDbClient client;
-  @Mock private Notifier notifier;
 
   private DynamoDbMailboxSpi mailbox;
 
@@ -50,7 +49,7 @@ class DynamoDbMailboxTest {
   void setUp() {
     mailbox =
         new DynamoDbMailboxSpi(
-            client, notifier, "substrate:mailbox:", "substrate_mailbox", Duration.ofMinutes(5));
+            client, "substrate:mailbox:", "substrate_mailbox", Duration.ofMinutes(5));
   }
 
   @Test
@@ -59,7 +58,7 @@ class DynamoDbMailboxTest {
   }
 
   @Test
-  void deliverPutsItemAndNotifies() {
+  void deliverPutsItem() {
     mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8));
 
     ArgumentCaptor<PutItemRequest> captor = ArgumentCaptor.forClass(PutItemRequest.class);
@@ -70,12 +69,10 @@ class DynamoDbMailboxTest {
     assertThat(item.get("value").b().asByteArray())
         .isEqualTo("hello".getBytes(StandardCharsets.UTF_8));
     assertThat(item.get("ttl").n()).isNotEmpty();
-
-    verify(notifier).notify("substrate:mailbox:test", "substrate:mailbox:test");
   }
 
   @Test
-  void awaitReturnsExistingValue() {
+  void getReturnsValueWhenPresent() {
     when(client.getItem(any(GetItemRequest.class)))
         .thenReturn(
             GetItemResponse.builder()
@@ -90,9 +87,19 @@ class DynamoDbMailboxTest {
                                 .build()))
                 .build());
 
-    var future = mailbox.await("substrate:mailbox:test", Duration.ofSeconds(5));
+    Optional<byte[]> result = mailbox.get("substrate:mailbox:test");
 
-    assertThat(future.join()).isEqualTo("existing-value".getBytes(StandardCharsets.UTF_8));
+    assertThat(result).isPresent();
+    assertThat(result.get()).isEqualTo("existing-value".getBytes(StandardCharsets.UTF_8));
+  }
+
+  @Test
+  void getReturnsEmptyWhenAbsent() {
+    when(client.getItem(any(GetItemRequest.class))).thenReturn(GetItemResponse.builder().build());
+
+    Optional<byte[]> result = mailbox.get("substrate:mailbox:test");
+
+    assertThat(result).isEmpty();
   }
 
   @Test

@@ -28,9 +28,9 @@ import io.nats.client.api.KeyValueEntry;
 import io.nats.client.api.KeyValueStatus;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.jwcarman.substrate.spi.Notifier;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -38,7 +38,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class NatsMailboxTest {
 
   @Mock private Connection connection;
-  @Mock private Notifier notifier;
   @Mock private KeyValueManagement kvm;
 
   @Test
@@ -50,7 +49,7 @@ class NatsMailboxTest {
   }
 
   @Test
-  void deliverPutsValueAndNotifies() throws Exception {
+  void deliverPutsValue() throws Exception {
     wireConnectionForConstruction();
     var kv = mock(io.nats.client.KeyValue.class);
     when(connection.keyValue("substrate-mailbox")).thenReturn(kv);
@@ -59,11 +58,10 @@ class NatsMailboxTest {
     mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8));
 
     verify(kv).put(anyString(), any(byte[].class));
-    verify(notifier).notify("substrate:mailbox:test", "substrate:mailbox:test");
   }
 
   @Test
-  void awaitReturnsExistingValue() throws Exception {
+  void getReturnsValueWhenPresent() throws Exception {
     wireConnectionForConstruction();
     var kv = mock(io.nats.client.KeyValue.class);
     when(connection.keyValue("substrate-mailbox")).thenReturn(kv);
@@ -73,9 +71,24 @@ class NatsMailboxTest {
     when(kv.get(anyString())).thenReturn(entry);
 
     NatsMailboxSpi mailbox = createMailbox();
-    var future = mailbox.await("substrate:mailbox:test", Duration.ofSeconds(5));
+    Optional<byte[]> result = mailbox.get("substrate:mailbox:test");
 
-    assertThat(future.join()).isEqualTo("existing-value".getBytes(StandardCharsets.UTF_8));
+    assertThat(result).isPresent();
+    assertThat(result.get()).isEqualTo("existing-value".getBytes(StandardCharsets.UTF_8));
+  }
+
+  @Test
+  void getReturnsEmptyWhenAbsent() throws Exception {
+    wireConnectionForConstruction();
+    var kv = mock(io.nats.client.KeyValue.class);
+    when(connection.keyValue("substrate-mailbox")).thenReturn(kv);
+
+    when(kv.get(anyString())).thenReturn(null);
+
+    NatsMailboxSpi mailbox = createMailbox();
+    Optional<byte[]> result = mailbox.get("substrate:mailbox:test");
+
+    assertThat(result).isEmpty();
   }
 
   private void wireConnectionForConstruction() throws Exception {
@@ -85,6 +98,6 @@ class NatsMailboxTest {
 
   private NatsMailboxSpi createMailbox() {
     return new NatsMailboxSpi(
-        connection, notifier, "substrate:mailbox:", "substrate-mailbox", Duration.ofMinutes(5));
+        connection, "substrate:mailbox:", "substrate-mailbox", Duration.ofMinutes(5));
   }
 }

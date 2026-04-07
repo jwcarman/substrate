@@ -30,6 +30,7 @@ import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.codec.spi.TypeRef;
 import org.jwcarman.substrate.memory.InMemoryMailboxSpi;
+import org.jwcarman.substrate.memory.InMemoryNotifier;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -43,8 +44,9 @@ class MailboxFactoryTest {
   @Test
   void createReturnsBoundMailboxWithPrefixedKey() {
     InMemoryMailboxSpi spi = new InMemoryMailboxSpi();
+    InMemoryNotifier notifier = new InMemoryNotifier();
     when(codecFactory.create(String.class)).thenReturn(stringCodec);
-    MailboxFactory factory = new MailboxFactory(spi, codecFactory);
+    MailboxFactory factory = new MailboxFactory(spi, codecFactory, notifier);
 
     Mailbox<String> mailbox = factory.create("my-elicit", String.class);
 
@@ -54,12 +56,13 @@ class MailboxFactoryTest {
   @Test
   void createdMailboxDelegatesToSpi() {
     InMemoryMailboxSpi spi = new InMemoryMailboxSpi();
+    InMemoryNotifier notifier = new InMemoryNotifier();
     when(codecFactory.create(String.class)).thenReturn(stringCodec);
     when(stringCodec.encode(anyString()))
         .thenAnswer(inv -> ((String) inv.getArgument(0)).getBytes(UTF_8));
     when(stringCodec.decode(any(byte[].class)))
         .thenAnswer(inv -> new String((byte[]) inv.getArgument(0), UTF_8));
-    MailboxFactory factory = new MailboxFactory(spi, codecFactory);
+    MailboxFactory factory = new MailboxFactory(spi, codecFactory, notifier);
 
     Mailbox<String> mailbox = factory.create("test", String.class);
     mailbox.deliver("hello");
@@ -70,13 +73,14 @@ class MailboxFactoryTest {
   @Test
   void createWithTypeRefReturnsBoundMailbox() {
     InMemoryMailboxSpi spi = new InMemoryMailboxSpi();
+    InMemoryNotifier notifier = new InMemoryNotifier();
     TypeRef<List<String>> typeRef = new TypeRef<>() {};
     when(codecFactory.create(typeRef)).thenReturn(listCodec);
     lenient()
         .when(listCodec.encode(any()))
         .thenAnswer(inv -> inv.getArgument(0).toString().getBytes(UTF_8));
     lenient().when(listCodec.decode(any(byte[].class))).thenAnswer(inv -> List.of("decoded"));
-    MailboxFactory factory = new MailboxFactory(spi, codecFactory);
+    MailboxFactory factory = new MailboxFactory(spi, codecFactory, notifier);
 
     Mailbox<List<String>> mailbox = factory.create("typed-elicit", typeRef);
 

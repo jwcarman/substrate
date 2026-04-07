@@ -25,7 +25,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.stream.Stream;
 import org.jwcarman.substrate.spi.AbstractJournalSpi;
-import org.jwcarman.substrate.spi.JournalEntry;
+import org.jwcarman.substrate.spi.RawJournalEntry;
 import tools.jackson.databind.ObjectMapper;
 
 public class HazelcastJournalSpi extends AbstractJournalSpi {
@@ -58,7 +58,7 @@ public class HazelcastJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<JournalEntry> readAfter(String key, String afterId) {
+  public Stream<RawJournalEntry> readAfter(String key, String afterId) {
     Ringbuffer<String> ringbuffer = hazelcast.getRingbuffer(key);
     long startSequence = Long.parseLong(afterId) + 1;
     long tailSequence = ringbuffer.tailSequence();
@@ -78,7 +78,7 @@ public class HazelcastJournalSpi extends AbstractJournalSpi {
     try {
       var resultSet =
           ringbuffer.readManyAsync(readFrom, 0, count, null).toCompletableFuture().join();
-      List<JournalEntry> entries = new ArrayList<>();
+      List<RawJournalEntry> entries = new ArrayList<>();
       for (int i = 0; i < resultSet.readCount(); i++) {
         String json = resultSet.get(i);
         entries.add(deserialize(json, key, String.valueOf(readFrom + i)));
@@ -90,7 +90,7 @@ public class HazelcastJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public Stream<JournalEntry> readLast(String key, int count) {
+  public Stream<RawJournalEntry> readLast(String key, int count) {
     Ringbuffer<String> ringbuffer = hazelcast.getRingbuffer(key);
     long tailSequence = ringbuffer.tailSequence();
 
@@ -109,7 +109,7 @@ public class HazelcastJournalSpi extends AbstractJournalSpi {
     try {
       var resultSet =
           ringbuffer.readManyAsync(startSequence, 0, readCount, null).toCompletableFuture().join();
-      List<JournalEntry> entries = new ArrayList<>();
+      List<RawJournalEntry> entries = new ArrayList<>();
       for (int i = 0; i < resultSet.readCount(); i++) {
         String json = resultSet.get(i);
         entries.add(deserialize(json, key, String.valueOf(startSequence + i)));
@@ -127,7 +127,7 @@ public class HazelcastJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public boolean isCompleted(String key) {
+  public boolean isComplete(String key) {
     IMap<String, Boolean> completedMap = hazelcast.getMap(COMPLETED_MAP_NAME);
     return Boolean.TRUE.equals(completedMap.get(key));
   }
@@ -150,11 +150,11 @@ public class HazelcastJournalSpi extends AbstractJournalSpi {
     }
   }
 
-  private JournalEntry deserialize(String json, String key, String id) {
+  private RawJournalEntry deserialize(String json, String key, String id) {
     try {
       StoredEntry stored = objectMapper.readValue(json, StoredEntry.class);
       byte[] data = Base64.getDecoder().decode(stored.data());
-      return new JournalEntry(id, key, data, Instant.parse(stored.timestamp()));
+      return new RawJournalEntry(id, key, data, Instant.parse(stored.timestamp()));
     } catch (tools.jackson.core.JacksonException e) {
       throw new IllegalStateException("Failed to deserialize journal entry", e);
     }
