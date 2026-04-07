@@ -139,11 +139,6 @@
                 <artifactId>substrate-notifier-sns</artifactId>
                 <version>${project.version}</version>
             </dependency>
-            <dependency>
-                <groupId>org.jwcarman.substrate</groupId>
-                <artifactId>substrate-jackson</artifactId>
-                <version>${project.version}</version>
-            </dependency>
         </dependencies>
     </dependencyManagement>
 </project>

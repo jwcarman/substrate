@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-07T14:08:00Z
-ITERATION: 12
-SPEC_COMPLETED: 011-spi-refactor.md
-WHAT_WAS_DONE: Refactored substrate-core to separate backend SPI (key-based) from consumer-facing API (key-bound), added factories
-VERIFICATION: ./mvnw spotless:check — passed; ./mvnw verify — BUILD SUCCESS (all 23 modules pass)
+LAST_RUN: 2026-04-07T14:13:00Z
+ITERATION: 13
+SPEC_COMPLETED: 012-remove-jackson-module.md
+WHAT_WAS_DONE: Removed substrate-jackson module entirely — deleted directory, removed from parent POM modules list, removed from substrate-bom dependency management
+VERIFICATION: ./mvnw verify — BUILD SUCCESS (all 22 modules pass); grep confirms no substrate-jackson references remain in source code or POMs
 STATUS: MORE_WORK
-NEXT_SPEC: 012-substrate-jackson.md
-NOTES: Renamed Journal→JournalSpi, Mailbox→MailboxSpi, AbstractJournal→AbstractJournalSpi, AbstractMailbox→AbstractMailboxSpi in spi package. Created consumer-facing Journal/Mailbox interfaces in core package with DefaultJournal/DefaultMailbox delegation wrappers. Added JournalFactory/MailboxFactory in core package. Renamed InMemoryJournal→InMemoryJournalSpi, InMemoryMailbox→InMemoryMailboxSpi. All 14 backend implementations renamed (8 journal + 6 mailbox) with Spi suffix. Notifier stays unchanged (no separate SPI). SubstrateAutoConfiguration updated with JournalSpi/MailboxSpi types and new JournalFactory/MailboxFactory beans. substrate-jackson updated to use JournalSpi/MailboxSpi. New unit tests added for DefaultJournal, DefaultMailbox, JournalFactory, MailboxFactory.
+NEXT_SPEC: 013-byte-array-spis-and-codec.md
+NOTES: Deletion-only spec. References to substrate-jackson remain only in specs/done/ and specs/backlog/ (historical docs) and specs/013 (dependency note). No code references remain.
