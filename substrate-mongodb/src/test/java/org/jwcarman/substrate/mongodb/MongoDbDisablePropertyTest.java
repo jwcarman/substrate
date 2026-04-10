@@ -21,6 +21,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.Test;
+import org.jwcarman.substrate.mongodb.atom.MongoDbAtomAutoConfiguration;
+import org.jwcarman.substrate.mongodb.atom.MongoDbAtomSpi;
 import org.jwcarman.substrate.mongodb.journal.MongoDbJournalAutoConfiguration;
 import org.jwcarman.substrate.mongodb.journal.MongoDbJournalSpi;
 import org.jwcarman.substrate.mongodb.mailbox.MongoDbMailboxAutoConfiguration;
@@ -39,6 +41,7 @@ class MongoDbDisablePropertyTest {
           .withConfiguration(
               AutoConfigurations.of(
                   MongoDbAutoConfiguration.class,
+                  MongoDbAtomAutoConfiguration.class,
                   MongoDbJournalAutoConfiguration.class,
                   MongoDbMailboxAutoConfiguration.class))
           .withUserConfiguration(MockMongoConfiguration.class);
@@ -65,6 +68,18 @@ class MongoDbDisablePropertyTest {
   @Test
   void mailboxEnabledByDefault() {
     runner.run(context -> assertThat(context).hasSingleBean(MongoDbMailboxSpi.class));
+  }
+
+  @Test
+  void atomDisabledWhenPropertySetToFalse() {
+    runner
+        .withPropertyValues("substrate.mongodb.atom.enabled=false")
+        .run(context -> assertThat(context).doesNotHaveBean(MongoDbAtomSpi.class));
+  }
+
+  @Test
+  void atomEnabledByDefault() {
+    runner.run(context -> assertThat(context).hasSingleBean(MongoDbAtomSpi.class));
   }
 
   @Configuration(proxyBeanMethods = false)

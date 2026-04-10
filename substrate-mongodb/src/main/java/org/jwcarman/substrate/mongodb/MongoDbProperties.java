@@ -19,7 +19,10 @@ import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "substrate.mongodb")
-public record MongoDbProperties(JournalProperties journal, MailboxProperties mailbox) {
+public record MongoDbProperties(
+    AtomProperties atom, JournalProperties journal, MailboxProperties mailbox) {
+  public record AtomProperties(boolean enabled, String prefix, String collectionName) {}
+
   public record JournalProperties(
       boolean enabled, String prefix, String collectionName, Duration ttl) {}
 
