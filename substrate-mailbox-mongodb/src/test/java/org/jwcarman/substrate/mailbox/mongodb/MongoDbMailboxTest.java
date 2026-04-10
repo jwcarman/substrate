@@ -16,19 +16,20 @@
 package org.jwcarman.substrate.mailbox.mongodb;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.Optional;
 import org.bson.Document;
 import org.bson.types.Binary;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -44,9 +45,7 @@ class MongoDbMailboxTest {
 
   @BeforeEach
   void setUp() {
-    mailbox =
-        new MongoDbMailboxSpi(
-            mongoTemplate, "substrate:mailbox:", "substrate_mailbox", Duration.ofMinutes(5));
+    mailbox = new MongoDbMailboxSpi(mongoTemplate, "substrate:mailbox:", "substrate_mailbox");
   }
 
   @Test
@@ -55,10 +54,15 @@ class MongoDbMailboxTest {
   }
 
   @Test
-  void deliverUpsertsDocument() {
+  void deliverUpdatesDocument() {
+    com.mongodb.client.result.UpdateResult updateResult =
+        com.mongodb.client.result.UpdateResult.acknowledged(1, 1L, null);
+    when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq("substrate_mailbox")))
+        .thenReturn(updateResult);
+
     mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8));
 
-    verify(mongoTemplate).upsert(any(Query.class), any(Update.class), eq("substrate_mailbox"));
+    verify(mongoTemplate).updateFirst(any(Query.class), any(Update.class), eq("substrate_mailbox"));
   }
 
   @Test
@@ -76,9 +80,20 @@ class MongoDbMailboxTest {
   }
 
   @Test
-  void getReturnsEmptyWhenAbsent() {
+  void getThrowsWhenAbsent() {
     when(mongoTemplate.findOne(any(Query.class), eq(Document.class), eq("substrate_mailbox")))
         .thenReturn(null);
+
+    assertThrows(MailboxExpiredException.class, () -> mailbox.get("substrate:mailbox:test"));
+  }
+
+  @Test
+  void getReturnsEmptyWhenCreatedButNotDelivered() {
+    Document doc = new Document();
+    doc.put("key", "substrate:mailbox:test");
+
+    when(mongoTemplate.findOne(any(Query.class), eq(Document.class), eq("substrate_mailbox")))
+        .thenReturn(doc);
 
     Optional<byte[]> result = mailbox.get("substrate:mailbox:test");
 

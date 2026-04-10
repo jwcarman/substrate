@@ -20,7 +20,8 @@ import java.time.Instant;
 import java.util.Optional;
 import org.bson.Document;
 import org.bson.types.Binary;
-import org.jwcarman.substrate.spi.AbstractMailboxSpi;
+import org.jwcarman.substrate.core.mailbox.AbstractMailboxSpi;
+import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.Index;
@@ -36,49 +37,58 @@ public class MongoDbMailboxSpi extends AbstractMailboxSpi {
 
   private final MongoTemplate mongoTemplate;
   private final String collectionName;
-  private final Duration defaultTtl;
 
-  public MongoDbMailboxSpi(
-      MongoTemplate mongoTemplate, String prefix, String collectionName, Duration defaultTtl) {
+  public MongoDbMailboxSpi(MongoTemplate mongoTemplate, String prefix, String collectionName) {
     super(prefix);
     this.mongoTemplate = mongoTemplate;
     this.collectionName = collectionName;
-    this.defaultTtl = defaultTtl;
   }
 
   public void ensureIndexes() {
     var indexOps = mongoTemplate.indexOps(collectionName);
-
     indexOps.createIndex(new Index().on(FIELD_KEY, Sort.Direction.ASC).unique());
-
-    if (!defaultTtl.isZero()) {
-      indexOps.createIndex(new Index().on(FIELD_EXPIRE_AT, Sort.Direction.ASC).expire(0));
-    }
+    indexOps.createIndex(new Index().on(FIELD_EXPIRE_AT, Sort.Direction.ASC).expire(0));
   }
 
   @Override
-  public void deliver(String key, byte[] value) {
+  public void create(String key, Duration ttl) {
     Query query = new Query(Criteria.where(FIELD_KEY).is(key));
-    Update update = new Update().set(FIELD_VALUE, new Binary(value));
-
-    if (!defaultTtl.isZero()) {
-      update.set(FIELD_EXPIRE_AT, Instant.now().plus(defaultTtl));
-    }
-
+    Update update =
+        new Update()
+            .set(FIELD_KEY, key)
+            .unset(FIELD_VALUE)
+            .set(FIELD_EXPIRE_AT, Instant.now().plus(ttl));
     mongoTemplate.upsert(query, update, collectionName);
   }
 
   @Override
-  public Optional<byte[]> get(String key) {
-    Query query = new Query(Criteria.where(FIELD_KEY).is(key));
-    Document doc = mongoTemplate.findOne(query, Document.class, collectionName);
-    if (doc != null && doc.containsKey(FIELD_VALUE)) {
-      Binary binary = doc.get(FIELD_VALUE, Binary.class);
-      if (binary != null) {
-        return Optional.of(binary.getData());
-      }
+  public void deliver(String key, byte[] value) {
+    Query query =
+        new Query(Criteria.where(FIELD_KEY).is(key).and(FIELD_EXPIRE_AT).gt(Instant.now()));
+    Update update = new Update().set(FIELD_VALUE, new Binary(value));
+
+    var result = mongoTemplate.updateFirst(query, update, collectionName);
+    if (result.getMatchedCount() == 0) {
+      throw new MailboxExpiredException(key);
     }
-    return Optional.empty();
+  }
+
+  @Override
+  public Optional<byte[]> get(String key) {
+    Query query =
+        new Query(Criteria.where(FIELD_KEY).is(key).and(FIELD_EXPIRE_AT).gt(Instant.now()));
+    Document doc = mongoTemplate.findOne(query, Document.class, collectionName);
+    if (doc == null) {
+      throw new MailboxExpiredException(key);
+    }
+    if (!doc.containsKey(FIELD_VALUE)) {
+      return Optional.empty();
+    }
+    Binary binary = doc.get(FIELD_VALUE, Binary.class);
+    if (binary == null) {
+      return Optional.empty();
+    }
+    return Optional.of(binary.getData());
   }
 
   @Override

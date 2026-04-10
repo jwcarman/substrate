@@ -22,9 +22,9 @@ import static org.mockito.Mockito.when;
 
 import java.util.Map;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.memory.InMemoryNotifier;
-import org.jwcarman.substrate.spi.Notifier;
+import org.jwcarman.substrate.core.autoconfigure.SubstrateAutoConfiguration;
+import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
+import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -54,7 +54,7 @@ class SnsNotifierAutoConfigurationTest {
         .run(
             context -> {
               assertThat(context).hasSingleBean(SnsNotifier.class);
-              assertThat(context).hasSingleBean(Notifier.class);
+              assertThat(context).hasSingleBean(NotifierSpi.class);
             });
   }
 
@@ -121,8 +121,8 @@ class SnsNotifierAutoConfigurationTest {
         .withPropertyValues("substrate.notifier.sns.topic-arn=arn:aws:sns:us-east-1:123456789:test")
         .run(
             context -> {
-              assertThat(context).hasSingleBean(Notifier.class);
-              assertThat(context.getBean(Notifier.class)).isInstanceOf(SnsNotifier.class);
+              assertThat(context).hasSingleBean(NotifierSpi.class);
+              assertThat(context.getBean(NotifierSpi.class)).isInstanceOf(SnsNotifier.class);
               assertThat(context).doesNotHaveBean(InMemoryNotifier.class);
             });
   }

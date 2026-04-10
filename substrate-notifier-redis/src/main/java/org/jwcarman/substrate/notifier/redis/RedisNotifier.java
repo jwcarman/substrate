@@ -21,13 +21,13 @@ import io.lettuce.core.pubsub.api.sync.RedisPubSubCommands;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.jwcarman.substrate.spi.NotificationHandler;
-import org.jwcarman.substrate.spi.Notifier;
-import org.jwcarman.substrate.spi.NotifierSubscription;
+import org.jwcarman.substrate.core.notifier.NotificationHandler;
+import org.jwcarman.substrate.core.notifier.NotifierSpi;
+import org.jwcarman.substrate.core.notifier.NotifierSubscription;
 import org.springframework.context.SmartLifecycle;
 
 public class RedisNotifier extends RedisPubSubAdapter<String, String>
-    implements Notifier, SmartLifecycle {
+    implements NotifierSpi, SmartLifecycle {
 
   private final StatefulRedisPubSubConnection<String, String> pubSubConnection;
   private final RedisPubSubCommands<String, String> pubSubCommands;

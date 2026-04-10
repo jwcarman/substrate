@@ -15,7 +15,7 @@
  */
 package org.jwcarman.substrate.mailbox.dynamodb;
 
-import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
+import org.jwcarman.substrate.core.autoconfigure.SubstrateAutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -33,8 +33,7 @@ public class DynamoDbMailboxAutoConfiguration {
   public DynamoDbMailboxSpi dynamoDbMailbox(
       DynamoDbClient dynamoDbClient, DynamoDbMailboxProperties properties) {
     DynamoDbMailboxSpi mailbox =
-        new DynamoDbMailboxSpi(
-            dynamoDbClient, properties.prefix(), properties.tableName(), properties.defaultTtl());
+        new DynamoDbMailboxSpi(dynamoDbClient, properties.prefix(), properties.tableName());
 
     if (properties.autoCreateTable()) {
       mailbox.createTable();

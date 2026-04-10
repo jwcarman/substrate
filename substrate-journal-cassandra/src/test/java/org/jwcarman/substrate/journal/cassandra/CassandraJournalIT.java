@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.spi.RawJournalEntry;
+import org.jwcarman.substrate.core.journal.RawJournalEntry;
 import org.testcontainers.cassandra.CassandraContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -69,7 +69,7 @@ class CassandraJournalSpiIT {
   @Test
   void appendReturnsTimeuuidId() {
     String key = journal.journalKey("append-test");
-    String id = journal.append(key, "hello".getBytes(StandardCharsets.UTF_8));
+    String id = journal.append(key, "hello".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     UUID uuid = UUID.fromString(id);
     assertThat(uuid.version()).isEqualTo(1);
@@ -78,8 +78,9 @@ class CassandraJournalSpiIT {
   @Test
   void appendReturnsMonotonicallyIncreasingIds() {
     String key = journal.journalKey("mono");
-    String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8));
-    String id2 = journal.append(key, "second".getBytes(StandardCharsets.UTF_8));
+    String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    String id2 =
+        journal.append(key, "second".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     UUID uuid1 = UUID.fromString(id1);
     UUID uuid2 = UUID.fromString(id2);
@@ -89,9 +90,12 @@ class CassandraJournalSpiIT {
   @Test
   void readAfterReturnsEntriesInOrder() {
     String key = journal.journalKey("read-after");
-    String id1 = journal.append(key, "payload1".getBytes(StandardCharsets.UTF_8));
-    String id2 = journal.append(key, "payload2".getBytes(StandardCharsets.UTF_8));
-    String id3 = journal.append(key, "payload3".getBytes(StandardCharsets.UTF_8));
+    String id1 =
+        journal.append(key, "payload1".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    String id2 =
+        journal.append(key, "payload2".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    String id3 =
+        journal.append(key, "payload3".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     List<RawJournalEntry> entries = journal.readAfter(key, id1);
 
@@ -113,10 +117,10 @@ class CassandraJournalSpiIT {
   @Test
   void readLastReturnsLastNInChronologicalOrder() {
     String key = journal.journalKey("read-last");
-    journal.append(key, "first".getBytes(StandardCharsets.UTF_8));
-    journal.append(key, "second".getBytes(StandardCharsets.UTF_8));
-    journal.append(key, "third".getBytes(StandardCharsets.UTF_8));
-    journal.append(key, "fourth".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "first".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(key, "second".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(key, "third".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(key, "fourth".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     List<RawJournalEntry> entries = journal.readLast(key, 2);
 
@@ -135,8 +139,8 @@ class CassandraJournalSpiIT {
   @Test
   void readLastReturnsAllWhenCountExceedsSize() {
     String key = journal.journalKey("small");
-    journal.append(key, "one".getBytes(StandardCharsets.UTF_8));
-    journal.append(key, "two".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "one".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(key, "two".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     List<RawJournalEntry> entries = journal.readLast(key, 100);
 
@@ -148,7 +152,7 @@ class CassandraJournalSpiIT {
   @Test
   void completeMarksJournalAsDone() {
     String key = journal.journalKey("complete-test");
-    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     journal.complete(key);
 
     // Completion marker should not appear in readLast
@@ -160,7 +164,7 @@ class CassandraJournalSpiIT {
   @Test
   void readAfterExcludesCompletionMarker() {
     String key = journal.journalKey("completed-read-after");
-    String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8));
+    String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     journal.complete(key);
 
     List<RawJournalEntry> entries = journal.readAfter(key, id1);
@@ -170,8 +174,8 @@ class CassandraJournalSpiIT {
   @Test
   void deleteRemovesAllEntries() {
     String key = journal.journalKey("delete-test");
-    journal.append(key, "hello".getBytes(StandardCharsets.UTF_8));
-    journal.append(key, "world".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "hello".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(key, "world".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     journal.delete(key);
 
@@ -183,8 +187,8 @@ class CassandraJournalSpiIT {
   void deleteDoesNotAffectOtherJournals() {
     String key1 = journal.journalKey("a");
     String key2 = journal.journalKey("b");
-    journal.append(key1, "a-event".getBytes(StandardCharsets.UTF_8));
-    journal.append(key2, "b-event".getBytes(StandardCharsets.UTF_8));
+    journal.append(key1, "a-event".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(key2, "b-event".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     journal.delete(key1);
 
@@ -195,7 +199,7 @@ class CassandraJournalSpiIT {
   @Test
   void timestampIsPreserved() {
     String key = journal.journalKey("time");
-    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     List<RawJournalEntry> entries = journal.readLast(key, 1);
     assertThat(entries).hasSize(1);
@@ -209,7 +213,8 @@ class CassandraJournalSpiIT {
             session, "substrate:journal:", "substrate_journal", Duration.ofHours(1));
 
     String key = ttlJournal.journalKey("ttl-test");
-    String id = ttlJournal.append(key, "ttl-event".getBytes(StandardCharsets.UTF_8));
+    String id =
+        ttlJournal.append(key, "ttl-event".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     assertThat(id).isNotEmpty();
 
     List<RawJournalEntry> entries = ttlJournal.readLast(key, 1);

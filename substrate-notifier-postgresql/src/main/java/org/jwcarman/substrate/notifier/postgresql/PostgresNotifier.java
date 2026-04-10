@@ -25,9 +25,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 import javax.sql.DataSource;
-import org.jwcarman.substrate.spi.NotificationHandler;
-import org.jwcarman.substrate.spi.Notifier;
-import org.jwcarman.substrate.spi.NotifierSubscription;
+import org.jwcarman.substrate.core.notifier.NotificationHandler;
+import org.jwcarman.substrate.core.notifier.NotifierSpi;
+import org.jwcarman.substrate.core.notifier.NotifierSubscription;
 import org.postgresql.PGConnection;
 import org.postgresql.PGNotification;
 import org.slf4j.Logger;
@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-public class PostgresNotifier implements Notifier, SmartLifecycle {
+public class PostgresNotifier implements NotifierSpi, SmartLifecycle {
 
   private static final Logger log = LoggerFactory.getLogger(PostgresNotifier.class);
 

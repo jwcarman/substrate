@@ -27,8 +27,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
-import org.jwcarman.substrate.spi.AbstractJournalSpi;
-import org.jwcarman.substrate.spi.RawJournalEntry;
+import org.jwcarman.substrate.core.journal.AbstractJournalSpi;
+import org.jwcarman.substrate.core.journal.RawJournalEntry;
 
 public class CassandraJournalSpi extends AbstractJournalSpi {
 
@@ -144,11 +144,6 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
             + ") WITH CLUSTERING ORDER BY ("
             + FIELD_ENTRY_ID
             + " ASC)");
-  }
-
-  @Override
-  public String append(String key, byte[] data) {
-    return append(key, data, defaultTtl);
   }
 
   @Override

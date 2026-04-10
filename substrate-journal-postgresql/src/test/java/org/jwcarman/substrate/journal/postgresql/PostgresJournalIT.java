@@ -18,11 +18,12 @@ package org.jwcarman.substrate.journal.postgresql;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.spi.RawJournalEntry;
+import org.jwcarman.substrate.core.journal.RawJournalEntry;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -58,9 +59,10 @@ class PostgresJournalSpiIT {
   @Test
   void appendAndReadAfterFullLifecycle() {
     String key = journal.journalKey("test-stream");
-    String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8));
-    String id2 = journal.append(key, "second".getBytes(StandardCharsets.UTF_8));
-    String id3 = journal.append(key, "third".getBytes(StandardCharsets.UTF_8));
+    String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    String id2 =
+        journal.append(key, "second".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    String id3 = journal.append(key, "third".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     List<RawJournalEntry> entries = journal.readAfter(key, id1);
 
@@ -76,9 +78,9 @@ class PostgresJournalSpiIT {
   @Test
   void readLastReturnsEntriesInChronologicalOrder() {
     String key = journal.journalKey("last-test");
-    journal.append(key, "a".getBytes(StandardCharsets.UTF_8));
-    journal.append(key, "b".getBytes(StandardCharsets.UTF_8));
-    journal.append(key, "c".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "a".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(key, "b".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(key, "c".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     List<RawJournalEntry> entries = journal.readLast(key, 2);
 
@@ -96,7 +98,7 @@ class PostgresJournalSpiIT {
   @Test
   void deleteRemovesAllEntries() {
     String key = journal.journalKey("delete-test");
-    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     journal.delete(key);
 
     List<RawJournalEntry> entries = journal.readLast(key, 100);
@@ -106,7 +108,7 @@ class PostgresJournalSpiIT {
   @Test
   void completeStoresCompletionMarker() {
     String key = journal.journalKey("complete-test");
-    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     journal.complete(key);
 
     Integer count =
@@ -118,7 +120,7 @@ class PostgresJournalSpiIT {
   @Test
   void deleteRemovesCompletionMarker() {
     String key = journal.journalKey("complete-delete-test");
-    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     journal.complete(key);
     journal.delete(key);
 
@@ -132,8 +134,8 @@ class PostgresJournalSpiIT {
   void deleteDoesNotAffectOtherStreams() {
     String stream1 = journal.journalKey("stream-a");
     String stream2 = journal.journalKey("stream-b");
-    journal.append(stream1, "a-event".getBytes(StandardCharsets.UTF_8));
-    journal.append(stream2, "b-event".getBytes(StandardCharsets.UTF_8));
+    journal.append(stream1, "a-event".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(stream2, "b-event".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     journal.delete(stream1);
 
@@ -144,8 +146,9 @@ class PostgresJournalSpiIT {
   @Test
   void appendReturnsMonotonicId() {
     String key = journal.journalKey("monotonic-test");
-    String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8));
-    String id2 = journal.append(key, "second".getBytes(StandardCharsets.UTF_8));
+    String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    String id2 =
+        journal.append(key, "second".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     assertThat(Long.parseLong(id1)).isPositive();
     assertThat(Long.parseLong(id2)).isGreaterThan(Long.parseLong(id1));
@@ -162,7 +165,8 @@ class PostgresJournalSpiIT {
 
     String key = smallJournal.journalKey("trim-test");
     for (int i = 0; i < 10; i++) {
-      smallJournal.append(key, ("event-" + i).getBytes(StandardCharsets.UTF_8));
+      smallJournal.append(
+          key, ("event-" + i).getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     }
 
     // All 10 events exist because trim only fires every 100 appends
@@ -185,7 +189,7 @@ class PostgresJournalSpiIT {
   @Test
   void isCompleteReturnsFalseForNonCompletedJournal() {
     String key = journal.journalKey("incomplete-test");
-    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     assertThat(journal.isComplete(key)).isFalse();
   }
@@ -193,7 +197,7 @@ class PostgresJournalSpiIT {
   @Test
   void isCompleteReturnsTrueAfterComplete() {
     String key = journal.journalKey("is-complete-test");
-    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     journal.complete(key);
 
     assertThat(journal.isComplete(key)).isTrue();
@@ -206,7 +210,8 @@ class PostgresJournalSpiIT {
 
     String key = smallJournal.journalKey("trim-100-test");
     for (int i = 0; i < 100; i++) {
-      smallJournal.append(key, ("event-" + i).getBytes(StandardCharsets.UTF_8));
+      smallJournal.append(
+          key, ("event-" + i).getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     }
 
     List<RawJournalEntry> entries = smallJournal.readLast(key, 100);

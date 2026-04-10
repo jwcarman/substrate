@@ -20,28 +20,43 @@ import com.hazelcast.map.IMap;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
-import org.jwcarman.substrate.spi.AbstractMailboxSpi;
+import org.jwcarman.substrate.core.mailbox.AbstractMailboxSpi;
+import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 
 public class HazelcastMailboxSpi extends AbstractMailboxSpi {
 
-  private final IMap<String, byte[]> map;
-  private final Duration defaultTtl;
+  private static final byte[] CREATED_MARKER = new byte[0];
 
-  public HazelcastMailboxSpi(
-      HazelcastInstance hazelcastInstance, String prefix, String mapName, Duration defaultTtl) {
+  private final IMap<String, byte[]> map;
+
+  public HazelcastMailboxSpi(HazelcastInstance hazelcastInstance, String prefix, String mapName) {
     super(prefix);
     this.map = hazelcastInstance.getMap(mapName);
-    this.defaultTtl = defaultTtl;
+  }
+
+  @Override
+  public void create(String key, Duration ttl) {
+    map.put(key, CREATED_MARKER, ttl.toMillis(), TimeUnit.MILLISECONDS);
   }
 
   @Override
   public void deliver(String key, byte[] value) {
-    map.put(key, value, defaultTtl.toMillis(), TimeUnit.MILLISECONDS);
+    byte[] existing = map.replace(key, value);
+    if (existing == null) {
+      throw new MailboxExpiredException(key);
+    }
   }
 
   @Override
   public Optional<byte[]> get(String key) {
-    return Optional.ofNullable(map.get(key));
+    byte[] value = map.get(key);
+    if (value == null) {
+      throw new MailboxExpiredException(key);
+    }
+    if (value.length == 0) {
+      return Optional.empty();
+    }
+    return Optional.of(value);
   }
 
   @Override

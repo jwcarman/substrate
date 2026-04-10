@@ -23,12 +23,12 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import org.jwcarman.substrate.spi.NotificationHandler;
-import org.jwcarman.substrate.spi.Notifier;
-import org.jwcarman.substrate.spi.NotifierSubscription;
+import org.jwcarman.substrate.core.notifier.NotificationHandler;
+import org.jwcarman.substrate.core.notifier.NotifierSpi;
+import org.jwcarman.substrate.core.notifier.NotifierSubscription;
 import org.springframework.context.SmartLifecycle;
 
-public class NatsNotifier implements Notifier, SmartLifecycle {
+public class NatsNotifier implements NotifierSpi, SmartLifecycle {
 
   private final Connection connection;
   private final String subjectPrefix;

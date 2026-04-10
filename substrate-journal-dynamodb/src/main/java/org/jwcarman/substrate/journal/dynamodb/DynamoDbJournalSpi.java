@@ -22,8 +22,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.jwcarman.substrate.spi.AbstractJournalSpi;
-import org.jwcarman.substrate.spi.RawJournalEntry;
+import org.jwcarman.substrate.core.journal.AbstractJournalSpi;
+import org.jwcarman.substrate.core.journal.RawJournalEntry;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
@@ -72,11 +72,6 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
     } catch (ResourceInUseException _) {
       // table already exists
     }
-  }
-
-  @Override
-  public String append(String key, byte[] data) {
-    return append(key, data, ttl);
   }
 
   @Override

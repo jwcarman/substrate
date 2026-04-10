@@ -23,8 +23,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
-import org.jwcarman.substrate.spi.AbstractJournalSpi;
-import org.jwcarman.substrate.spi.RawJournalEntry;
+import org.jwcarman.substrate.core.journal.AbstractJournalSpi;
+import org.jwcarman.substrate.core.journal.RawJournalEntry;
 import tools.jackson.databind.ObjectMapper;
 
 public class HazelcastJournalSpi extends AbstractJournalSpi {
@@ -41,11 +41,6 @@ public class HazelcastJournalSpi extends AbstractJournalSpi {
     this.hazelcast = hazelcast;
     this.objectMapper = objectMapper;
     this.batchSize = batchSize;
-  }
-
-  @Override
-  public String append(String key, byte[] data) {
-    return append(key, data, null);
   }
 
   @Override

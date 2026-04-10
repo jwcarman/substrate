@@ -30,7 +30,7 @@ import org.bson.types.Binary;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.jwcarman.substrate.spi.RawJournalEntry;
+import org.jwcarman.substrate.core.journal.RawJournalEntry;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -53,7 +53,8 @@ class MongoDbJournalSpiTest {
 
   @Test
   void appendInsertsDocumentWithCorrectFields() {
-    journal.append("substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8));
+    journal.append(
+        "substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     ArgumentCaptor<Document> captor = ArgumentCaptor.forClass(Document.class);
     verify(mongoTemplate).insert(captor.capture(), eq("substrate_journal"));
@@ -70,7 +71,11 @@ class MongoDbJournalSpiTest {
 
   @Test
   void appendReturnsUuidV7Id() {
-    String id = journal.append("substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8));
+    String id =
+        journal.append(
+            "substrate:journal:test",
+            "hello".getBytes(StandardCharsets.UTF_8),
+            Duration.ofHours(1));
     assertThat(id).matches("[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}");
   }
 
@@ -79,7 +84,8 @@ class MongoDbJournalSpiTest {
     MongoDbJournalSpi noTtlJournal =
         new MongoDbJournalSpi(
             mongoTemplate, "substrate:journal:", "substrate_journal", Duration.ZERO);
-    noTtlJournal.append("substrate:journal:test", "data".getBytes(StandardCharsets.UTF_8));
+    noTtlJournal.append(
+        "substrate:journal:test", "data".getBytes(StandardCharsets.UTF_8), Duration.ZERO);
 
     ArgumentCaptor<Document> captor = ArgumentCaptor.forClass(Document.class);
     verify(mongoTemplate).insert(captor.capture(), eq("substrate_journal"));

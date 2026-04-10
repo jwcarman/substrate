@@ -122,6 +122,27 @@ public interface NotificationHandler {
 - `notify`: broadcasts a signal to all nodes
 - `subscribe`: registers a handler (one per node, called for all notifications)
 
+### Atom — single-value, TTL-governed, optimistic-concurrency cell
+
+The 0-ary case. A single named value with built-in TTL, CAS-style updates via
+content-based tokens, and a blocking `watch` for change detection.
+
+```java
+public interface Atom<T> {
+    void set(T data, Duration ttl);
+    boolean touch(Duration ttl);
+    Snapshot<T> get();
+    Optional<Snapshot<T>> watch(Snapshot<T> lastSeen, Duration timeout);
+    void delete();
+    String key();
+}
+```
+
+**Use case in Mocapi:** MCP session state. Each active session holds an Atom
+containing the session's current state (capabilities, roots, sampling config).
+Changes are detected via `watch`, and the TTL ensures abandoned sessions are
+reclaimed automatically.
+
 ---
 
 ## Module Structure
@@ -129,48 +150,30 @@ public interface NotificationHandler {
 ```
 substrate/
 ├── substrate-bom/                          # BOM for version alignment
-├── substrate-core/                         # SPIs, in-memory implementations, auto-config
-│   ├── spi/
+├── substrate-api/                          # User-facing interfaces and value types
+│   ├── atom/
+│   │   ├── Atom.java
+│   │   ├── AtomFactory.java
+│   │   ├── Snapshot.java
+│   │   ├── AtomExpiredException.java
+│   │   └── AtomAlreadyExistsException.java
+│   ├── journal/
 │   │   ├── Journal.java
-│   │   ├── JournalEntry.java
-│   │   ├── Mailbox.java
-│   │   ├── Notifier.java
-│   │   └── NotificationHandler.java
-│   ├── memory/
-│   │   ├── InMemoryJournal.java
-│   │   ├── InMemoryMailbox.java
-│   │   └── InMemoryNotifier.java
-│   └── autoconfigure/
-│       ├── SubstrateAutoConfiguration.java
-│       └── SubstrateProperties.java
-│
-│   # Journal implementations (one module per backend)
-├── substrate-journal-redis/                # Redis Streams
-├── substrate-journal-postgresql/           # PostgreSQL table
-├── substrate-journal-cassandra/            # Cassandra table (TIMEUUID)
-├── substrate-journal-dynamodb/             # DynamoDB table
-├── substrate-journal-mongodb/              # MongoDB collection
-├── substrate-journal-rabbitmq/             # RabbitMQ Streams
-├── substrate-journal-nats/                 # NATS JetStream
-├── substrate-journal-hazelcast/            # Hazelcast Ringbuffer
-│
-│   # Mailbox implementations (one module per backend)
-├── substrate-mailbox-redis/                # Redis GET/SET + TTL
-├── substrate-mailbox-postgresql/           # PostgreSQL table
-├── substrate-mailbox-hazelcast/            # Hazelcast IMap
-├── substrate-mailbox-dynamodb/             # DynamoDB PutItem/GetItem
-├── substrate-mailbox-nats/                 # NATS KV Store
-├── substrate-mailbox-mongodb/              # MongoDB collection
-│
-│   # Notifier implementations (one module per backend)
-├── substrate-notifier-redis/               # Redis Pub/Sub
-├── substrate-notifier-postgresql/          # PostgreSQL LISTEN/NOTIFY
-├── substrate-notifier-nats/                # NATS Core
-├── substrate-notifier-sns/                 # AWS SNS + SQS fan-out
-├── substrate-notifier-rabbitmq/            # RabbitMQ fanout exchange
-├── substrate-notifier-hazelcast/           # Hazelcast ITopic
-│
-└── substrate-example/                      # Example app (not published)
+│   │   ├── JournalFactory.java
+│   │   ├── JournalCursor.java
+│   │   └── JournalEntry.java
+│   └── mailbox/
+│       ├── Mailbox.java
+│       ├── MailboxFactory.java
+│       └── MailboxExpiredException.java
+├── substrate-core/                         # Implementations, SPIs, in-memory, auto-config
+│   ├── core/
+│   │   ├── atom/        # AtomSpi, AbstractAtomSpi, DefaultAtom, DefaultAtomFactory
+│   │   ├── journal/     # JournalSpi, AbstractJournalSpi, DefaultJournal, DefaultJournalFactory
+│   │   ├── mailbox/     # MailboxSpi, AbstractMailboxSpi, DefaultMailbox, DefaultMailboxFactory
+│   │   ├── notifier/    # NotifierSpi, NotificationHandler, NotifierSubscription
+│   │   ├── memory/      # InMemoryAtomSpi, InMemoryJournalSpi, InMemoryMailboxSpi, InMemoryNotifier
+│   │   └── autoconfigure/ # SubstrateAutoConfiguration, SubstrateProperties
 ```
 
 Each module is independently deployable. Modules that share the same backend
@@ -306,7 +309,6 @@ A spec is done when ALL of the following are true:
 
 ## Constraints and guardrails
 
-- Backend auto-configurations use `@ConditionalOnClass` only — no `@ConditionalOnProperty`
 - All new Java files and POM files must include Apache 2.0 license headers
 - Tests using Testcontainers must be named `*IT` (Failsafe, not Surefire)
 - `@ConfigurationProperties` must be records with defaults in `*-defaults.properties`

@@ -20,9 +20,9 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import org.jwcarman.substrate.spi.NotificationHandler;
-import org.jwcarman.substrate.spi.Notifier;
-import org.jwcarman.substrate.spi.NotifierSubscription;
+import org.jwcarman.substrate.core.notifier.NotificationHandler;
+import org.jwcarman.substrate.core.notifier.NotifierSpi;
+import org.jwcarman.substrate.core.notifier.NotifierSubscription;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.FanoutExchange;
 import org.springframework.amqp.core.Message;
@@ -34,7 +34,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
 import org.springframework.context.SmartLifecycle;
 
-public class RabbitMqNotifier implements Notifier, SmartLifecycle {
+public class RabbitMqNotifier implements NotifierSpi, SmartLifecycle {
 
   private static final String DELIMITER = "|";
 

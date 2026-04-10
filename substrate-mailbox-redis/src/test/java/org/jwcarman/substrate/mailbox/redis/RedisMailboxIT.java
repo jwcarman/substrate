@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.mailbox.redis;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
@@ -27,6 +28,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -51,7 +53,7 @@ class RedisMailboxIT {
                 .build());
 
     RedisCommands<String, String> commands = client.connect(StringCodec.UTF8).sync();
-    mailbox = new RedisMailboxSpi(commands, "substrate:mailbox:", Duration.ofMinutes(5));
+    mailbox = new RedisMailboxSpi(commands, "substrate:mailbox:");
   }
 
   @AfterEach
@@ -64,6 +66,7 @@ class RedisMailboxIT {
   @Test
   void deliverThenGetReturnsValue() {
     String key = mailbox.mailboxKey("deliver-first");
+    mailbox.create(key, Duration.ofMinutes(5));
     mailbox.deliver(key, "hello".getBytes(StandardCharsets.UTF_8));
 
     Optional<byte[]> result = mailbox.get(key);
@@ -72,8 +75,16 @@ class RedisMailboxIT {
   }
 
   @Test
-  void getReturnsEmptyWhenNotDelivered() {
+  void getThrowsWhenMailboxDoesNotExist() {
     String key = mailbox.mailboxKey("empty-test");
+
+    assertThrows(MailboxExpiredException.class, () -> mailbox.get(key));
+  }
+
+  @Test
+  void getReturnsEmptyWhenCreatedButNotDelivered() {
+    String key = mailbox.mailboxKey("created-not-delivered");
+    mailbox.create(key, Duration.ofMinutes(5));
 
     Optional<byte[]> result = mailbox.get(key);
 
@@ -83,10 +94,11 @@ class RedisMailboxIT {
   @Test
   void deleteRemovesValue() {
     String key = mailbox.mailboxKey("delete-test");
+    mailbox.create(key, Duration.ofMinutes(5));
     mailbox.deliver(key, "to-delete".getBytes(StandardCharsets.UTF_8));
     mailbox.delete(key);
 
-    assertThat(mailbox.get(key)).isEmpty();
+    assertThrows(MailboxExpiredException.class, () -> mailbox.get(key));
   }
 
   @Test

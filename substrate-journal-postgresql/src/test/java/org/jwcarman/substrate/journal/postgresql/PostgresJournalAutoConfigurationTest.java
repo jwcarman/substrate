@@ -19,9 +19,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.memory.InMemoryJournalSpi;
-import org.jwcarman.substrate.spi.JournalSpi;
+import org.jwcarman.substrate.core.autoconfigure.SubstrateAutoConfiguration;
+import org.jwcarman.substrate.core.journal.JournalSpi;
+import org.jwcarman.substrate.core.memory.journal.InMemoryJournalSpi;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;

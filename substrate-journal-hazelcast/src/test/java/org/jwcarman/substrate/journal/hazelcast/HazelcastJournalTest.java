@@ -27,12 +27,13 @@ import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.map.IMap;
 import com.hazelcast.ringbuffer.Ringbuffer;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.jwcarman.substrate.spi.RawJournalEntry;
+import org.jwcarman.substrate.core.journal.RawJournalEntry;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.ObjectMapper;
@@ -57,7 +58,8 @@ class HazelcastJournalSpiTest {
     when(hazelcastInstance.<String>getRingbuffer("test-key")).thenReturn(ringbuffer);
     when(ringbuffer.add(anyString())).thenReturn(42L);
 
-    String id = journal.append("test-key", "hello".getBytes(StandardCharsets.UTF_8));
+    String id =
+        journal.append("test-key", "hello".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     assertThat(id).isEqualTo("42");
     verify(ringbuffer).add(anyString());

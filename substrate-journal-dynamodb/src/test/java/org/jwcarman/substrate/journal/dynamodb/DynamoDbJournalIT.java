@@ -23,7 +23,7 @@ import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.spi.RawJournalEntry;
+import org.jwcarman.substrate.core.journal.RawJournalEntry;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.localstack.LocalStackContainer;
@@ -73,7 +73,7 @@ class DynamoDbJournalSpiIT {
   @Test
   void appendReturnsUuidV7Id() {
     String key = journal.journalKey("append-test");
-    String id = journal.append(key, "hello".getBytes(StandardCharsets.UTF_8));
+    String id = journal.append(key, "hello".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     assertThat(id).matches("[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}");
   }
@@ -81,8 +81,9 @@ class DynamoDbJournalSpiIT {
   @Test
   void appendReturnsMonotonicallyIncreasingIds() {
     String key = journal.journalKey("mono");
-    String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8));
-    String id2 = journal.append(key, "second".getBytes(StandardCharsets.UTF_8));
+    String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    String id2 =
+        journal.append(key, "second".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     assertThat(id2).isGreaterThan(id1);
   }
@@ -90,9 +91,12 @@ class DynamoDbJournalSpiIT {
   @Test
   void readAfterReturnsEntriesInOrder() {
     String key = journal.journalKey("read-after");
-    String id1 = journal.append(key, "payload1".getBytes(StandardCharsets.UTF_8));
-    String id2 = journal.append(key, "payload2".getBytes(StandardCharsets.UTF_8));
-    String id3 = journal.append(key, "payload3".getBytes(StandardCharsets.UTF_8));
+    String id1 =
+        journal.append(key, "payload1".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    String id2 =
+        journal.append(key, "payload2".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    String id3 =
+        journal.append(key, "payload3".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     List<RawJournalEntry> entries = journal.readAfter(key, id1);
 
@@ -113,10 +117,10 @@ class DynamoDbJournalSpiIT {
   @Test
   void readLastReturnsLastNInChronologicalOrder() {
     String key = journal.journalKey("read-last");
-    journal.append(key, "first".getBytes(StandardCharsets.UTF_8));
-    journal.append(key, "second".getBytes(StandardCharsets.UTF_8));
-    journal.append(key, "third".getBytes(StandardCharsets.UTF_8));
-    journal.append(key, "fourth".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "first".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(key, "second".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(key, "third".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(key, "fourth".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     List<RawJournalEntry> entries = journal.readLast(key, 2);
 
@@ -135,8 +139,8 @@ class DynamoDbJournalSpiIT {
   @Test
   void readLastReturnsAllWhenCountExceedsSize() {
     String key = journal.journalKey("small");
-    journal.append(key, "one".getBytes(StandardCharsets.UTF_8));
-    journal.append(key, "two".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "one".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(key, "two".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     List<RawJournalEntry> entries = journal.readLast(key, 100);
 
@@ -148,7 +152,7 @@ class DynamoDbJournalSpiIT {
   @Test
   void completeMarksJournalAsDone() {
     String key = journal.journalKey("complete-test");
-    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     journal.complete(key);
 
     // COMPLETED marker should not appear in readAfter or readLast
@@ -160,8 +164,8 @@ class DynamoDbJournalSpiIT {
   @Test
   void deleteRemovesAllEntries() {
     String key = journal.journalKey("delete-test");
-    journal.append(key, "hello".getBytes(StandardCharsets.UTF_8));
-    journal.append(key, "world".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "hello".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(key, "world".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     journal.delete(key);
 
@@ -173,8 +177,8 @@ class DynamoDbJournalSpiIT {
   void deleteDoesNotAffectOtherJournals() {
     String key1 = journal.journalKey("a");
     String key2 = journal.journalKey("b");
-    journal.append(key1, "a-event".getBytes(StandardCharsets.UTF_8));
-    journal.append(key2, "b-event".getBytes(StandardCharsets.UTF_8));
+    journal.append(key1, "a-event".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(key2, "b-event".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     journal.delete(key1);
 
@@ -185,7 +189,7 @@ class DynamoDbJournalSpiIT {
   @Test
   void timestampIsPreserved() {
     String key = journal.journalKey("time");
-    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     List<RawJournalEntry> entries = journal.readLast(key, 1);
     assertThat(entries).hasSize(1);
@@ -195,7 +199,7 @@ class DynamoDbJournalSpiIT {
   @Test
   void ttlFieldIsPopulatedAsEpochSeconds() {
     String key = journal.journalKey("ttl-test");
-    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     // Verify entry was stored and can be read back
     List<RawJournalEntry> entries = journal.readLast(key, 1);
@@ -206,7 +210,7 @@ class DynamoDbJournalSpiIT {
   void batchDeleteHandlesMoreThan25Items() {
     String key = journal.journalKey("batch-delete");
     for (int i = 0; i < 30; i++) {
-      journal.append(key, ("item-" + i).getBytes(StandardCharsets.UTF_8));
+      journal.append(key, ("item-" + i).getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     }
 
     journal.delete(key);
@@ -240,7 +244,7 @@ class DynamoDbJournalSpiIT {
   @Test
   void isCompleteReturnsFalseForNonCompletedJournal() {
     String key = journal.journalKey("incomplete");
-    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     assertThat(journal.isComplete(key)).isFalse();
   }
@@ -248,7 +252,7 @@ class DynamoDbJournalSpiIT {
   @Test
   void isCompleteReturnsTrueAfterComplete() {
     String key = journal.journalKey("is-complete");
-    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     journal.complete(key);
 
     assertThat(journal.isComplete(key)).isTrue();
@@ -257,7 +261,7 @@ class DynamoDbJournalSpiIT {
   @Test
   void readAfterExcludesCompletionMarker() {
     String key = journal.journalKey("completed-read-after");
-    String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8));
+    String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     journal.complete(key);
 
     List<RawJournalEntry> entries = journal.readAfter(key, id1);

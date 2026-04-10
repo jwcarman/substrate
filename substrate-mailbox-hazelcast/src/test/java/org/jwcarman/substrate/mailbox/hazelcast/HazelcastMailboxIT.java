@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.mailbox.hazelcast;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 
 class HazelcastMailboxIT {
 
@@ -52,16 +54,14 @@ class HazelcastMailboxIT {
   void setUp() {
     mailbox =
         new HazelcastMailboxSpi(
-            hazelcast,
-            "substrate:mailbox:",
-            "substrate-mailbox-" + System.nanoTime(),
-            Duration.ofMinutes(5));
+            hazelcast, "substrate:mailbox:", "substrate-mailbox-" + System.nanoTime());
   }
 
   @Test
   void deliverThenGetReturnsValue() {
     String key = mailbox.mailboxKey("test-" + System.nanoTime());
 
+    mailbox.create(key, Duration.ofMinutes(5));
     mailbox.deliver(key, "hello".getBytes(StandardCharsets.UTF_8));
 
     Optional<byte[]> result = mailbox.get(key);
@@ -70,8 +70,16 @@ class HazelcastMailboxIT {
   }
 
   @Test
-  void getReturnsEmptyWhenNotDelivered() {
+  void getThrowsWhenMailboxDoesNotExist() {
     String key = mailbox.mailboxKey("absent-" + System.nanoTime());
+
+    assertThrows(MailboxExpiredException.class, () -> mailbox.get(key));
+  }
+
+  @Test
+  void getReturnsEmptyWhenCreatedButNotDelivered() {
+    String key = mailbox.mailboxKey("created-" + System.nanoTime());
+    mailbox.create(key, Duration.ofMinutes(5));
 
     Optional<byte[]> result = mailbox.get(key);
 
@@ -82,11 +90,11 @@ class HazelcastMailboxIT {
   void deleteRemovesValue() {
     String key = mailbox.mailboxKey("delete-" + System.nanoTime());
 
+    mailbox.create(key, Duration.ofMinutes(5));
     mailbox.deliver(key, "to-delete".getBytes(StandardCharsets.UTF_8));
     mailbox.delete(key);
 
-    Optional<byte[]> result = mailbox.get(key);
-    assertThat(result).isEmpty();
+    assertThrows(MailboxExpiredException.class, () -> mailbox.get(key));
   }
 
   @Test

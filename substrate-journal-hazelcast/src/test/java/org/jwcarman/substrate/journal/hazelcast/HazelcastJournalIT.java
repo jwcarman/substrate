@@ -21,12 +21,13 @@ import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.spi.RawJournalEntry;
+import org.jwcarman.substrate.core.journal.RawJournalEntry;
 import tools.jackson.databind.ObjectMapper;
 
 class HazelcastJournalSpiIT {
@@ -58,7 +59,7 @@ class HazelcastJournalSpiIT {
   @Test
   void appendReturnsSequenceId() {
     String key = journal.journalKey("append-test-" + System.nanoTime());
-    String id = journal.append(key, "hello".getBytes(StandardCharsets.UTF_8));
+    String id = journal.append(key, "hello".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     assertThat(id).matches("\\d+");
   }
@@ -66,8 +67,9 @@ class HazelcastJournalSpiIT {
   @Test
   void appendReturnsMonotonicallyIncreasingIds() {
     String key = journal.journalKey("mono-" + System.nanoTime());
-    String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8));
-    String id2 = journal.append(key, "second".getBytes(StandardCharsets.UTF_8));
+    String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    String id2 =
+        journal.append(key, "second".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     assertThat(Long.parseLong(id2)).isGreaterThan(Long.parseLong(id1));
   }
@@ -75,9 +77,12 @@ class HazelcastJournalSpiIT {
   @Test
   void readAfterReturnsEntriesInOrder() {
     String key = journal.journalKey("read-after-" + System.nanoTime());
-    String id1 = journal.append(key, "payload1".getBytes(StandardCharsets.UTF_8));
-    String id2 = journal.append(key, "payload2".getBytes(StandardCharsets.UTF_8));
-    String id3 = journal.append(key, "payload3".getBytes(StandardCharsets.UTF_8));
+    String id1 =
+        journal.append(key, "payload1".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    String id2 =
+        journal.append(key, "payload2".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    String id3 =
+        journal.append(key, "payload3".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     List<RawJournalEntry> entries = journal.readAfter(key, id1);
 
@@ -98,10 +103,10 @@ class HazelcastJournalSpiIT {
   @Test
   void readLastReturnsLastNInChronologicalOrder() {
     String key = journal.journalKey("read-last-" + System.nanoTime());
-    journal.append(key, "first".getBytes(StandardCharsets.UTF_8));
-    journal.append(key, "second".getBytes(StandardCharsets.UTF_8));
-    journal.append(key, "third".getBytes(StandardCharsets.UTF_8));
-    journal.append(key, "fourth".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "first".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(key, "second".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(key, "third".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(key, "fourth".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     List<RawJournalEntry> entries = journal.readLast(key, 2);
 
@@ -120,8 +125,8 @@ class HazelcastJournalSpiIT {
   @Test
   void readLastReturnsAllWhenCountExceedsSize() {
     String key = journal.journalKey("small-" + System.nanoTime());
-    journal.append(key, "one".getBytes(StandardCharsets.UTF_8));
-    journal.append(key, "two".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "one".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(key, "two".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     List<RawJournalEntry> entries = journal.readLast(key, 100);
 
@@ -133,8 +138,8 @@ class HazelcastJournalSpiIT {
   @Test
   void deleteDestroysRingbuffer() {
     String key = journal.journalKey("delete-" + System.nanoTime());
-    journal.append(key, "hello".getBytes(StandardCharsets.UTF_8));
-    journal.append(key, "world".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "hello".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(key, "world".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     journal.delete(key);
 
@@ -146,8 +151,8 @@ class HazelcastJournalSpiIT {
   void deleteDoesNotAffectOtherJournals() {
     String key1 = journal.journalKey("a-" + System.nanoTime());
     String key2 = journal.journalKey("b-" + System.nanoTime());
-    journal.append(key1, "a-event".getBytes(StandardCharsets.UTF_8));
-    journal.append(key2, "b-event".getBytes(StandardCharsets.UTF_8));
+    journal.append(key1, "a-event".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(key2, "b-event".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     journal.delete(key1);
 
@@ -158,7 +163,7 @@ class HazelcastJournalSpiIT {
   @Test
   void timestampIsPreserved() {
     String key = journal.journalKey("time-" + System.nanoTime());
-    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     List<RawJournalEntry> entries = journal.readLast(key, 1);
     assertThat(entries).hasSize(1);
@@ -168,7 +173,7 @@ class HazelcastJournalSpiIT {
   @Test
   void isCompleteReturnsFalseForNonCompletedJournal() {
     String key = journal.journalKey("incomplete-" + System.nanoTime());
-    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     assertThat(journal.isComplete(key)).isFalse();
   }
@@ -176,7 +181,7 @@ class HazelcastJournalSpiIT {
   @Test
   void isCompleteReturnsTrueAfterComplete() {
     String key = journal.journalKey("is-complete-" + System.nanoTime());
-    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     journal.complete(key);
 
     assertThat(journal.isComplete(key)).isTrue();

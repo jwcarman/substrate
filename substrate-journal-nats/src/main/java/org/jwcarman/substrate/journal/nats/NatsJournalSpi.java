@@ -39,8 +39,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import org.jwcarman.substrate.spi.AbstractJournalSpi;
-import org.jwcarman.substrate.spi.RawJournalEntry;
+import org.jwcarman.substrate.core.journal.AbstractJournalSpi;
+import org.jwcarman.substrate.core.journal.RawJournalEntry;
 
 public class NatsJournalSpi extends AbstractJournalSpi {
 
@@ -65,11 +65,6 @@ public class NatsJournalSpi extends AbstractJournalSpi {
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to initialize NATS JetStream", e);
     }
-  }
-
-  @Override
-  public String append(String key, byte[] data) {
-    return append(key, data, null);
   }
 
   @Override

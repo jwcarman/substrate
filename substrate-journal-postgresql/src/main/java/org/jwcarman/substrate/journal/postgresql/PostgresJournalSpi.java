@@ -21,8 +21,8 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
-import org.jwcarman.substrate.spi.AbstractJournalSpi;
-import org.jwcarman.substrate.spi.RawJournalEntry;
+import org.jwcarman.substrate.core.journal.AbstractJournalSpi;
+import org.jwcarman.substrate.core.journal.RawJournalEntry;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 public class PostgresJournalSpi extends AbstractJournalSpi {
@@ -37,11 +37,6 @@ public class PostgresJournalSpi extends AbstractJournalSpi {
     super(prefix);
     this.jdbcTemplate = jdbcTemplate;
     this.maxLen = maxLen;
-  }
-
-  @Override
-  public String append(String key, byte[] data) {
-    return append(key, data, null);
   }
 
   @Override

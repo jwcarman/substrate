@@ -16,7 +16,7 @@
 package org.jwcarman.substrate.journal.postgresql;
 
 import javax.sql.DataSource;
-import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
+import org.jwcarman.substrate.core.autoconfigure.SubstrateAutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

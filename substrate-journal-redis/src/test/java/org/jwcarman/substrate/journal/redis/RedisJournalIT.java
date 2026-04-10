@@ -28,7 +28,7 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.spi.RawJournalEntry;
+import org.jwcarman.substrate.core.journal.RawJournalEntry;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -67,9 +67,10 @@ class RedisJournalSpiIT {
   @Test
   void appendAndReadAfterFullLifecycle() {
     String key = journal.journalKey("test-stream");
-    String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8));
-    String id2 = journal.append(key, "second".getBytes(StandardCharsets.UTF_8));
-    String id3 = journal.append(key, "third".getBytes(StandardCharsets.UTF_8));
+    String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    String id2 =
+        journal.append(key, "second".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    String id3 = journal.append(key, "third".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     List<RawJournalEntry> entries = journal.readAfter(key, id1);
 
@@ -85,9 +86,9 @@ class RedisJournalSpiIT {
   @Test
   void readLastReturnsEntriesInChronologicalOrder() {
     String key = journal.journalKey("last-test");
-    journal.append(key, "a".getBytes(StandardCharsets.UTF_8));
-    journal.append(key, "b".getBytes(StandardCharsets.UTF_8));
-    journal.append(key, "c".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "a".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(key, "b".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.append(key, "c".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     List<RawJournalEntry> entries = journal.readLast(key, 2);
 
@@ -105,7 +106,7 @@ class RedisJournalSpiIT {
   @Test
   void deleteRemovesStream() {
     String key = journal.journalKey("delete-test");
-    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     journal.delete(key);
 
     List<RawJournalEntry> entries = journal.readAfter(key, "0-0");
@@ -115,7 +116,7 @@ class RedisJournalSpiIT {
   @Test
   void completeAndDeleteRemovesCompletionFlag() {
     String key = journal.journalKey("complete-test");
-    journal.append(key, "data".getBytes(StandardCharsets.UTF_8));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     journal.complete(key);
 
     assertThat(commands.get(key + ":completed")).isEqualTo("true");

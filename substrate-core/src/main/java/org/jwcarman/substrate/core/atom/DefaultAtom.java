@@ -27,25 +27,29 @@ import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.atom.Atom;
 import org.jwcarman.substrate.atom.AtomExpiredException;
 import org.jwcarman.substrate.atom.Snapshot;
-import org.jwcarman.substrate.spi.Notifier;
-import org.jwcarman.substrate.spi.NotifierSubscription;
+import org.jwcarman.substrate.core.notifier.NotifierSpi;
+import org.jwcarman.substrate.core.notifier.NotifierSubscription;
 
 public class DefaultAtom<T> implements Atom<T> {
 
   private final AtomSpi atomSpi;
   private final String key;
   private final Codec<T> codec;
-  private final Notifier notifier;
+  private final NotifierSpi notifier;
+  private final Duration maxTtl;
 
-  public DefaultAtom(AtomSpi atomSpi, String key, Codec<T> codec, Notifier notifier) {
+  public DefaultAtom(
+      AtomSpi atomSpi, String key, Codec<T> codec, NotifierSpi notifier, Duration maxTtl) {
     this.atomSpi = atomSpi;
     this.key = key;
     this.codec = codec;
     this.notifier = notifier;
+    this.maxTtl = maxTtl;
   }
 
   @Override
   public void set(T data, Duration ttl) {
+    validateTtl(ttl);
     byte[] bytes = codec.encode(data);
     String newToken = token(bytes);
     boolean alive = atomSpi.set(key, bytes, newToken, ttl);
@@ -57,6 +61,7 @@ public class DefaultAtom<T> implements Atom<T> {
 
   @Override
   public boolean touch(Duration ttl) {
+    validateTtl(ttl);
     return atomSpi.touch(key, ttl);
   }
 
@@ -129,6 +134,13 @@ public class DefaultAtom<T> implements Atom<T> {
       return Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
     } catch (NoSuchAlgorithmException e) {
       throw new IllegalStateException("SHA-256 unavailable", e);
+    }
+  }
+
+  private void validateTtl(Duration ttl) {
+    if (ttl.compareTo(maxTtl) > 0) {
+      throw new IllegalArgumentException(
+          "Atom TTL " + ttl + " exceeds configured maximum " + maxTtl);
     }
   }
 }

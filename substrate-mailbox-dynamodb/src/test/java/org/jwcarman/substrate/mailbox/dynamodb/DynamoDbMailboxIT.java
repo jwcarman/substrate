@@ -16,12 +16,14 @@
 package org.jwcarman.substrate.mailbox.dynamodb;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.localstack.LocalStackContainer;
@@ -61,9 +63,7 @@ class DynamoDbMailboxIT {
       // table doesn't exist yet
     }
 
-    mailbox =
-        new DynamoDbMailboxSpi(
-            client, "substrate:mailbox:", "substrate_mailbox", Duration.ofMinutes(5));
+    mailbox = new DynamoDbMailboxSpi(client, "substrate:mailbox:", "substrate_mailbox");
     mailbox.createTable();
   }
 
@@ -71,6 +71,7 @@ class DynamoDbMailboxIT {
   void deliverThenGetReturnsValue() {
     String key = mailbox.mailboxKey("test-" + System.nanoTime());
 
+    mailbox.create(key, Duration.ofMinutes(5));
     mailbox.deliver(key, "hello".getBytes(StandardCharsets.UTF_8));
 
     Optional<byte[]> result = mailbox.get(key);
@@ -79,8 +80,16 @@ class DynamoDbMailboxIT {
   }
 
   @Test
-  void getReturnsEmptyWhenNotDelivered() {
+  void getThrowsWhenMailboxDoesNotExist() {
     String key = mailbox.mailboxKey("absent-" + System.nanoTime());
+
+    assertThrows(MailboxExpiredException.class, () -> mailbox.get(key));
+  }
+
+  @Test
+  void getReturnsEmptyWhenCreatedButNotDelivered() {
+    String key = mailbox.mailboxKey("created-" + System.nanoTime());
+    mailbox.create(key, Duration.ofMinutes(5));
 
     Optional<byte[]> result = mailbox.get(key);
 
@@ -91,11 +100,11 @@ class DynamoDbMailboxIT {
   void deleteRemovesValue() {
     String key = mailbox.mailboxKey("delete-" + System.nanoTime());
 
+    mailbox.create(key, Duration.ofMinutes(5));
     mailbox.deliver(key, "to-delete".getBytes(StandardCharsets.UTF_8));
     mailbox.delete(key);
 
-    Optional<byte[]> result = mailbox.get(key);
-    assertThat(result).isEmpty();
+    assertThrows(MailboxExpiredException.class, () -> mailbox.get(key));
   }
 
   @Test

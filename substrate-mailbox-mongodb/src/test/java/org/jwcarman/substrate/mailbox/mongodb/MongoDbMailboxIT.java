@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.mailbox.mongodb;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
@@ -24,6 +25,7 @@ import java.time.Duration;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -44,9 +46,7 @@ class MongoDbMailboxIT {
 
     mongoTemplate.dropCollection("substrate_mailbox");
 
-    mailbox =
-        new MongoDbMailboxSpi(
-            mongoTemplate, "substrate:mailbox:", "substrate_mailbox", Duration.ofMinutes(5));
+    mailbox = new MongoDbMailboxSpi(mongoTemplate, "substrate:mailbox:", "substrate_mailbox");
     mailbox.ensureIndexes();
   }
 
@@ -54,6 +54,7 @@ class MongoDbMailboxIT {
   void deliverThenGetReturnsValue() {
     String key = mailbox.mailboxKey("test-" + System.nanoTime());
 
+    mailbox.create(key, Duration.ofMinutes(5));
     mailbox.deliver(key, "hello".getBytes(StandardCharsets.UTF_8));
 
     Optional<byte[]> result = mailbox.get(key);
@@ -62,8 +63,16 @@ class MongoDbMailboxIT {
   }
 
   @Test
-  void getReturnsEmptyWhenNotDelivered() {
+  void getThrowsWhenMailboxDoesNotExist() {
     String key = mailbox.mailboxKey("absent-" + System.nanoTime());
+
+    assertThrows(MailboxExpiredException.class, () -> mailbox.get(key));
+  }
+
+  @Test
+  void getReturnsEmptyWhenCreatedButNotDelivered() {
+    String key = mailbox.mailboxKey("created-" + System.nanoTime());
+    mailbox.create(key, Duration.ofMinutes(5));
 
     Optional<byte[]> result = mailbox.get(key);
 
@@ -74,11 +83,11 @@ class MongoDbMailboxIT {
   void deleteRemovesValue() {
     String key = mailbox.mailboxKey("delete-" + System.nanoTime());
 
+    mailbox.create(key, Duration.ofMinutes(5));
     mailbox.deliver(key, "to-delete".getBytes(StandardCharsets.UTF_8));
     mailbox.delete(key);
 
-    Optional<byte[]> result = mailbox.get(key);
-    assertThat(result).isEmpty();
+    assertThrows(MailboxExpiredException.class, () -> mailbox.get(key));
   }
 
   @Test

@@ -61,7 +61,11 @@ class NatsJournalSpiTest {
     when(publishAck.getSeqno()).thenReturn(42L);
 
     NatsJournalSpi journal = createJournal();
-    String id = journal.append("substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8));
+    String id =
+        journal.append(
+            "substrate:journal:test",
+            "hello".getBytes(StandardCharsets.UTF_8),
+            Duration.ofHours(1));
 
     assertThat(id).isEqualTo("42");
   }
@@ -73,7 +77,7 @@ class NatsJournalSpiTest {
 
     NatsJournalSpi journal = createJournal();
     byte[] data = "data".getBytes(StandardCharsets.UTF_8);
-    assertThatThrownBy(() -> journal.append("substrate:journal:test", data))
+    assertThatThrownBy(() -> journal.append("substrate:journal:test", data, Duration.ofHours(1)))
         .isInstanceOf(UncheckedIOException.class);
   }
 
@@ -113,7 +117,7 @@ class NatsJournalSpiTest {
 
     NatsJournalSpi journal = createJournal();
     byte[] data = "data".getBytes(StandardCharsets.UTF_8);
-    assertThatThrownBy(() -> journal.append("substrate:journal:test", data))
+    assertThatThrownBy(() -> journal.append("substrate:journal:test", data, Duration.ofHours(1)))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("Failed to publish to NATS JetStream");
   }

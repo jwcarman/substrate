@@ -34,7 +34,7 @@ import org.jwcarman.substrate.atom.Atom;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
 import org.jwcarman.substrate.atom.AtomExpiredException;
 import org.jwcarman.substrate.core.memory.atom.InMemoryAtomSpi;
-import org.jwcarman.substrate.memory.InMemoryNotifier;
+import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 
 class DefaultAtomFactoryTest {
 
@@ -74,7 +74,7 @@ class DefaultAtomFactoryTest {
   void setUp() {
     spi = new InMemoryAtomSpi();
     notifier = new InMemoryNotifier();
-    factory = new DefaultAtomFactory(spi, CODEC_FACTORY, notifier);
+    factory = new DefaultAtomFactory(spi, CODEC_FACTORY, notifier, Duration.ofHours(24));
   }
 
   @Test
@@ -170,7 +170,7 @@ class DefaultAtomFactoryTest {
         };
 
     DefaultAtomFactory lazyFactory =
-        new DefaultAtomFactory(failOnAnySpiCall, CODEC_FACTORY, notifier);
+        new DefaultAtomFactory(failOnAnySpiCall, CODEC_FACTORY, notifier, Duration.ofHours(24));
 
     Atom<String> atom = lazyFactory.connect("test", String.class);
     assertThat(atom).isNotNull();
@@ -204,5 +204,13 @@ class DefaultAtomFactoryTest {
     Atom<String> atom = factory.connect("nonexistent", String.class);
 
     assertThat(atom.touch(Duration.ofSeconds(10))).isFalse();
+  }
+
+  @Test
+  void createThrowsWhenTtlExceedsMaxTtl() {
+    assertThatThrownBy(
+            () -> factory.create("excessive", String.class, "value", Duration.ofHours(25)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("exceeds configured maximum");
   }
 }

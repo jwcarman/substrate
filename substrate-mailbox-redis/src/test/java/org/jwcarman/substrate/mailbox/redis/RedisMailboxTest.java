@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.mailbox.redis;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -24,12 +25,12 @@ import static org.mockito.Mockito.when;
 import io.lettuce.core.SetArgs;
 import io.lettuce.core.api.sync.RedisCommands;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.Base64;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -42,11 +43,17 @@ class RedisMailboxTest {
 
   @BeforeEach
   void setUp() {
-    mailbox = new RedisMailboxSpi(commands, "substrate:mailbox:", Duration.ofMinutes(5));
+    mailbox = new RedisMailboxSpi(commands, "substrate:mailbox:");
   }
 
   @Test
-  void deliverSetsValueWithTtl() {
+  void deliverSetsValueWithKeepTtl() {
+    when(commands.set(
+            eq("substrate:mailbox:test"),
+            eq(Base64.getEncoder().encodeToString("hello".getBytes(StandardCharsets.UTF_8))),
+            any(SetArgs.class)))
+        .thenReturn("OK");
+
     mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8));
 
     verify(commands)
@@ -68,8 +75,15 @@ class RedisMailboxTest {
   }
 
   @Test
-  void getReturnsEmptyWhenValueDoesNotExist() {
+  void getThrowsWhenValueDoesNotExist() {
     when(commands.get("substrate:mailbox:test")).thenReturn(null);
+
+    assertThrows(MailboxExpiredException.class, () -> mailbox.get("substrate:mailbox:test"));
+  }
+
+  @Test
+  void getReturnsEmptyWhenCreatedButNotDelivered() {
+    when(commands.get("substrate:mailbox:test")).thenReturn("");
 
     Optional<byte[]> result = mailbox.get("substrate:mailbox:test");
 

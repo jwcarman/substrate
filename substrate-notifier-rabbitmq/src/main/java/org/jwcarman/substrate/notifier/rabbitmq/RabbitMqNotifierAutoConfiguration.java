@@ -15,7 +15,7 @@
  */
 package org.jwcarman.substrate.notifier.rabbitmq;
 
-import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
+import org.jwcarman.substrate.core.autoconfigure.SubstrateAutoConfiguration;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.boot.autoconfigure.AutoConfiguration;

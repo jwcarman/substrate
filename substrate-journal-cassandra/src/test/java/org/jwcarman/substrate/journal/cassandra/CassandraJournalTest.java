@@ -64,7 +64,11 @@ class CassandraJournalSpiTest {
 
   @Test
   void appendReturnsTimeuuidId() {
-    String id = journal.append("substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8));
+    String id =
+        journal.append(
+            "substrate:journal:test",
+            "hello".getBytes(StandardCharsets.UTF_8),
+            Duration.ofHours(1));
 
     UUID uuid = UUID.fromString(id);
     assertThat(uuid.version()).isEqualTo(1);
@@ -72,7 +76,8 @@ class CassandraJournalSpiTest {
 
   @Test
   void appendExecutesPreparedStatement() {
-    journal.append("substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8));
+    journal.append(
+        "substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     // Constructor executes 0 statements; append executes 1
     verify(session, atLeast(1)).execute(any(BoundStatement.class));
@@ -83,7 +88,8 @@ class CassandraJournalSpiTest {
     CassandraJournalSpi noTtlJournal =
         new CassandraJournalSpi(session, "substrate:journal:", "substrate_journal", Duration.ZERO);
 
-    noTtlJournal.append("substrate:journal:test", "data".getBytes(StandardCharsets.UTF_8));
+    noTtlJournal.append(
+        "substrate:journal:test", "data".getBytes(StandardCharsets.UTF_8), Duration.ZERO);
 
     verify(session, atLeast(1)).execute(any(BoundStatement.class));
   }

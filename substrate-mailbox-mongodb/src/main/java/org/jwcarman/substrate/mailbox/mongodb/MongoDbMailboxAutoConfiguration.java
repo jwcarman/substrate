@@ -16,7 +16,7 @@
 package org.jwcarman.substrate.mailbox.mongodb;
 
 import com.mongodb.client.MongoClient;
-import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
+import org.jwcarman.substrate.core.autoconfigure.SubstrateAutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -34,11 +34,7 @@ public class MongoDbMailboxAutoConfiguration {
   public MongoDbMailboxSpi mongoDbMailbox(
       MongoTemplate mongoTemplate, MongoDbMailboxProperties properties) {
     MongoDbMailboxSpi mailbox =
-        new MongoDbMailboxSpi(
-            mongoTemplate,
-            properties.prefix(),
-            properties.collectionName(),
-            properties.defaultTtl());
+        new MongoDbMailboxSpi(mongoTemplate, properties.prefix(), properties.collectionName());
 
     mailbox.ensureIndexes();
 

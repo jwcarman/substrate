@@ -23,10 +23,10 @@ import static org.mockito.Mockito.mock;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.map.IMap;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.memory.InMemoryMailboxSpi;
-import org.jwcarman.substrate.spi.MailboxSpi;
-import org.jwcarman.substrate.spi.Notifier;
+import org.jwcarman.substrate.core.autoconfigure.SubstrateAutoConfiguration;
+import org.jwcarman.substrate.core.mailbox.MailboxSpi;
+import org.jwcarman.substrate.core.memory.mailbox.InMemoryMailboxSpi;
+import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -73,8 +73,8 @@ class HazelcastMailboxAutoConfigurationTest {
     }
 
     @Bean
-    Notifier notifier() {
-      return mock(Notifier.class);
+    NotifierSpi notifier() {
+      return mock(NotifierSpi.class);
     }
   }
 }

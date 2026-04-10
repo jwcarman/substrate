@@ -24,9 +24,9 @@ import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.MessageHandler;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.memory.InMemoryNotifier;
-import org.jwcarman.substrate.spi.Notifier;
+import org.jwcarman.substrate.core.autoconfigure.SubstrateAutoConfiguration;
+import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
+import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -42,7 +42,7 @@ class NatsNotifierAutoConfigurationTest {
         .run(
             context -> {
               assertThat(context).hasSingleBean(NatsNotifier.class);
-              assertThat(context).hasSingleBean(Notifier.class);
+              assertThat(context).hasSingleBean(NotifierSpi.class);
             });
   }
 
@@ -55,8 +55,8 @@ class NatsNotifierAutoConfigurationTest {
         .withUserConfiguration(MockNatsConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(Notifier.class);
-              assertThat(context.getBean(Notifier.class)).isInstanceOf(NatsNotifier.class);
+              assertThat(context).hasSingleBean(NotifierSpi.class);
+              assertThat(context.getBean(NotifierSpi.class)).isInstanceOf(NatsNotifier.class);
               assertThat(context).doesNotHaveBean(InMemoryNotifier.class);
             });
   }

@@ -23,9 +23,12 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.util.Optional;
-import org.jwcarman.substrate.spi.AbstractMailboxSpi;
+import org.jwcarman.substrate.core.mailbox.AbstractMailboxSpi;
+import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 
 public class NatsMailboxSpi extends AbstractMailboxSpi {
+
+  private static final byte[] CREATED_MARKER = new byte[0];
 
   private final Connection connection;
   private final String bucketName;
@@ -41,9 +44,25 @@ public class NatsMailboxSpi extends AbstractMailboxSpi {
   }
 
   @Override
+  public void create(String key, Duration ttl) {
+    try {
+      var kv = connection.keyValue(bucketName);
+      kv.put(toKvKey(key), CREATED_MARKER);
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to create mailbox in NATS KV", e);
+    } catch (JetStreamApiException e) {
+      throw new IllegalStateException("Failed to create mailbox in NATS KV", e);
+    }
+  }
+
+  @Override
   public void deliver(String key, byte[] value) {
     try {
       var kv = connection.keyValue(bucketName);
+      KeyValueEntry entry = kv.get(toKvKey(key));
+      if (entry == null) {
+        throw new MailboxExpiredException(key);
+      }
       kv.put(toKvKey(key), value);
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to deliver to NATS KV", e);
@@ -57,10 +76,13 @@ public class NatsMailboxSpi extends AbstractMailboxSpi {
     try {
       var kv = connection.keyValue(bucketName);
       KeyValueEntry entry = kv.get(toKvKey(key));
-      if (entry != null && entry.getValue() != null) {
-        return Optional.of(entry.getValue());
+      if (entry == null || entry.getValue() == null) {
+        throw new MailboxExpiredException(key);
       }
-      return Optional.empty();
+      if (entry.getValue().length == 0) {
+        return Optional.empty();
+      }
+      return Optional.of(entry.getValue());
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to get from NATS KV", e);
     } catch (JetStreamApiException e) {

@@ -46,7 +46,7 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.jwcarman.substrate.spi.RawJournalEntry;
+import org.jwcarman.substrate.core.journal.RawJournalEntry;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -79,7 +79,11 @@ class RabbitMqJournalSpiTest {
     wireMessageBuilder();
     wireSuccessfulPublish();
 
-    String id = journal.append("substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8));
+    String id =
+        journal.append(
+            "substrate:journal:test",
+            "hello".getBytes(StandardCharsets.UTF_8),
+            Duration.ofHours(1));
 
     assertThat(id).isNotNull();
     verify(producer).send(any(Message.class), any(ConfirmationHandler.class));
@@ -105,7 +109,7 @@ class RabbitMqJournalSpiTest {
         .send(any(Message.class), any(ConfirmationHandler.class));
 
     byte[] data = "data".getBytes(StandardCharsets.UTF_8);
-    assertThatThrownBy(() -> journal.append("substrate:journal:test", data))
+    assertThatThrownBy(() -> journal.append("substrate:journal:test", data, Duration.ofHours(1)))
         .isInstanceOf(StreamException.class);
   }
 
@@ -116,7 +120,8 @@ class RabbitMqJournalSpiTest {
     wireSuccessfulPublish();
 
     // Trigger producer creation by appending
-    journal.append("substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8));
+    journal.append(
+        "substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     journal.delete("substrate:journal:test");
 
@@ -139,7 +144,8 @@ class RabbitMqJournalSpiTest {
     wireMessageBuilder();
     wireSuccessfulPublish();
 
-    journal.append("substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8));
+    journal.append(
+        "substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     journal.close();
 
     verify(producer).close();

@@ -20,7 +20,8 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import org.jwcarman.substrate.spi.AbstractMailboxSpi;
+import org.jwcarman.substrate.core.mailbox.AbstractMailboxSpi;
+import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
@@ -40,14 +41,11 @@ public class DynamoDbMailboxSpi extends AbstractMailboxSpi {
 
   private final DynamoDbClient client;
   private final String tableName;
-  private final Duration defaultTtl;
 
-  public DynamoDbMailboxSpi(
-      DynamoDbClient client, String prefix, String tableName, Duration defaultTtl) {
+  public DynamoDbMailboxSpi(DynamoDbClient client, String prefix, String tableName) {
     super(prefix);
     this.client = client;
     this.tableName = tableName;
-    this.defaultTtl = defaultTtl;
   }
 
   public void createTable() {
@@ -65,14 +63,37 @@ public class DynamoDbMailboxSpi extends AbstractMailboxSpi {
   }
 
   @Override
+  public void create(String key, Duration ttl) {
+    Map<String, AttributeValue> item = new HashMap<>();
+    item.put(FIELD_KEY, AttributeValue.builder().s(key).build());
+
+    if (!ttl.isZero()) {
+      long ttlEpoch = Instant.now().plus(ttl).getEpochSecond();
+      item.put(FIELD_TTL, AttributeValue.builder().n(String.valueOf(ttlEpoch)).build());
+    }
+
+    client.putItem(PutItemRequest.builder().tableName(tableName).item(item).build());
+  }
+
+  @Override
   public void deliver(String key, byte[] value) {
     Map<String, AttributeValue> item = new HashMap<>();
     item.put(FIELD_KEY, AttributeValue.builder().s(key).build());
     item.put(FIELD_VALUE, AttributeValue.builder().b(SdkBytes.fromByteArray(value)).build());
 
-    if (!defaultTtl.isZero()) {
-      long ttlEpoch = Instant.now().plus(defaultTtl).getEpochSecond();
-      item.put(FIELD_TTL, AttributeValue.builder().n(String.valueOf(ttlEpoch)).build());
+    GetItemResponse existing =
+        client.getItem(
+            GetItemRequest.builder()
+                .tableName(tableName)
+                .key(Map.of(FIELD_KEY, AttributeValue.builder().s(key).build()))
+                .build());
+
+    if (!existing.hasItem() || existing.item().isEmpty()) {
+      throw new MailboxExpiredException(key);
+    }
+
+    if (existing.item().containsKey(FIELD_TTL)) {
+      item.put(FIELD_TTL, existing.item().get(FIELD_TTL));
     }
 
     client.putItem(PutItemRequest.builder().tableName(tableName).item(item).build());
@@ -87,7 +108,11 @@ public class DynamoDbMailboxSpi extends AbstractMailboxSpi {
                 .key(Map.of(FIELD_KEY, AttributeValue.builder().s(key).build()))
                 .build());
 
-    if (response.hasItem() && response.item().containsKey(FIELD_VALUE)) {
+    if (!response.hasItem() || response.item().isEmpty()) {
+      throw new MailboxExpiredException(key);
+    }
+
+    if (response.item().containsKey(FIELD_VALUE)) {
       return Optional.of(response.item().get(FIELD_VALUE).b().asByteArray());
     }
     return Optional.empty();

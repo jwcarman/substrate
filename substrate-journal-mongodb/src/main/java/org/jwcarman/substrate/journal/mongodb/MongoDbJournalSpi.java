@@ -22,8 +22,8 @@ import java.util.Date;
 import java.util.List;
 import org.bson.Document;
 import org.bson.types.Binary;
-import org.jwcarman.substrate.spi.AbstractJournalSpi;
-import org.jwcarman.substrate.spi.RawJournalEntry;
+import org.jwcarman.substrate.core.journal.AbstractJournalSpi;
+import org.jwcarman.substrate.core.journal.RawJournalEntry;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.CompoundIndexDefinition;
@@ -61,11 +61,6 @@ public class MongoDbJournalSpi extends AbstractJournalSpi {
     if (!ttl.isZero()) {
       indexOps.createIndex(new Index().on(FIELD_EXPIRE_AT, Sort.Direction.ASC).expire(0));
     }
-  }
-
-  @Override
-  public String append(String key, byte[] data) {
-    return append(key, data, ttl);
   }
 
   @Override

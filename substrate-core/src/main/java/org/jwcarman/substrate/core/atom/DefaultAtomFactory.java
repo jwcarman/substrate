@@ -21,53 +21,65 @@ import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.codec.spi.TypeRef;
 import org.jwcarman.substrate.atom.Atom;
 import org.jwcarman.substrate.atom.AtomFactory;
-import org.jwcarman.substrate.spi.Notifier;
+import org.jwcarman.substrate.core.notifier.NotifierSpi;
 
 public class DefaultAtomFactory implements AtomFactory {
 
   private final AtomSpi atomSpi;
   private final CodecFactory codecFactory;
-  private final Notifier notifier;
+  private final NotifierSpi notifier;
+  private final Duration maxTtl;
 
-  public DefaultAtomFactory(AtomSpi atomSpi, CodecFactory codecFactory, Notifier notifier) {
+  public DefaultAtomFactory(
+      AtomSpi atomSpi, CodecFactory codecFactory, NotifierSpi notifier, Duration maxTtl) {
     this.atomSpi = atomSpi;
     this.codecFactory = codecFactory;
     this.notifier = notifier;
+    this.maxTtl = maxTtl;
   }
 
   @Override
   public <T> Atom<T> create(String name, Class<T> type, T initialValue, Duration ttl) {
+    validateTtl(ttl);
     Codec<T> codec = codecFactory.create(type);
     String key = atomSpi.atomKey(name);
     byte[] bytes = codec.encode(initialValue);
     String token = DefaultAtom.token(bytes);
     atomSpi.create(key, bytes, token, ttl);
     notifier.notify(key, token);
-    return new DefaultAtom<>(atomSpi, key, codec, notifier);
+    return new DefaultAtom<>(atomSpi, key, codec, notifier, maxTtl);
   }
 
   @Override
   public <T> Atom<T> create(String name, TypeRef<T> typeRef, T initialValue, Duration ttl) {
+    validateTtl(ttl);
     Codec<T> codec = codecFactory.create(typeRef);
     String key = atomSpi.atomKey(name);
     byte[] bytes = codec.encode(initialValue);
     String token = DefaultAtom.token(bytes);
     atomSpi.create(key, bytes, token, ttl);
     notifier.notify(key, token);
-    return new DefaultAtom<>(atomSpi, key, codec, notifier);
+    return new DefaultAtom<>(atomSpi, key, codec, notifier, maxTtl);
   }
 
   @Override
   public <T> Atom<T> connect(String name, Class<T> type) {
     Codec<T> codec = codecFactory.create(type);
     String key = atomSpi.atomKey(name);
-    return new DefaultAtom<>(atomSpi, key, codec, notifier);
+    return new DefaultAtom<>(atomSpi, key, codec, notifier, maxTtl);
   }
 
   @Override
   public <T> Atom<T> connect(String name, TypeRef<T> typeRef) {
     Codec<T> codec = codecFactory.create(typeRef);
     String key = atomSpi.atomKey(name);
-    return new DefaultAtom<>(atomSpi, key, codec, notifier);
+    return new DefaultAtom<>(atomSpi, key, codec, notifier, maxTtl);
+  }
+
+  private void validateTtl(Duration ttl) {
+    if (ttl.compareTo(maxTtl) > 0) {
+      throw new IllegalArgumentException(
+          "Atom TTL " + ttl + " exceeds configured maximum " + maxTtl);
+    }
   }
 }

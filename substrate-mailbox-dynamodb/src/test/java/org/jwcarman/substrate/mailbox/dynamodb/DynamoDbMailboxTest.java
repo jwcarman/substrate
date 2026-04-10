@@ -16,17 +16,18 @@
 package org.jwcarman.substrate.mailbox.dynamodb;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -47,9 +48,7 @@ class DynamoDbMailboxTest {
 
   @BeforeEach
   void setUp() {
-    mailbox =
-        new DynamoDbMailboxSpi(
-            client, "substrate:mailbox:", "substrate_mailbox", Duration.ofMinutes(5));
+    mailbox = new DynamoDbMailboxSpi(client, "substrate:mailbox:", "substrate_mailbox");
   }
 
   @Test
@@ -59,6 +58,12 @@ class DynamoDbMailboxTest {
 
   @Test
   void deliverPutsItem() {
+    when(client.getItem(any(GetItemRequest.class)))
+        .thenReturn(
+            GetItemResponse.builder()
+                .item(Map.of("key", AttributeValue.builder().s("substrate:mailbox:test").build()))
+                .build());
+
     mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8));
 
     ArgumentCaptor<PutItemRequest> captor = ArgumentCaptor.forClass(PutItemRequest.class);
@@ -68,7 +73,6 @@ class DynamoDbMailboxTest {
     assertThat(item.get("key").s()).isEqualTo("substrate:mailbox:test");
     assertThat(item.get("value").b().asByteArray())
         .isEqualTo("hello".getBytes(StandardCharsets.UTF_8));
-    assertThat(item.get("ttl").n()).isNotEmpty();
   }
 
   @Test
@@ -93,8 +97,19 @@ class DynamoDbMailboxTest {
   }
 
   @Test
-  void getReturnsEmptyWhenAbsent() {
+  void getThrowsWhenAbsent() {
     when(client.getItem(any(GetItemRequest.class))).thenReturn(GetItemResponse.builder().build());
+
+    assertThrows(MailboxExpiredException.class, () -> mailbox.get("substrate:mailbox:test"));
+  }
+
+  @Test
+  void getReturnsEmptyWhenCreatedButNotDelivered() {
+    when(client.getItem(any(GetItemRequest.class)))
+        .thenReturn(
+            GetItemResponse.builder()
+                .item(Map.of("key", AttributeValue.builder().s("substrate:mailbox:test").build()))
+                .build());
 
     Optional<byte[]> result = mailbox.get("substrate:mailbox:test");
 

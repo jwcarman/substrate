@@ -36,7 +36,7 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.jwcarman.substrate.spi.RawJournalEntry;
+import org.jwcarman.substrate.core.journal.RawJournalEntry;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -59,7 +59,10 @@ class RedisJournalSpiTest {
     when(commands.expire("substrate:journal:test", 3600)).thenReturn(true);
 
     String entryId =
-        journal.append("substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8));
+        journal.append(
+            "substrate:journal:test",
+            "hello".getBytes(StandardCharsets.UTF_8),
+            Duration.ofHours(1));
 
     assertThat(entryId).isEqualTo("1712404800000-0");
 
@@ -81,7 +84,8 @@ class RedisJournalSpiTest {
         .thenReturn("1-0");
     when(commands.expire("substrate:journal:test", 3600)).thenReturn(true);
 
-    journal.append("substrate:journal:test", "data".getBytes(StandardCharsets.UTF_8));
+    journal.append(
+        "substrate:journal:test", "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     verify(commands).expire("substrate:journal:test", 3600);
   }

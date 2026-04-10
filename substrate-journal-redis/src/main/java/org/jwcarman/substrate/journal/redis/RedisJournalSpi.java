@@ -28,8 +28,8 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import org.jwcarman.substrate.spi.AbstractJournalSpi;
-import org.jwcarman.substrate.spi.RawJournalEntry;
+import org.jwcarman.substrate.core.journal.AbstractJournalSpi;
+import org.jwcarman.substrate.core.journal.RawJournalEntry;
 
 public class RedisJournalSpi extends AbstractJournalSpi {
 
@@ -48,11 +48,6 @@ public class RedisJournalSpi extends AbstractJournalSpi {
     this.commands = commands;
     this.maxLen = maxLen;
     this.defaultTtl = defaultTtl;
-  }
-
-  @Override
-  public String append(String key, byte[] data) {
-    return append(key, data, defaultTtl);
   }
 
   @Override

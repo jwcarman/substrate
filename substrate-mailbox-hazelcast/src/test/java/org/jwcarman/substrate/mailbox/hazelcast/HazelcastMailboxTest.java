@@ -16,18 +16,18 @@
 package org.jwcarman.substrate.mailbox.hazelcast;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.map.IMap;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -42,21 +42,17 @@ class HazelcastMailboxTest {
   @BeforeEach
   void setUp() {
     when(hazelcastInstance.<String, byte[]>getMap("substrate-mailbox")).thenReturn(map);
-    mailbox =
-        new HazelcastMailboxSpi(
-            hazelcastInstance, "substrate:mailbox:", "substrate-mailbox", Duration.ofMinutes(5));
+    mailbox = new HazelcastMailboxSpi(hazelcastInstance, "substrate:mailbox:", "substrate-mailbox");
   }
 
   @Test
-  void deliverPutsValueInMapWithTtl() {
+  void deliverReplacesValueInMap() {
+    when(map.replace("test-key", "test-value".getBytes(StandardCharsets.UTF_8)))
+        .thenReturn(new byte[0]);
+
     mailbox.deliver("test-key", "test-value".getBytes(StandardCharsets.UTF_8));
 
-    verify(map)
-        .put(
-            "test-key",
-            "test-value".getBytes(StandardCharsets.UTF_8),
-            Duration.ofMinutes(5).toMillis(),
-            TimeUnit.MILLISECONDS);
+    verify(map).replace("test-key", "test-value".getBytes(StandardCharsets.UTF_8));
   }
 
   @Test
@@ -69,8 +65,15 @@ class HazelcastMailboxTest {
   }
 
   @Test
-  void getReturnsEmptyWhenAbsent() {
+  void getThrowsWhenAbsent() {
     when(map.get("test-key")).thenReturn(null);
+
+    assertThrows(MailboxExpiredException.class, () -> mailbox.get("test-key"));
+  }
+
+  @Test
+  void getReturnsEmptyWhenCreatedButNotDelivered() {
+    when(map.get("test-key")).thenReturn(new byte[0]);
 
     Optional<byte[]> result = mailbox.get("test-key");
 

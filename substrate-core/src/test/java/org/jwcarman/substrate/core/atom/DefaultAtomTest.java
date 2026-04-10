@@ -32,7 +32,7 @@ import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.atom.AtomExpiredException;
 import org.jwcarman.substrate.atom.Snapshot;
 import org.jwcarman.substrate.core.memory.atom.InMemoryAtomSpi;
-import org.jwcarman.substrate.memory.InMemoryNotifier;
+import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 
 class DefaultAtomTest {
 
@@ -65,7 +65,7 @@ class DefaultAtomTest {
     String token = DefaultAtom.token(bytes);
     spi.create(KEY, bytes, token, TTL);
 
-    atom = new DefaultAtom<>(spi, KEY, STRING_CODEC, notifier);
+    atom = new DefaultAtom<>(spi, KEY, STRING_CODEC, notifier, Duration.ofHours(24));
   }
 
   @Test
@@ -266,5 +266,23 @@ class DefaultAtomTest {
 
     Snapshot<String> after = atom.get();
     assertThat(after.token()).isEqualTo(before.token());
+  }
+
+  @Test
+  void setThrowsWhenTtlExceedsMaxTtl() {
+    Duration excessive = Duration.ofHours(25);
+
+    assertThatThrownBy(() -> atom.set("value", excessive))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("exceeds configured maximum");
+  }
+
+  @Test
+  void touchThrowsWhenTtlExceedsMaxTtl() {
+    Duration excessive = Duration.ofHours(25);
+
+    assertThatThrownBy(() -> atom.touch(excessive))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("exceeds configured maximum");
   }
 }

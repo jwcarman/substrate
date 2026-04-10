@@ -25,9 +25,9 @@ import static org.mockito.Mockito.when;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.memory.InMemoryNotifier;
-import org.jwcarman.substrate.spi.Notifier;
+import org.jwcarman.substrate.core.autoconfigure.SubstrateAutoConfiguration;
+import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
+import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.springframework.amqp.rabbit.connection.Connection;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -46,7 +46,7 @@ class RabbitMqNotifierAutoConfigurationTest {
         .run(
             context -> {
               assertThat(context).hasSingleBean(RabbitMqNotifier.class);
-              assertThat(context).hasSingleBean(Notifier.class);
+              assertThat(context).hasSingleBean(NotifierSpi.class);
             });
   }
 
@@ -59,8 +59,8 @@ class RabbitMqNotifierAutoConfigurationTest {
         .withUserConfiguration(MockRabbitMqConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(Notifier.class);
-              assertThat(context.getBean(Notifier.class)).isInstanceOf(RabbitMqNotifier.class);
+              assertThat(context).hasSingleBean(NotifierSpi.class);
+              assertThat(context.getBean(NotifierSpi.class)).isInstanceOf(RabbitMqNotifier.class);
               assertThat(context).doesNotHaveBean(InMemoryNotifier.class);
             });
   }

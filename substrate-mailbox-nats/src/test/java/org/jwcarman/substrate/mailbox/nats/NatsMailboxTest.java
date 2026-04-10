@@ -17,6 +17,7 @@ package org.jwcarman.substrate.mailbox.nats;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
@@ -38,6 +39,7 @@ import java.time.Duration;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -60,6 +62,8 @@ class NatsMailboxTest {
     wireConnectionForConstruction();
     var kv = mock(io.nats.client.KeyValue.class);
     when(connection.keyValue("substrate-mailbox")).thenReturn(kv);
+    KeyValueEntry entry = mock(KeyValueEntry.class);
+    when(kv.get(anyString())).thenReturn(entry);
 
     NatsMailboxSpi mailbox = createMailbox();
     mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8));
@@ -84,12 +88,26 @@ class NatsMailboxTest {
   }
 
   @Test
-  void getReturnsEmptyWhenAbsent() throws Exception {
+  void getThrowsWhenAbsent() throws Exception {
     wireConnectionForConstruction();
     var kv = mock(io.nats.client.KeyValue.class);
     when(connection.keyValue("substrate-mailbox")).thenReturn(kv);
 
     when(kv.get(anyString())).thenReturn(null);
+
+    NatsMailboxSpi mailbox = createMailbox();
+    assertThrows(MailboxExpiredException.class, () -> mailbox.get("substrate:mailbox:test"));
+  }
+
+  @Test
+  void getReturnsEmptyWhenCreatedButNotDelivered() throws Exception {
+    wireConnectionForConstruction();
+    var kv = mock(io.nats.client.KeyValue.class);
+    when(connection.keyValue("substrate-mailbox")).thenReturn(kv);
+
+    KeyValueEntry entry = mock(KeyValueEntry.class);
+    when(entry.getValue()).thenReturn(new byte[0]);
+    when(kv.get(anyString())).thenReturn(entry);
 
     NatsMailboxSpi mailbox = createMailbox();
     Optional<byte[]> result = mailbox.get("substrate:mailbox:test");
@@ -102,6 +120,8 @@ class NatsMailboxTest {
     wireConnectionForConstruction();
     var kv = mock(io.nats.client.KeyValue.class);
     when(connection.keyValue("substrate-mailbox")).thenReturn(kv);
+    KeyValueEntry entry = mock(KeyValueEntry.class);
+    when(kv.get(anyString())).thenReturn(entry);
     when(kv.put(anyString(), any(byte[].class))).thenThrow(new IOException("write failed"));
 
     NatsMailboxSpi mailbox = createMailbox();
@@ -117,6 +137,8 @@ class NatsMailboxTest {
     JetStreamApiException apiException = mockApiException();
     var kv = mock(io.nats.client.KeyValue.class);
     when(connection.keyValue("substrate-mailbox")).thenReturn(kv);
+    KeyValueEntry entry = mock(KeyValueEntry.class);
+    when(kv.get(anyString())).thenReturn(entry);
     when(kv.put(anyString(), any(byte[].class))).thenThrow(apiException);
 
     NatsMailboxSpi mailbox = createMailbox();

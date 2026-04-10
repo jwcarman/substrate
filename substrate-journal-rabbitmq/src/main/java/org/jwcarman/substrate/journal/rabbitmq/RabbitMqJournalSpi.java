@@ -34,8 +34,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import org.jwcarman.substrate.spi.AbstractJournalSpi;
-import org.jwcarman.substrate.spi.RawJournalEntry;
+import org.jwcarman.substrate.core.journal.AbstractJournalSpi;
+import org.jwcarman.substrate.core.journal.RawJournalEntry;
 
 public class RabbitMqJournalSpi extends AbstractJournalSpi implements AutoCloseable {
 
@@ -57,11 +57,6 @@ public class RabbitMqJournalSpi extends AbstractJournalSpi implements AutoClosea
     this.environment = environment;
     this.maxAge = maxAge;
     this.maxLengthBytes = maxLengthBytes;
-  }
-
-  @Override
-  public String append(String key, byte[] data) {
-    return append(key, data, null);
   }
 
   @Override

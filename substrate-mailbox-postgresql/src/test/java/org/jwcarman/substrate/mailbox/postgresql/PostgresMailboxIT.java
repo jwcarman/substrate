@@ -16,12 +16,15 @@
 package org.jwcarman.substrate.mailbox.postgresql;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Optional;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
@@ -56,6 +59,7 @@ class PostgresMailboxIT {
   @Test
   void deliverThenGetReturnsValue() {
     String key = mailbox.mailboxKey("deliver-first");
+    mailbox.create(key, Duration.ofMinutes(5));
     mailbox.deliver(key, "hello".getBytes(StandardCharsets.UTF_8));
 
     Optional<byte[]> result = mailbox.get(key);
@@ -64,8 +68,16 @@ class PostgresMailboxIT {
   }
 
   @Test
-  void getReturnsEmptyWhenNotDelivered() {
+  void getThrowsWhenMailboxDoesNotExist() {
     String key = mailbox.mailboxKey("never-delivered");
+
+    assertThrows(MailboxExpiredException.class, () -> mailbox.get(key));
+  }
+
+  @Test
+  void getReturnsEmptyWhenCreatedButNotDelivered() {
+    String key = mailbox.mailboxKey("created-not-delivered");
+    mailbox.create(key, Duration.ofMinutes(5));
 
     Optional<byte[]> result = mailbox.get(key);
 
@@ -75,11 +87,11 @@ class PostgresMailboxIT {
   @Test
   void deleteRemovesValue() {
     String key = mailbox.mailboxKey("delete-test");
+    mailbox.create(key, Duration.ofMinutes(5));
     mailbox.deliver(key, "to-delete".getBytes(StandardCharsets.UTF_8));
     mailbox.delete(key);
 
-    Optional<byte[]> result = mailbox.get(key);
-    assertThat(result).isEmpty();
+    assertThrows(MailboxExpiredException.class, () -> mailbox.get(key));
 
     Integer count =
         jdbcTemplate.queryForObject(

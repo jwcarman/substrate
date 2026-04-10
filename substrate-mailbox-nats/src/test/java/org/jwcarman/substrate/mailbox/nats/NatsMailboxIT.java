@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.mailbox.nats;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.nats.client.Connection;
 import io.nats.client.Nats;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -68,6 +70,7 @@ class NatsMailboxIT {
   void deliverThenGetReturnsValue() {
     String key = mailbox.mailboxKey("test-" + System.nanoTime());
 
+    mailbox.create(key, Duration.ofMinutes(5));
     mailbox.deliver(key, "hello".getBytes(StandardCharsets.UTF_8));
 
     Optional<byte[]> result = mailbox.get(key);
@@ -76,8 +79,16 @@ class NatsMailboxIT {
   }
 
   @Test
-  void getReturnsEmptyWhenNotDelivered() {
+  void getThrowsWhenMailboxDoesNotExist() {
     String key = mailbox.mailboxKey("absent-" + System.nanoTime());
+
+    assertThrows(MailboxExpiredException.class, () -> mailbox.get(key));
+  }
+
+  @Test
+  void getReturnsEmptyWhenCreatedButNotDelivered() {
+    String key = mailbox.mailboxKey("created-" + System.nanoTime());
+    mailbox.create(key, Duration.ofMinutes(5));
 
     Optional<byte[]> result = mailbox.get(key);
 
@@ -88,11 +99,11 @@ class NatsMailboxIT {
   void deleteRemovesValue() {
     String key = mailbox.mailboxKey("delete-" + System.nanoTime());
 
+    mailbox.create(key, Duration.ofMinutes(5));
     mailbox.deliver(key, "to-delete".getBytes(StandardCharsets.UTF_8));
     mailbox.delete(key);
 
-    Optional<byte[]> result = mailbox.get(key);
-    assertThat(result).isEmpty();
+    assertThrows(MailboxExpiredException.class, () -> mailbox.get(key));
   }
 
   @Test

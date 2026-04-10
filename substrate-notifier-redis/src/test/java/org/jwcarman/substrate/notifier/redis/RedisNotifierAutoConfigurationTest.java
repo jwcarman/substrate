@@ -26,9 +26,9 @@ import io.lettuce.core.codec.StringCodec;
 import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
 import io.lettuce.core.pubsub.api.sync.RedisPubSubCommands;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.memory.InMemoryNotifier;
-import org.jwcarman.substrate.spi.Notifier;
+import org.jwcarman.substrate.core.autoconfigure.SubstrateAutoConfiguration;
+import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
+import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -63,7 +63,7 @@ class RedisNotifierAutoConfigurationTest {
         .run(
             context -> {
               assertThat(context).hasSingleBean(RedisNotifier.class);
-              assertThat(context).hasSingleBean(Notifier.class);
+              assertThat(context).hasSingleBean(NotifierSpi.class);
             });
   }
 
@@ -76,8 +76,8 @@ class RedisNotifierAutoConfigurationTest {
         .withUserConfiguration(MockRedisConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(Notifier.class);
-              assertThat(context.getBean(Notifier.class)).isInstanceOf(RedisNotifier.class);
+              assertThat(context).hasSingleBean(NotifierSpi.class);
+              assertThat(context.getBean(NotifierSpi.class)).isInstanceOf(RedisNotifier.class);
               assertThat(context).doesNotHaveBean(InMemoryNotifier.class);
             });
   }

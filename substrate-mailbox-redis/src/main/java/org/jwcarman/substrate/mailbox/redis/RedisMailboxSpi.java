@@ -20,33 +20,45 @@ import io.lettuce.core.api.sync.RedisCommands;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Optional;
-import org.jwcarman.substrate.spi.AbstractMailboxSpi;
+import org.jwcarman.substrate.core.mailbox.AbstractMailboxSpi;
+import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 
 public class RedisMailboxSpi extends AbstractMailboxSpi {
 
-  private final RedisCommands<String, String> commands;
-  private final Duration defaultTtl;
+  private static final String CREATED_MARKER = "";
 
-  public RedisMailboxSpi(
-      RedisCommands<String, String> commands, String prefix, Duration defaultTtl) {
+  private final RedisCommands<String, String> commands;
+
+  public RedisMailboxSpi(RedisCommands<String, String> commands, String prefix) {
     super(prefix);
     this.commands = commands;
-    this.defaultTtl = defaultTtl;
+  }
+
+  @Override
+  public void create(String key, Duration ttl) {
+    commands.set(key, CREATED_MARKER, SetArgs.Builder.ex(ttl.toSeconds()));
   }
 
   @Override
   public void deliver(String key, byte[] value) {
-    SetArgs setArgs = SetArgs.Builder.ex(defaultTtl.toSeconds());
-    commands.set(key, Base64.getEncoder().encodeToString(value), setArgs);
+    String result =
+        commands.set(
+            key, Base64.getEncoder().encodeToString(value), SetArgs.Builder.keepttl().xx());
+    if (result == null) {
+      throw new MailboxExpiredException(key);
+    }
   }
 
   @Override
   public Optional<byte[]> get(String key) {
     String encoded = commands.get(key);
-    if (encoded != null) {
-      return Optional.of(Base64.getDecoder().decode(encoded));
+    if (encoded == null) {
+      throw new MailboxExpiredException(key);
     }
-    return Optional.empty();
+    if (encoded.isEmpty()) {
+      return Optional.empty();
+    }
+    return Optional.of(Base64.getDecoder().decode(encoded));
   }
 
   @Override

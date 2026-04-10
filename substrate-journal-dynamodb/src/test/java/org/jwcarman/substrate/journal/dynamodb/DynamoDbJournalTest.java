@@ -52,7 +52,8 @@ class DynamoDbJournalSpiTest {
 
   @Test
   void appendPutsItemWithCorrectFields() {
-    journal.append("substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8));
+    journal.append(
+        "substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     ArgumentCaptor<PutItemRequest> captor = ArgumentCaptor.forClass(PutItemRequest.class);
     verify(client).putItem(captor.capture());
@@ -72,7 +73,11 @@ class DynamoDbJournalSpiTest {
 
   @Test
   void appendReturnsUuidV7Id() {
-    String id = journal.append("substrate:journal:test", "hello".getBytes(StandardCharsets.UTF_8));
+    String id =
+        journal.append(
+            "substrate:journal:test",
+            "hello".getBytes(StandardCharsets.UTF_8),
+            Duration.ofHours(1));
     assertThat(id).matches("[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}");
   }
 
@@ -80,7 +85,8 @@ class DynamoDbJournalSpiTest {
   void appendWithNullTtlOmitsTtlField() {
     DynamoDbJournalSpi noTtlJournal =
         new DynamoDbJournalSpi(client, "substrate:journal:", "substrate_journal", Duration.ZERO);
-    noTtlJournal.append("substrate:journal:test", "data".getBytes(StandardCharsets.UTF_8));
+    noTtlJournal.append(
+        "substrate:journal:test", "data".getBytes(StandardCharsets.UTF_8), Duration.ZERO);
 
     ArgumentCaptor<PutItemRequest> captor = ArgumentCaptor.forClass(PutItemRequest.class);
     verify(client).putItem(captor.capture());
