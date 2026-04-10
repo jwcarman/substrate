@@ -20,7 +20,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "substrate.postgresql")
 public record PostgresProperties(
-    JournalProperties journal, MailboxProperties mailbox, NotifierProperties notifier) {
+    AtomProperties atom,
+    JournalProperties journal,
+    MailboxProperties mailbox,
+    NotifierProperties notifier) {
+  public record AtomProperties(boolean enabled, String prefix, boolean autoCreateSchema) {}
+
   public record JournalProperties(
       boolean enabled, String prefix, long maxLen, boolean autoCreateSchema) {}
 

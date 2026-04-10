@@ -20,6 +20,8 @@ import static org.mockito.Mockito.mock;
 
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.substrate.postgresql.atom.PostgresAtomAutoConfiguration;
+import org.jwcarman.substrate.postgresql.atom.PostgresAtomSpi;
 import org.jwcarman.substrate.postgresql.journal.PostgresJournalAutoConfiguration;
 import org.jwcarman.substrate.postgresql.journal.PostgresJournalSpi;
 import org.jwcarman.substrate.postgresql.mailbox.PostgresMailboxAutoConfiguration;
@@ -32,6 +34,17 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 class PostgresDisablePropertyTest {
+
+  @Test
+  void atomDisabledDoesNotCreateBean() {
+    new ApplicationContextRunner()
+        .withConfiguration(
+            AutoConfigurations.of(
+                PostgresAutoConfiguration.class, PostgresAtomAutoConfiguration.class))
+        .withPropertyValues("substrate.postgresql.atom.enabled=false")
+        .withUserConfiguration(MockDataSourceConfiguration.class)
+        .run(context -> assertThat(context).doesNotHaveBean(PostgresAtomSpi.class));
+  }
 
   @Test
   void journalDisabledDoesNotCreateBean() {
