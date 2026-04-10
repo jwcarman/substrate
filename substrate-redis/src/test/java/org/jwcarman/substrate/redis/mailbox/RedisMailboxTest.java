@@ -22,7 +22,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.lettuce.core.SetArgs;
+import io.lettuce.core.ScriptOutputType;
 import io.lettuce.core.api.sync.RedisCommands;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -31,6 +31,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
+import org.jwcarman.substrate.mailbox.MailboxFullException;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -47,20 +48,35 @@ class RedisMailboxTest {
   }
 
   @Test
-  void deliverSetsValueWithKeepTtl() {
-    when(commands.set(
-            eq("substrate:mailbox:test"),
-            eq(Base64.getEncoder().encodeToString("hello".getBytes(StandardCharsets.UTF_8))),
-            any(SetArgs.class)))
-        .thenReturn("OK");
+  void deliverUsesLuaScript() {
+    when(commands.eval(
+            any(String.class),
+            eq(ScriptOutputType.INTEGER),
+            any(String[].class),
+            eq(Base64.getEncoder().encodeToString("hello".getBytes(StandardCharsets.UTF_8)))))
+        .thenReturn(1L);
 
     mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8));
+  }
 
-    verify(commands)
-        .set(
-            eq("substrate:mailbox:test"),
-            eq(Base64.getEncoder().encodeToString("hello".getBytes(StandardCharsets.UTF_8))),
-            any(SetArgs.class));
+  @Test
+  void deliverThrowsExpiredWhenKeyMissing() {
+    when(commands.eval(any(String.class), eq(ScriptOutputType.INTEGER), any(String[].class), any()))
+        .thenReturn(0L);
+
+    assertThrows(
+        MailboxExpiredException.class,
+        () -> mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8)));
+  }
+
+  @Test
+  void deliverThrowsFullWhenAlreadyDelivered() {
+    when(commands.eval(any(String.class), eq(ScriptOutputType.INTEGER), any(String[].class), any()))
+        .thenReturn(-1L);
+
+    assertThrows(
+        MailboxFullException.class,
+        () -> mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8)));
   }
 
   @Test

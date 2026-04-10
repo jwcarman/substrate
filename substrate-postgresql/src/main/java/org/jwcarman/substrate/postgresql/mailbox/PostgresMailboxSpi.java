@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.jwcarman.substrate.core.mailbox.AbstractMailboxSpi;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
+import org.jwcarman.substrate.mailbox.MailboxFullException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 public class PostgresMailboxSpi extends AbstractMailboxSpi {
@@ -48,10 +49,17 @@ public class PostgresMailboxSpi extends AbstractMailboxSpi {
   public void deliver(String key, byte[] value) {
     int updated =
         jdbcTemplate.update(
-            "UPDATE substrate_mailbox SET value = ? WHERE key = ? AND expires_at > NOW()",
+            "UPDATE substrate_mailbox SET value = ? WHERE key = ? AND expires_at > NOW()"
+                + " AND value IS NULL",
             value,
             key);
     if (updated == 0) {
+      List<Map<String, Object>> rows =
+          jdbcTemplate.queryForList(
+              "SELECT 1 FROM substrate_mailbox WHERE key = ? AND expires_at > NOW()", key);
+      if (!rows.isEmpty()) {
+        throw new MailboxFullException(key);
+      }
       throw new MailboxExpiredException(key);
     }
   }

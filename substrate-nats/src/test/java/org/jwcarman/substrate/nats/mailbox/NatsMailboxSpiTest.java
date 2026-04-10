@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -40,6 +41,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
+import org.jwcarman.substrate.mailbox.MailboxFullException;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -58,17 +60,34 @@ class NatsMailboxSpiTest {
   }
 
   @Test
-  void deliverPutsValue() throws Exception {
+  void deliverUpdatesWithRevision() throws Exception {
     wireConnectionForConstruction();
     var kv = mock(io.nats.client.KeyValue.class);
     when(connection.keyValue("substrate-mailbox")).thenReturn(kv);
     KeyValueEntry entry = mock(KeyValueEntry.class);
+    when(entry.getValue()).thenReturn(new byte[] {0});
+    when(entry.getRevision()).thenReturn(1L);
     when(kv.get(anyString())).thenReturn(entry);
 
     NatsMailboxSpi mailbox = createMailbox();
     mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8));
 
-    verify(kv).put(anyString(), any(byte[].class));
+    verify(kv).update(anyString(), any(byte[].class), anyLong());
+  }
+
+  @Test
+  void deliverThrowsFullWhenAlreadyDelivered() throws Exception {
+    wireConnectionForConstruction();
+    var kv = mock(io.nats.client.KeyValue.class);
+    when(connection.keyValue("substrate-mailbox")).thenReturn(kv);
+    KeyValueEntry entry = mock(KeyValueEntry.class);
+    when(entry.getValue()).thenReturn("existing".getBytes(StandardCharsets.UTF_8));
+    when(kv.get(anyString())).thenReturn(entry);
+
+    NatsMailboxSpi mailbox = createMailbox();
+    assertThrows(
+        MailboxFullException.class,
+        () -> mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8)));
   }
 
   @Test
@@ -106,7 +125,7 @@ class NatsMailboxSpiTest {
     when(connection.keyValue("substrate-mailbox")).thenReturn(kv);
 
     KeyValueEntry entry = mock(KeyValueEntry.class);
-    when(entry.getValue()).thenReturn(new byte[0]);
+    when(entry.getValue()).thenReturn(new byte[] {0});
     when(kv.get(anyString())).thenReturn(entry);
 
     NatsMailboxSpi mailbox = createMailbox();
@@ -121,8 +140,11 @@ class NatsMailboxSpiTest {
     var kv = mock(io.nats.client.KeyValue.class);
     when(connection.keyValue("substrate-mailbox")).thenReturn(kv);
     KeyValueEntry entry = mock(KeyValueEntry.class);
+    when(entry.getValue()).thenReturn(new byte[] {0});
+    when(entry.getRevision()).thenReturn(1L);
     when(kv.get(anyString())).thenReturn(entry);
-    when(kv.put(anyString(), any(byte[].class))).thenThrow(new IOException("write failed"));
+    when(kv.update(anyString(), any(byte[].class), anyLong()))
+        .thenThrow(new IOException("write failed"));
 
     NatsMailboxSpi mailbox = createMailbox();
     byte[] data = "hello".getBytes(StandardCharsets.UTF_8);
@@ -132,20 +154,21 @@ class NatsMailboxSpiTest {
   }
 
   @Test
-  void deliverThrowsIllegalStateExceptionOnJetStreamApiError() throws Exception {
+  void deliverThrowsMailboxFullOnJetStreamApiRevisionMismatch() throws Exception {
     wireConnectionForConstruction();
     JetStreamApiException apiException = mockApiException();
     var kv = mock(io.nats.client.KeyValue.class);
     when(connection.keyValue("substrate-mailbox")).thenReturn(kv);
     KeyValueEntry entry = mock(KeyValueEntry.class);
+    when(entry.getValue()).thenReturn(new byte[] {0});
+    when(entry.getRevision()).thenReturn(1L);
     when(kv.get(anyString())).thenReturn(entry);
-    when(kv.put(anyString(), any(byte[].class))).thenThrow(apiException);
+    when(kv.update(anyString(), any(byte[].class), anyLong())).thenThrow(apiException);
 
     NatsMailboxSpi mailbox = createMailbox();
     byte[] data = "hello".getBytes(StandardCharsets.UTF_8);
     assertThatThrownBy(() -> mailbox.deliver("substrate:mailbox:test", data))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("Failed to deliver to NATS KV");
+        .isInstanceOf(MailboxFullException.class);
   }
 
   @Test

@@ -15,6 +15,7 @@
  */
 package org.jwcarman.substrate.redis.mailbox;
 
+import io.lettuce.core.ScriptOutputType;
 import io.lettuce.core.SetArgs;
 import io.lettuce.core.api.sync.RedisCommands;
 import java.time.Duration;
@@ -22,6 +23,7 @@ import java.util.Base64;
 import java.util.Optional;
 import org.jwcarman.substrate.core.mailbox.AbstractMailboxSpi;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
+import org.jwcarman.substrate.mailbox.MailboxFullException;
 
 public class RedisMailboxSpi extends AbstractMailboxSpi {
 
@@ -39,13 +41,25 @@ public class RedisMailboxSpi extends AbstractMailboxSpi {
     commands.set(key, CREATED_MARKER, SetArgs.Builder.ex(ttl.toSeconds()));
   }
 
+  private static final String DELIVER_SCRIPT =
+      "local cur = redis.call('GET', KEYS[1]) "
+          + "if cur == false then return 0 "
+          + "elseif cur ~= '' then return -1 "
+          + "else redis.call('SET', KEYS[1], ARGV[1], 'KEEPTTL') return 1 end";
+
   @Override
   public void deliver(String key, byte[] value) {
-    String result =
-        commands.set(
-            key, Base64.getEncoder().encodeToString(value), SetArgs.Builder.keepttl().xx());
-    if (result == null) {
+    Long result =
+        commands.eval(
+            DELIVER_SCRIPT,
+            ScriptOutputType.INTEGER,
+            new String[] {key},
+            Base64.getEncoder().encodeToString(value));
+    if (result == 0) {
       throw new MailboxExpiredException(key);
+    }
+    if (result == -1) {
+      throw new MailboxFullException(key);
     }
   }
 

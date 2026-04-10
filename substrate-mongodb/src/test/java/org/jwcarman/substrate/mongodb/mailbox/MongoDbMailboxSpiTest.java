@@ -30,6 +30,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
+import org.jwcarman.substrate.mailbox.MailboxFullException;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -63,6 +64,32 @@ class MongoDbMailboxSpiTest {
     mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8));
 
     verify(mongoTemplate).updateFirst(any(Query.class), any(Update.class), eq("substrate_mailbox"));
+  }
+
+  @Test
+  void deliverThrowsExpiredWhenMailboxMissing() {
+    com.mongodb.client.result.UpdateResult noMatch =
+        com.mongodb.client.result.UpdateResult.acknowledged(0, 0L, null);
+    when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq("substrate_mailbox")))
+        .thenReturn(noMatch);
+    when(mongoTemplate.exists(any(Query.class), eq("substrate_mailbox"))).thenReturn(false);
+
+    assertThrows(
+        MailboxExpiredException.class,
+        () -> mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8)));
+  }
+
+  @Test
+  void deliverThrowsFullWhenAlreadyDelivered() {
+    com.mongodb.client.result.UpdateResult noMatch =
+        com.mongodb.client.result.UpdateResult.acknowledged(0, 0L, null);
+    when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq("substrate_mailbox")))
+        .thenReturn(noMatch);
+    when(mongoTemplate.exists(any(Query.class), eq("substrate_mailbox"))).thenReturn(true);
+
+    assertThrows(
+        MailboxFullException.class,
+        () -> mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8)));
   }
 
   @Test

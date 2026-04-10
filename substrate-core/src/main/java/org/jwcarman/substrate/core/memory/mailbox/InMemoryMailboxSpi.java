@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.jwcarman.substrate.core.mailbox.AbstractMailboxSpi;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
+import org.jwcarman.substrate.mailbox.MailboxFullException;
 
 public class InMemoryMailboxSpi extends AbstractMailboxSpi {
 
@@ -45,18 +46,17 @@ public class InMemoryMailboxSpi extends AbstractMailboxSpi {
   @Override
   public void deliver(String key, byte[] value) {
     Instant now = Instant.now();
-    Entry updated =
-        store.compute(
-            key,
-            (k, existing) -> {
-              if (existing == null || !existing.isAlive(now)) {
-                return null;
-              }
-              return new Entry(Optional.of(value), existing.expiresAt());
-            });
-    if (updated == null) {
-      throw new MailboxExpiredException(key);
-    }
+    store.compute(
+        key,
+        (k, existing) -> {
+          if (existing == null || !existing.isAlive(now)) {
+            throw new MailboxExpiredException(key);
+          }
+          if (existing.value().isPresent()) {
+            throw new MailboxFullException(key);
+          }
+          return new Entry(Optional.of(value), existing.expiresAt());
+        });
   }
 
   @Override

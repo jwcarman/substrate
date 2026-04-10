@@ -25,10 +25,11 @@ import java.time.Duration;
 import java.util.Optional;
 import org.jwcarman.substrate.core.mailbox.AbstractMailboxSpi;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
+import org.jwcarman.substrate.mailbox.MailboxFullException;
 
 public class NatsMailboxSpi extends AbstractMailboxSpi {
 
-  private static final byte[] CREATED_MARKER = new byte[0];
+  private static final byte[] CREATED_MARKER = new byte[] {0};
 
   private final Connection connection;
   private final String bucketName;
@@ -63,11 +64,15 @@ public class NatsMailboxSpi extends AbstractMailboxSpi {
       if (entry == null) {
         throw new MailboxExpiredException(key);
       }
-      kv.put(toKvKey(key), value);
+      if (entry.getValue() != null && !java.util.Arrays.equals(entry.getValue(), CREATED_MARKER)) {
+        throw new MailboxFullException(key);
+      }
+      kv.update(toKvKey(key), value, entry.getRevision());
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to deliver to NATS KV", e);
     } catch (JetStreamApiException e) {
-      throw new IllegalStateException("Failed to deliver to NATS KV", e);
+      // Revision mismatch means another thread delivered concurrently
+      throw new MailboxFullException(key);
     }
   }
 
@@ -79,7 +84,7 @@ public class NatsMailboxSpi extends AbstractMailboxSpi {
       if (entry == null || entry.getValue() == null) {
         throw new MailboxExpiredException(key);
       }
-      if (entry.getValue().length == 0) {
+      if (java.util.Arrays.equals(entry.getValue(), CREATED_MARKER)) {
         return Optional.empty();
       }
       return Optional.of(entry.getValue());

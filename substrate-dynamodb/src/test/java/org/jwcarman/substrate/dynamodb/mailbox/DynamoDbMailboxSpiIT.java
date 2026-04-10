@@ -21,10 +21,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.dynamodb.AbstractDynamoDbIT;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
+import org.jwcarman.substrate.mailbox.MailboxFullException;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.DeleteTableRequest;
 import software.amazon.awssdk.services.dynamodb.model.ResourceNotFoundException;
@@ -90,5 +93,67 @@ class DynamoDbMailboxSpiIT extends AbstractDynamoDbIT {
   @Test
   void mailboxKeyUsesConfiguredPrefix() {
     assertThat(mailbox.mailboxKey("my-box")).isEqualTo("substrate:mailbox:my-box");
+  }
+
+  @Test
+  void secondDeliveryThrowsMailboxFullException() {
+    String key = mailbox.mailboxKey("double-" + System.nanoTime());
+    mailbox.create(key, Duration.ofMinutes(5));
+    mailbox.deliver(key, "first".getBytes(StandardCharsets.UTF_8));
+
+    assertThrows(
+        MailboxFullException.class,
+        () -> mailbox.deliver(key, "second".getBytes(StandardCharsets.UTF_8)));
+  }
+
+  @Test
+  void originalValueSurvivesAfterMailboxFullException() {
+    String key = mailbox.mailboxKey("survive-" + System.nanoTime());
+    mailbox.create(key, Duration.ofMinutes(5));
+    mailbox.deliver(key, "original".getBytes(StandardCharsets.UTF_8));
+
+    assertThrows(
+        MailboxFullException.class,
+        () -> mailbox.deliver(key, "replacement".getBytes(StandardCharsets.UTF_8)));
+
+    assertThat(mailbox.get(key)).isPresent();
+    assertThat(new String(mailbox.get(key).get(), StandardCharsets.UTF_8)).isEqualTo("original");
+  }
+
+  @Test
+  void concurrentDeliveryExactlyOneSucceeds() {
+    String key = mailbox.mailboxKey("concurrent-" + System.nanoTime());
+    mailbox.create(key, Duration.ofMinutes(5));
+
+    int threadCount = 8;
+    AtomicInteger successes = new AtomicInteger();
+    AtomicInteger failures = new AtomicInteger();
+
+    IntStream.range(0, threadCount)
+        .mapToObj(
+            i ->
+                Thread.ofVirtual()
+                    .start(
+                        () -> {
+                          try {
+                            mailbox.deliver(key, ("payload-" + i).getBytes(StandardCharsets.UTF_8));
+                            successes.incrementAndGet();
+                          } catch (MailboxFullException _) {
+                            failures.incrementAndGet();
+                          }
+                        }))
+        .toList()
+        .forEach(
+            t -> {
+              try {
+                t.join();
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+              }
+            });
+
+    assertThat(successes.get()).isEqualTo(1);
+    assertThat(failures.get()).isEqualTo(threadCount - 1);
+    assertThat(mailbox.get(key)).isPresent();
   }
 }

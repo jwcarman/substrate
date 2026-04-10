@@ -25,10 +25,13 @@ import io.lettuce.core.codec.StringCodec;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
+import org.jwcarman.substrate.mailbox.MailboxFullException;
 import org.jwcarman.substrate.redis.AbstractRedisIT;
 
 class RedisMailboxIT extends AbstractRedisIT {
@@ -97,5 +100,66 @@ class RedisMailboxIT extends AbstractRedisIT {
   @Test
   void mailboxKeyUsesConfiguredPrefix() {
     assertThat(mailbox.mailboxKey("my-mailbox")).isEqualTo("substrate:mailbox:my-mailbox");
+  }
+
+  @Test
+  void secondDeliveryThrowsMailboxFullException() {
+    String key = mailbox.mailboxKey("double-deliver");
+    mailbox.create(key, Duration.ofMinutes(5));
+    mailbox.deliver(key, "first".getBytes(StandardCharsets.UTF_8));
+
+    assertThrows(
+        MailboxFullException.class,
+        () -> mailbox.deliver(key, "second".getBytes(StandardCharsets.UTF_8)));
+  }
+
+  @Test
+  void originalValueSurvivesAfterMailboxFullException() {
+    String key = mailbox.mailboxKey("survive-full");
+    mailbox.create(key, Duration.ofMinutes(5));
+    mailbox.deliver(key, "original".getBytes(StandardCharsets.UTF_8));
+
+    assertThrows(
+        MailboxFullException.class,
+        () -> mailbox.deliver(key, "replacement".getBytes(StandardCharsets.UTF_8)));
+
+    assertThat(mailbox.get(key)).contains("original".getBytes(StandardCharsets.UTF_8));
+  }
+
+  @Test
+  void concurrentDeliveryExactlyOneSucceeds() {
+    String key = mailbox.mailboxKey("concurrent");
+    mailbox.create(key, Duration.ofMinutes(5));
+
+    int threadCount = 8;
+    AtomicInteger successes = new AtomicInteger();
+    AtomicInteger failures = new AtomicInteger();
+
+    IntStream.range(0, threadCount)
+        .mapToObj(
+            i ->
+                Thread.ofVirtual()
+                    .start(
+                        () -> {
+                          try {
+                            mailbox.deliver(key, ("payload-" + i).getBytes(StandardCharsets.UTF_8));
+                            successes.incrementAndGet();
+                          } catch (MailboxFullException _) {
+                            failures.incrementAndGet();
+                          }
+                        }))
+        .toList()
+        .forEach(
+            t -> {
+              try {
+                t.join();
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+              }
+            });
+
+    assertThat(successes.get()).isEqualTo(1);
+    assertThat(failures.get()).isEqualTo(threadCount - 1);
+    assertThat(mailbox.get(key)).isPresent();
   }
 }

@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS substrate_mailbox (
     key         VARCHAR(512) PRIMARY KEY,
-    value       BYTEA NOT NULL,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    value       BYTEA,
+    expires_at  TIMESTAMPTZ NOT NULL
 );

@@ -28,16 +28,18 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
+import org.jwcarman.substrate.mailbox.MailboxFullException;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
 import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.GetItemResponse;
-import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 @ExtendWith(MockitoExtension.class)
 class DynamoDbMailboxSpiTest {
@@ -57,22 +59,42 @@ class DynamoDbMailboxSpiTest {
   }
 
   @Test
-  void deliverPutsItem() {
+  void deliverUsesConditionalUpdate() {
+    mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8));
+
+    ArgumentCaptor<UpdateItemRequest> captor = ArgumentCaptor.forClass(UpdateItemRequest.class);
+    verify(client).updateItem(captor.capture());
+
+    UpdateItemRequest request = captor.getValue();
+    assertThat(request.tableName()).isEqualTo("substrate_mailbox");
+    assertThat(request.conditionExpression())
+        .isEqualTo("attribute_exists(#k) AND attribute_not_exists(#v)");
+  }
+
+  @Test
+  void deliverThrowsExpiredWhenItemMissing() {
+    when(client.updateItem(any(UpdateItemRequest.class)))
+        .thenThrow(ConditionalCheckFailedException.builder().build());
+    when(client.getItem(any(GetItemRequest.class))).thenReturn(GetItemResponse.builder().build());
+
+    assertThrows(
+        MailboxExpiredException.class,
+        () -> mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8)));
+  }
+
+  @Test
+  void deliverThrowsFullWhenAlreadyDelivered() {
+    when(client.updateItem(any(UpdateItemRequest.class)))
+        .thenThrow(ConditionalCheckFailedException.builder().build());
     when(client.getItem(any(GetItemRequest.class)))
         .thenReturn(
             GetItemResponse.builder()
                 .item(Map.of("key", AttributeValue.builder().s("substrate:mailbox:test").build()))
                 .build());
 
-    mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8));
-
-    ArgumentCaptor<PutItemRequest> captor = ArgumentCaptor.forClass(PutItemRequest.class);
-    verify(client).putItem(captor.capture());
-
-    Map<String, AttributeValue> item = captor.getValue().item();
-    assertThat(item.get("key").s()).isEqualTo("substrate:mailbox:test");
-    assertThat(item.get("value").b().asByteArray())
-        .isEqualTo("hello".getBytes(StandardCharsets.UTF_8));
+    assertThrows(
+        MailboxFullException.class,
+        () -> mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8)));
   }
 
   @Test

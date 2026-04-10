@@ -15,24 +15,9 @@
  */
 package org.jwcarman.substrate.mailbox;
 
-import java.time.Duration;
-import java.util.Optional;
+public class MailboxFullException extends RuntimeException {
 
-public interface Mailbox<T> {
-
-  /**
-   * Deliver a value to this mailbox. A mailbox can receive exactly one delivery in its lifetime —
-   * once delivered, the value is observable via {@link #poll} until the mailbox's TTL elapses or
-   * {@link #delete} is called.
-   *
-   * @throws MailboxExpiredException if the mailbox has expired or been deleted
-   * @throws MailboxFullException if a delivery has already occurred
-   */
-  void deliver(T value);
-
-  Optional<T> poll(Duration timeout);
-
-  void delete();
-
-  String key();
+  public MailboxFullException(String key) {
+    super("Mailbox already has a delivered value: " + key);
+  }
 }

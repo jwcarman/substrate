@@ -22,6 +22,7 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import org.jwcarman.substrate.core.mailbox.AbstractMailboxSpi;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
+import org.jwcarman.substrate.mailbox.MailboxFullException;
 
 public class HazelcastMailboxSpi extends AbstractMailboxSpi {
 
@@ -41,8 +42,10 @@ public class HazelcastMailboxSpi extends AbstractMailboxSpi {
 
   @Override
   public void deliver(String key, byte[] value) {
-    byte[] existing = map.replace(key, value);
-    if (existing == null) {
+    if (!map.replace(key, CREATED_MARKER, value)) {
+      if (map.containsKey(key)) {
+        throw new MailboxFullException(key);
+      }
       throw new MailboxExpiredException(key);
     }
   }

@@ -28,6 +28,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
+import org.jwcarman.substrate.mailbox.MailboxFullException;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -46,13 +47,35 @@ class HazelcastMailboxTest {
   }
 
   @Test
-  void deliverReplacesValueInMap() {
-    when(map.replace("test-key", "test-value".getBytes(StandardCharsets.UTF_8)))
-        .thenReturn(new byte[0]);
+  void deliverReplacesEmptyMarkerInMap() {
+    when(map.replace("test-key", new byte[0], "test-value".getBytes(StandardCharsets.UTF_8)))
+        .thenReturn(true);
 
     mailbox.deliver("test-key", "test-value".getBytes(StandardCharsets.UTF_8));
 
-    verify(map).replace("test-key", "test-value".getBytes(StandardCharsets.UTF_8));
+    verify(map).replace("test-key", new byte[0], "test-value".getBytes(StandardCharsets.UTF_8));
+  }
+
+  @Test
+  void deliverThrowsExpiredWhenKeyMissing() {
+    when(map.replace("test-key", new byte[0], "v".getBytes(StandardCharsets.UTF_8)))
+        .thenReturn(false);
+    when(map.containsKey("test-key")).thenReturn(false);
+
+    assertThrows(
+        MailboxExpiredException.class,
+        () -> mailbox.deliver("test-key", "v".getBytes(StandardCharsets.UTF_8)));
+  }
+
+  @Test
+  void deliverThrowsFullWhenAlreadyDelivered() {
+    when(map.replace("test-key", new byte[0], "v".getBytes(StandardCharsets.UTF_8)))
+        .thenReturn(false);
+    when(map.containsKey("test-key")).thenReturn(true);
+
+    assertThrows(
+        MailboxFullException.class,
+        () -> mailbox.deliver("test-key", "v".getBytes(StandardCharsets.UTF_8)));
   }
 
   @Test

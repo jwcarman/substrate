@@ -21,9 +21,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
+import org.jwcarman.substrate.mailbox.MailboxFullException;
 
 class InMemoryMailboxSpiTest {
 
@@ -96,5 +99,72 @@ class InMemoryMailboxSpiTest {
     await()
         .atMost(Duration.ofSeconds(2))
         .untilAsserted(() -> assertThrows(MailboxExpiredException.class, () -> mailbox.get(KEY)));
+  }
+
+  @Test
+  void secondDeliveryThrowsMailboxFullException() {
+    mailbox.create(KEY, Duration.ofMinutes(5));
+    mailbox.deliver(KEY, "first".getBytes(UTF_8));
+
+    assertThrows(MailboxFullException.class, () -> mailbox.deliver(KEY, "second".getBytes(UTF_8)));
+  }
+
+  @Test
+  void originalValueSurvivesAfterMailboxFullException() {
+    mailbox.create(KEY, Duration.ofMinutes(5));
+    mailbox.deliver(KEY, "original".getBytes(UTF_8));
+
+    assertThrows(
+        MailboxFullException.class, () -> mailbox.deliver(KEY, "replacement".getBytes(UTF_8)));
+
+    Optional<byte[]> result = mailbox.get(KEY);
+    assertTrue(result.isPresent());
+    assertArrayEquals("original".getBytes(UTF_8), result.get());
+  }
+
+  @Test
+  void deliverThrowsExpiredOnDeadMailboxNotFull() {
+    assertThrows(
+        MailboxExpiredException.class, () -> mailbox.deliver(KEY, "value".getBytes(UTF_8)));
+  }
+
+  @Test
+  void concurrentDeliveryExactlyOneSucceeds() {
+    mailbox.create(KEY, Duration.ofMinutes(5));
+
+    int threadCount = 8;
+    AtomicInteger successes = new AtomicInteger();
+    AtomicInteger failures = new AtomicInteger();
+
+    IntStream.range(0, threadCount)
+        .mapToObj(
+            i ->
+                Thread.ofVirtual()
+                    .start(
+                        () -> {
+                          try {
+                            mailbox.deliver(KEY, ("payload-" + i).getBytes(UTF_8));
+                            successes.incrementAndGet();
+                          } catch (MailboxFullException _) {
+                            failures.incrementAndGet();
+                          }
+                        }))
+        .toList()
+        .forEach(
+            t -> {
+              try {
+                t.join();
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+              }
+            });
+
+    assertEquals(1, successes.get());
+    assertEquals(threadCount - 1, failures.get());
+
+    Optional<byte[]> result = mailbox.get(KEY);
+    assertTrue(result.isPresent());
+    String value = new String(result.get(), UTF_8);
+    assertTrue(value.startsWith("payload-"));
   }
 }

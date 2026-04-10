@@ -29,6 +29,7 @@ import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.core.memory.mailbox.InMemoryMailboxSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
+import org.jwcarman.substrate.mailbox.MailboxFullException;
 
 class DefaultMailboxTest {
 
@@ -161,5 +162,31 @@ class DefaultMailboxTest {
 
     Optional<String> result = mailbox.poll(Duration.ofMillis(200));
     assertThat(result).isEmpty();
+  }
+
+  @Test
+  void secondDeliverThrowsMailboxFullException() {
+    mailbox.deliver("first");
+
+    assertThatThrownBy(() -> mailbox.deliver("second")).isInstanceOf(MailboxFullException.class);
+  }
+
+  @Test
+  void pollReturnsOriginalValueAfterMailboxFullException() {
+    mailbox.deliver("original");
+
+    assertThatThrownBy(() -> mailbox.deliver("replacement"))
+        .isInstanceOf(MailboxFullException.class);
+
+    Optional<String> result = mailbox.poll(Duration.ofSeconds(1));
+    assertThat(result).contains("original");
+  }
+
+  @Test
+  void deleteAfterDeliveryStillWorks() {
+    mailbox.deliver("value");
+    mailbox.delete();
+
+    assertThatThrownBy(() -> spi.get(KEY)).isInstanceOf(MailboxExpiredException.class);
   }
 }

@@ -26,6 +26,7 @@ import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.notifier.NotifierSubscription;
 import org.jwcarman.substrate.mailbox.Mailbox;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
+import org.jwcarman.substrate.mailbox.MailboxFullException;
 
 public class DefaultMailbox<T> implements Mailbox<T> {
 
@@ -83,7 +84,7 @@ public class DefaultMailbox<T> implements Mailbox<T> {
   public void deliver(T value) {
     try {
       mailboxSpi.deliver(key, codec.encode(value));
-    } catch (MailboxExpiredException e) {
+    } catch (MailboxExpiredException | MailboxFullException e) {
       throw e;
     }
     notifier.notify(key, "delivered");

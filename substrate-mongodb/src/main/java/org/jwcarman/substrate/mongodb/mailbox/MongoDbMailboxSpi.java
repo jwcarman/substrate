@@ -22,6 +22,7 @@ import org.bson.Document;
 import org.bson.types.Binary;
 import org.jwcarman.substrate.core.mailbox.AbstractMailboxSpi;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
+import org.jwcarman.substrate.mailbox.MailboxFullException;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.Index;
@@ -64,11 +65,22 @@ public class MongoDbMailboxSpi extends AbstractMailboxSpi {
   @Override
   public void deliver(String key, byte[] value) {
     Query query =
-        new Query(Criteria.where(FIELD_KEY).is(key).and(FIELD_EXPIRE_AT).gt(Instant.now()));
+        new Query(
+            Criteria.where(FIELD_KEY)
+                .is(key)
+                .and(FIELD_EXPIRE_AT)
+                .gt(Instant.now())
+                .and(FIELD_VALUE)
+                .exists(false));
     Update update = new Update().set(FIELD_VALUE, new Binary(value));
 
     var result = mongoTemplate.updateFirst(query, update, collectionName);
     if (result.getMatchedCount() == 0) {
+      Query aliveQuery =
+          new Query(Criteria.where(FIELD_KEY).is(key).and(FIELD_EXPIRE_AT).gt(Instant.now()));
+      if (mongoTemplate.exists(aliveQuery, collectionName)) {
+        throw new MailboxFullException(key);
+      }
       throw new MailboxExpiredException(key);
     }
   }

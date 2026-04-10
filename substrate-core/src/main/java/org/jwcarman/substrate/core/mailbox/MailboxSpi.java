@@ -17,11 +17,19 @@ package org.jwcarman.substrate.core.mailbox;
 
 import java.time.Duration;
 import java.util.Optional;
+import org.jwcarman.substrate.mailbox.MailboxExpiredException;
+import org.jwcarman.substrate.mailbox.MailboxFullException;
 
 public interface MailboxSpi {
 
   void create(String key, Duration ttl);
 
+  /**
+   * Deliver a value to a previously-created mailbox.
+   *
+   * @throws MailboxExpiredException if the mailbox no longer exists
+   * @throws MailboxFullException if the mailbox already has a value
+   */
   void deliver(String key, byte[] value);
 
   Optional<byte[]> get(String key);
