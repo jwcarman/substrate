@@ -144,7 +144,7 @@ class DefaultAtomFactoryTest {
           }
 
           @Override
-          public java.util.Optional<AtomRecord> read(String key) {
+          public java.util.Optional<RawAtom> read(String key) {
             throw new AssertionError("SPI should not be called during connect");
           }
 

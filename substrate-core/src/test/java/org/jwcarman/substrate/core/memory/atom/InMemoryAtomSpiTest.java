@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
-import org.jwcarman.substrate.core.atom.AtomRecord;
+import org.jwcarman.substrate.core.atom.RawAtom;
 
 class InMemoryAtomSpiTest {
 
@@ -43,7 +43,7 @@ class InMemoryAtomSpiTest {
   void createStoresAtom() {
     spi.create("key", new byte[] {1, 2, 3}, "token1", Duration.ofSeconds(10));
 
-    Optional<AtomRecord> record = spi.read("key");
+    Optional<RawAtom> record = spi.read("key");
     assertThat(record).isPresent();
     assertThat(record.get().token()).isEqualTo("token1");
     assertThat(record.get().value()).containsExactly(1, 2, 3);
@@ -127,7 +127,7 @@ class InMemoryAtomSpiTest {
     boolean result = spi.set("key", new byte[] {2}, "t2", Duration.ofSeconds(10));
 
     assertThat(result).isTrue();
-    AtomRecord record = spi.read("key").orElseThrow();
+    RawAtom record = spi.read("key").orElseThrow();
     assertThat(record.value()).containsExactly(2);
     assertThat(record.token()).isEqualTo("t2");
   }

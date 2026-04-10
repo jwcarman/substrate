@@ -15,4 +15,4 @@
  */
 package org.jwcarman.substrate.core.atom;
 
-public record AtomRecord(byte[] value, String token) {}
+public record RawAtom(byte[] value, String token) {}

@@ -22,7 +22,7 @@ public interface AtomSpi {
 
   void create(String key, byte[] value, String token, Duration ttl);
 
-  Optional<AtomRecord> read(String key);
+  Optional<RawAtom> read(String key);
 
   boolean set(String key, byte[] value, String token, Duration ttl);
 

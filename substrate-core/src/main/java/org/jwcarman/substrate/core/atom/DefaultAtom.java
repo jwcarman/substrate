@@ -67,7 +67,7 @@ public class DefaultAtom<T> implements Atom<T> {
 
   @Override
   public Snapshot<T> get() {
-    AtomRecord record = atomSpi.read(key).orElseThrow(() -> new AtomExpiredException(key));
+    RawAtom record = atomSpi.read(key).orElseThrow(() -> new AtomExpiredException(key));
     return new Snapshot<>(codec.decode(record.value()), record.token());
   }
 
@@ -85,7 +85,7 @@ public class DefaultAtom<T> implements Atom<T> {
       Instant deadline = Instant.now().plus(timeout);
 
       while (true) {
-        Optional<AtomRecord> record = atomSpi.read(key);
+        Optional<RawAtom> record = atomSpi.read(key);
         if (record.isEmpty()) {
           throw new AtomExpiredException(key);
         }

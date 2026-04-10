@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-10T19:31:38Z
-ITERATION: 23
-SPEC_COMPLETED: 022-sweep-spi-and-core-sweepers.md
-WHAT_WAS_DONE: Added sweep SPI method to all three primitives with no-op defaults in abstract bases, real implementations in all three in-memory SPIs, three sweeper classes (AtomSweeper, JournalSweeper, MailboxSweeper) with drain-loop/iteration-cap/error-swallowing, SweepProperties config record, and auto-configuration bean wiring with ConditionalOnBean/ConditionalOnProperty gates.
-VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify — BUILD SUCCESS (all 13 modules, 192 substrate-core tests pass including new sweep/sweeper tests, all backend ITs pass)
+LAST_RUN: 2026-04-10T19:35:00Z
+ITERATION: 24
+SPEC_COMPLETED: 023-rename-atomrecord-to-rawatom.md
+WHAT_WAS_DONE: Renamed AtomRecord to RawAtom across substrate-core for consistency with the existing RawJournalEntry naming convention — deleted AtomRecord.java, created RawAtom.java, updated all imports and type references in AtomSpi, DefaultAtom, InMemoryAtomSpi, InMemoryAtomSpiTest, and DefaultAtomFactoryTest.
+VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify — BUILD SUCCESS (all 13 modules, 192 substrate-core tests pass, all backend ITs pass); grep -r AtomRecord substrate-core/ — no matches
 STATUS: MORE_WORK
-NEXT_SPEC: 023-rename-atomrecord-to-rawatom.md
-NOTES: SweepProperties uses compact defaults (batchSize=1000, interval=1m, enabled=true). The SweepProperties record has a compact constructor that fills in defaults for null/zero fields, so partial property overrides (e.g. only setting interval) work correctly. Had to add sweep() method to anonymous AtomSpi in DefaultAtomFactoryTest and stub SPIs in SubstrateAutoConfigurationTest since they implement interfaces directly rather than extending abstract bases. InMemoryJournalSpi sweep iterates through all BoundedEntryLists via a new synchronized removeExpired method.
+NEXT_SPEC: 024-journal-lifecycle-and-mailbox-connect.md
+NOTES: Purely mechanical rename, no behavioral changes. The old AtomRecord.java file was deleted and replaced with RawAtom.java in the same package. No backend modules were affected since none have implemented AtomSpi yet.

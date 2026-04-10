@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
 import org.jwcarman.substrate.core.atom.AbstractAtomSpi;
-import org.jwcarman.substrate.core.atom.AtomRecord;
+import org.jwcarman.substrate.core.atom.RawAtom;
 
 public class InMemoryAtomSpi extends AbstractAtomSpi {
 
@@ -56,7 +56,7 @@ public class InMemoryAtomSpi extends AbstractAtomSpi {
   }
 
   @Override
-  public Optional<AtomRecord> read(String key) {
+  public Optional<RawAtom> read(String key) {
     Entry entry = store.get(key);
     if (entry == null) {
       return Optional.empty();
@@ -65,7 +65,7 @@ public class InMemoryAtomSpi extends AbstractAtomSpi {
       store.remove(key, entry);
       return Optional.empty();
     }
-    return Optional.of(new AtomRecord(entry.value(), entry.token()));
+    return Optional.of(new RawAtom(entry.value(), entry.token()));
   }
 
   @Override
