@@ -23,6 +23,8 @@ import static org.mockito.Mockito.when;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.substrate.cassandra.atom.CassandraAtomAutoConfiguration;
+import org.jwcarman.substrate.cassandra.atom.CassandraAtomSpi;
 import org.jwcarman.substrate.cassandra.journal.CassandraJournalAutoConfiguration;
 import org.jwcarman.substrate.cassandra.journal.CassandraJournalSpi;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -36,7 +38,9 @@ class CassandraDisablePropertyTest {
       new ApplicationContextRunner()
           .withConfiguration(
               AutoConfigurations.of(
-                  CassandraAutoConfiguration.class, CassandraJournalAutoConfiguration.class))
+                  CassandraAutoConfiguration.class,
+                  CassandraJournalAutoConfiguration.class,
+                  CassandraAtomAutoConfiguration.class))
           .withUserConfiguration(MockCqlSessionConfiguration.class);
 
   @Test
@@ -44,6 +48,13 @@ class CassandraDisablePropertyTest {
     contextRunner
         .withPropertyValues("substrate.cassandra.journal.enabled=false")
         .run(context -> assertThat(context).doesNotHaveBean(CassandraJournalSpi.class));
+  }
+
+  @Test
+  void disablingAtomPreventsAtomBean() {
+    contextRunner
+        .withPropertyValues("substrate.cassandra.atom.enabled=false")
+        .run(context -> assertThat(context).doesNotHaveBean(CassandraAtomSpi.class));
   }
 
   @Configuration(proxyBeanMethods = false)

@@ -1,2 +1,3 @@
 org.jwcarman.substrate.cassandra.CassandraAutoConfiguration
 org.jwcarman.substrate.cassandra.journal.CassandraJournalAutoConfiguration
+org.jwcarman.substrate.cassandra.atom.CassandraAtomAutoConfiguration

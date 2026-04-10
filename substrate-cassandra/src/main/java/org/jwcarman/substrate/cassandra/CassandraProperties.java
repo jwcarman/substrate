@@ -19,11 +19,14 @@ import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "substrate.cassandra")
-public record CassandraProperties(JournalProperties journal) {
+public record CassandraProperties(JournalProperties journal, AtomProperties atom) {
   public record JournalProperties(
       boolean enabled,
       String prefix,
       String tableName,
       boolean autoCreateSchema,
       Duration defaultTtl) {}
+
+  public record AtomProperties(
+      boolean enabled, String prefix, String tableName, boolean autoCreateSchema) {}
 }

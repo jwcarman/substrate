@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-10T21:14:00Z
-ITERATION: 26
-SPEC_COMPLETED: 025-consolidate-sweeper.md
-WHAT_WAS_DONE: Consolidated AtomSweeper, JournalSweeper, and MailboxSweeper into a single generic Sweeper class plus a Sweepable marker interface; moved sweep(int) declaration from each SPI to Sweepable; updated SubstrateAutoConfiguration to create three Sweeper beans parameterized by Atom.class/Journal.class/Mailbox.class; deleted three sweeper classes, three sweeper test classes; created consolidated SweeperTest covering all behavior; updated SubstrateAutoConfigurationTest to use bean-name assertions.
-VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — BUILD SUCCESS (all 13 modules pass); no @SuppressWarnings annotations introduced
+LAST_RUN: 2026-04-10T21:25:00Z
+ITERATION: 27
+SPEC_COMPLETED: 026-atom-cassandra.md
+WHAT_WAS_DONE: Implemented CassandraAtomSpi with LWT-based create (INSERT IF NOT EXISTS), conditional set/touch/delete (IF EXISTS), native Cassandra TTL via USING TTL, and read-then-update touch for TTL refresh; added CassandraAtomAutoConfiguration with ConditionalOnProperty gating; extended CassandraProperties with AtomProperties record; registered auto-config in imports; added defaults to properties file; wrote unit tests (CassandraAtomSpiTest) and integration tests (CassandraAtomSpiIT) including concurrent-create collision and TTL expiry; updated CassandraDisablePropertyTest with atom disable assertion.
+VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — BUILD SUCCESS (all 13 modules pass); ./mvnw verify -pl substrate-cassandra — BUILD SUCCESS (25 unit + 32 integration tests pass, including 16 new atom IT tests)
 STATUS: DONE
 NEXT_SPEC: none
-NOTES: Pure refactor — zero behavior changes. Files created: Sweepable.java, Sweeper.java, SweeperTest.java in new org.jwcarman.substrate.core.sweep package. Files deleted: AtomSweeper.java, JournalSweeper.java, MailboxSweeper.java and their corresponding test classes. SPI interfaces (AtomSpi, JournalSpi, MailboxSpi) now extend Sweepable; AbstractAtomSpi/AbstractJournalSpi/AbstractMailboxSpi sweep defaults unchanged. No backend modules required changes.
+NOTES: CQL reserved word "token" required double-quoting in all CQL statements (q() helper method). Touch uses read-then-update pattern since CQL doesn't support column self-reference assignments. TTL minimum enforced at 1 second via Math.max. No new dependencies added. Files created: CassandraAtomSpi.java, CassandraAtomAutoConfiguration.java, CassandraAtomSpiTest.java, CassandraAtomSpiIT.java. Files modified: CassandraProperties.java, substrate-cassandra-defaults.properties, AutoConfiguration.imports, CassandraDisablePropertyTest.java.
