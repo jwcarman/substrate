@@ -105,26 +105,15 @@
         <module>substrate-bom</module>
         <module>substrate-api</module>
         <module>substrate-core</module>
-        <module>substrate-notifier-redis</module>
-        <module>substrate-journal-redis</module>
-        <module>substrate-mailbox-redis</module>
-        <module>substrate-notifier-postgresql</module>
-        <module>substrate-journal-postgresql</module>
-        <module>substrate-mailbox-postgresql</module>
-        <module>substrate-notifier-hazelcast</module>
-        <module>substrate-journal-hazelcast</module>
-        <module>substrate-mailbox-hazelcast</module>
-        <module>substrate-notifier-nats</module>
-        <module>substrate-journal-nats</module>
-        <module>substrate-mailbox-nats</module>
-        <module>substrate-journal-dynamodb</module>
-        <module>substrate-mailbox-dynamodb</module>
-        <module>substrate-journal-mongodb</module>
-        <module>substrate-mailbox-mongodb</module>
-        <module>substrate-journal-cassandra</module>
-        <module>substrate-journal-rabbitmq</module>
-        <module>substrate-notifier-rabbitmq</module>
-        <module>substrate-notifier-sns</module>
+        <module>substrate-redis</module>
+        <module>substrate-hazelcast</module>
+        <module>substrate-postgresql</module>
+        <module>substrate-nats</module>
+        <module>substrate-mongodb</module>
+        <module>substrate-dynamodb</module>
+        <module>substrate-rabbitmq</module>
+        <module>substrate-cassandra</module>
+        <module>substrate-sns</module>
     </modules>
 
     <dependencies>

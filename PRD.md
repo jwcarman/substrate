@@ -176,9 +176,9 @@ substrate/
 │   │   └── autoconfigure/ # SubstrateAutoConfiguration, SubstrateProperties
 ```
 
-Each module is independently deployable. Modules that share the same backend
-(e.g., `substrate-journal-redis` and `substrate-notifier-redis`) are separate
-jars — you can use one without the other.
+Each backend is a single consolidated module containing all the primitives
+that backend supports. Unwanted primitives can be disabled via
+`substrate.<backend>.<primitive>.enabled=false`.
 
 **Dependency rules:**
 - Journal requires a Notifier (the notifier nudges readers when new entries arrive)
@@ -187,28 +187,37 @@ jars — you can use one without the other.
 - Notifier can be deployed standalone (but has no consumer without Journal or Mailbox)
 
 Minimum viable deployments:
-- **Stream use case (Odyssey):** one Journal module + one Notifier module
-- **Future use case (Mocapi):** one Mailbox module + one Notifier module
-- **Both:** one Journal + one Mailbox + one Notifier (can be different backends)
+- **Stream use case (Odyssey):** one backend module with Journal + Notifier
+- **Future use case (Mocapi):** one backend module with Mailbox + Notifier
+- **Both:** one or more backend modules covering Journal + Mailbox + Notifier
 
-| Backend | Journal | Mailbox | Notifier |
-|---|---|---|---|
-| In-Memory | built into core | built into core | built into core |
-| Redis | `substrate-journal-redis` | `substrate-mailbox-redis` | `substrate-notifier-redis` |
-| Hazelcast | `substrate-journal-hazelcast` | `substrate-mailbox-hazelcast` | `substrate-notifier-hazelcast` |
-| PostgreSQL | `substrate-journal-postgresql` | `substrate-mailbox-postgresql` | `substrate-notifier-postgresql` |
-| Cassandra | `substrate-journal-cassandra` | — | — (use external) |
-| DynamoDB | `substrate-journal-dynamodb` | `substrate-mailbox-dynamodb` | — (use external) |
-| NATS | `substrate-journal-nats` | `substrate-mailbox-nats` | `substrate-notifier-nats` |
-| MongoDB | `substrate-journal-mongodb` | `substrate-mailbox-mongodb` | — |
-| RabbitMQ | `substrate-journal-rabbitmq` | — | `substrate-notifier-rabbitmq` |
-| SNS/SQS | — | — | `substrate-notifier-sns` |
+| Backend | Module | Journal | Mailbox | Notifier |
+|---|---|---|---|---|
+| In-Memory | built into core | yes | yes | yes |
+| Redis | `substrate-redis` | yes | yes | yes |
+| Hazelcast | `substrate-hazelcast` | yes | yes | yes |
+| PostgreSQL | `substrate-postgresql` | yes | yes | yes |
+| NATS | `substrate-nats` | yes | yes | yes |
+| MongoDB | `substrate-mongodb` | yes | yes | — |
+| DynamoDB | `substrate-dynamodb` | yes | yes | — |
+| RabbitMQ | `substrate-rabbitmq` | yes | — | yes |
+| Cassandra | `substrate-cassandra` | yes | — | — |
+| SNS/SQS | `substrate-sns` | — | — | yes |
 
 ### Auto-configuration
 
 Each backend module self-registers via `@AutoConfiguration` with
-`@ConditionalOnClass`. `substrate-core` provides in-memory fallbacks with
-`@ConditionalOnMissingBean` and WARN logging.
+`@ConditionalOnClass` and per-primitive `@ConditionalOnProperty` gates.
+`substrate-core` provides in-memory fallbacks with `@ConditionalOnMissingBean`
+and WARN logging.
+
+Each primitive within a backend can be individually disabled:
+```yaml
+substrate:
+  redis:
+    mailbox:
+      enabled: false  # disables the Redis mailbox, keeps journal and notifier
+```
 
 Each SPI is independently wired — you can use Redis for Journal, NATS for
 Notifier, and Hazelcast for Mailbox. The consumer just needs one bean of each

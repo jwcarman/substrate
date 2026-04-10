@@ -46,102 +46,47 @@
             </dependency>
             <dependency>
                 <groupId>org.jwcarman.substrate</groupId>
-                <artifactId>substrate-journal-redis</artifactId>
+                <artifactId>substrate-redis</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.jwcarman.substrate</groupId>
-                <artifactId>substrate-mailbox-redis</artifactId>
+                <artifactId>substrate-hazelcast</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.jwcarman.substrate</groupId>
-                <artifactId>substrate-notifier-redis</artifactId>
+                <artifactId>substrate-postgresql</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.jwcarman.substrate</groupId>
-                <artifactId>substrate-journal-postgresql</artifactId>
+                <artifactId>substrate-nats</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.jwcarman.substrate</groupId>
-                <artifactId>substrate-mailbox-postgresql</artifactId>
+                <artifactId>substrate-mongodb</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.jwcarman.substrate</groupId>
-                <artifactId>substrate-notifier-postgresql</artifactId>
+                <artifactId>substrate-dynamodb</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.jwcarman.substrate</groupId>
-                <artifactId>substrate-journal-hazelcast</artifactId>
+                <artifactId>substrate-rabbitmq</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.jwcarman.substrate</groupId>
-                <artifactId>substrate-mailbox-hazelcast</artifactId>
+                <artifactId>substrate-cassandra</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.jwcarman.substrate</groupId>
-                <artifactId>substrate-notifier-hazelcast</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.jwcarman.substrate</groupId>
-                <artifactId>substrate-journal-nats</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.jwcarman.substrate</groupId>
-                <artifactId>substrate-mailbox-nats</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.jwcarman.substrate</groupId>
-                <artifactId>substrate-notifier-nats</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.jwcarman.substrate</groupId>
-                <artifactId>substrate-journal-dynamodb</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.jwcarman.substrate</groupId>
-                <artifactId>substrate-mailbox-dynamodb</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.jwcarman.substrate</groupId>
-                <artifactId>substrate-journal-mongodb</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.jwcarman.substrate</groupId>
-                <artifactId>substrate-mailbox-mongodb</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.jwcarman.substrate</groupId>
-                <artifactId>substrate-journal-cassandra</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.jwcarman.substrate</groupId>
-                <artifactId>substrate-journal-rabbitmq</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.jwcarman.substrate</groupId>
-                <artifactId>substrate-notifier-rabbitmq</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.jwcarman.substrate</groupId>
-                <artifactId>substrate-notifier-sns</artifactId>
+                <artifactId>substrate-sns</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>

@@ -1,0 +1,3 @@
+org.jwcarman.substrate.rabbitmq.RabbitMqAutoConfiguration
+org.jwcarman.substrate.rabbitmq.journal.RabbitMqJournalAutoConfiguration
+org.jwcarman.substrate.rabbitmq.notifier.RabbitMqNotifierAutoConfiguration

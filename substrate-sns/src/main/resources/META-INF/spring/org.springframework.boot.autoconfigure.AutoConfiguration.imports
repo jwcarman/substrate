@@ -1,0 +1,2 @@
+org.jwcarman.substrate.sns.SnsAutoConfiguration
+org.jwcarman.substrate.sns.notifier.SnsNotifierAutoConfiguration

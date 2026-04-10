@@ -1,0 +1,4 @@
+org.jwcarman.substrate.redis.RedisAutoConfiguration
+org.jwcarman.substrate.redis.journal.RedisJournalAutoConfiguration
+org.jwcarman.substrate.redis.mailbox.RedisMailboxAutoConfiguration
+org.jwcarman.substrate.redis.notifier.RedisNotifierAutoConfiguration

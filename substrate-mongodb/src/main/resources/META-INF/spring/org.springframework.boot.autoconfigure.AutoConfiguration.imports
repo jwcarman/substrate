@@ -1,0 +1,3 @@
+org.jwcarman.substrate.mongodb.MongoDbAutoConfiguration
+org.jwcarman.substrate.mongodb.journal.MongoDbJournalAutoConfiguration
+org.jwcarman.substrate.mongodb.mailbox.MongoDbMailboxAutoConfiguration

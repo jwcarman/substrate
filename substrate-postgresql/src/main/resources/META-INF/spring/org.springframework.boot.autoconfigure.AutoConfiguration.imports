@@ -1,0 +1,4 @@
+org.jwcarman.substrate.postgresql.PostgresAutoConfiguration
+org.jwcarman.substrate.postgresql.journal.PostgresJournalAutoConfiguration
+org.jwcarman.substrate.postgresql.mailbox.PostgresMailboxAutoConfiguration
+org.jwcarman.substrate.postgresql.notifier.PostgresNotifierAutoConfiguration

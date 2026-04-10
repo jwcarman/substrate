@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Breaking changes — Backend module consolidation
+
+The 20 per-primitive backend modules have been consolidated into 9 per-backend modules.
+Update your POM dependencies as follows:
+
+| Removed artifact | Replaced by |
+|---|---|
+| `substrate-journal-redis` | `substrate-redis` |
+| `substrate-mailbox-redis` | `substrate-redis` |
+| `substrate-notifier-redis` | `substrate-redis` |
+| `substrate-journal-hazelcast` | `substrate-hazelcast` |
+| `substrate-mailbox-hazelcast` | `substrate-hazelcast` |
+| `substrate-notifier-hazelcast` | `substrate-hazelcast` |
+| `substrate-journal-postgresql` | `substrate-postgresql` |
+| `substrate-mailbox-postgresql` | `substrate-postgresql` |
+| `substrate-notifier-postgresql` | `substrate-postgresql` |
+| `substrate-journal-nats` | `substrate-nats` |
+| `substrate-mailbox-nats` | `substrate-nats` |
+| `substrate-notifier-nats` | `substrate-nats` |
+| `substrate-journal-mongodb` | `substrate-mongodb` |
+| `substrate-mailbox-mongodb` | `substrate-mongodb` |
+| `substrate-journal-dynamodb` | `substrate-dynamodb` |
+| `substrate-mailbox-dynamodb` | `substrate-dynamodb` |
+| `substrate-journal-rabbitmq` | `substrate-rabbitmq` |
+| `substrate-notifier-rabbitmq` | `substrate-rabbitmq` |
+| `substrate-journal-cassandra` | `substrate-cassandra` |
+| `substrate-notifier-sns` | `substrate-sns` |
+
+**Package changes:** Backend classes moved from `org.jwcarman.substrate.{primitive}.{backend}`
+to `org.jwcarman.substrate.{backend}.{primitive}`.
+
+**Configuration property changes:** Properties moved from `substrate.{primitive}.{backend}.*`
+to `substrate.{backend}.{primitive}.*`.
+
+**Per-primitive enable/disable:** Each primitive can now be disabled via
+`substrate.{backend}.{primitive}.enabled=false` (all are enabled by default).
+
 ## [0.1.0] - 2026-04-07
 
 ### Added

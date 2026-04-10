@@ -1,0 +1,3 @@
+org.jwcarman.substrate.dynamodb.DynamoDbAutoConfiguration
+org.jwcarman.substrate.dynamodb.journal.DynamoDbJournalAutoConfiguration
+org.jwcarman.substrate.dynamodb.mailbox.DynamoDbMailboxAutoConfiguration

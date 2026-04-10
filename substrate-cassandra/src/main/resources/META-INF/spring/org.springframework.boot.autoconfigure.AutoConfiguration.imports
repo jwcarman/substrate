@@ -1,0 +1,2 @@
+org.jwcarman.substrate.cassandra.CassandraAutoConfiguration
+org.jwcarman.substrate.cassandra.journal.CassandraJournalAutoConfiguration
