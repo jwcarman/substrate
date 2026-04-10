@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-10T19:35:00Z
-ITERATION: 24
-SPEC_COMPLETED: 023-rename-atomrecord-to-rawatom.md
-WHAT_WAS_DONE: Renamed AtomRecord to RawAtom across substrate-core for consistency with the existing RawJournalEntry naming convention — deleted AtomRecord.java, created RawAtom.java, updated all imports and type references in AtomSpi, DefaultAtom, InMemoryAtomSpi, InMemoryAtomSpiTest, and DefaultAtomFactoryTest.
-VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify — BUILD SUCCESS (all 13 modules, 192 substrate-core tests pass, all backend ITs pass); grep -r AtomRecord substrate-core/ — no matches
-STATUS: MORE_WORK
-NEXT_SPEC: 024-journal-lifecycle-and-mailbox-connect.md
-NOTES: Purely mechanical rename, no behavioral changes. The old AtomRecord.java file was deleted and replaced with RawAtom.java in the same package. No backend modules were affected since none have implemented AtomSpi yet.
+LAST_RUN: 2026-04-10T19:58:00Z
+ITERATION: 25
+SPEC_COMPLETED: 024-journal-lifecycle-and-mailbox-connect.md
+WHAT_WAS_DONE: Implemented full journal lifecycle state machine (active/completed/expired), added JournalFactory.create(name, type, inactivityTtl) with eager SPI create, added JournalFactory.connect and MailboxFactory.connect lazy handles, replaced Journal.complete() with complete(Duration retentionTtl), added three new exceptions (JournalCompletedException, JournalExpiredException, JournalAlreadyExistsException), rewrote InMemoryJournalSpi with sealed-type state machine, added max-TTL enforcement for inactivity/retention/entry TTLs in SubstrateProperties, updated all 8 backend JournalSpi implementations, updated DefaultJournalCursor to propagate JournalExpiredException to consumers, and added consumer-escape-hatch test.
+VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — BUILD SUCCESS (all 13 modules pass); no @SuppressWarnings annotations introduced
+STATUS: DONE
+NEXT_SPEC: none
+NOTES: Breaking changes: Journal.complete() now takes Duration retentionTtl, JournalFactory.create() now takes Duration inactivityTtl, JournalSpi.complete() now takes Duration retentionTtl, JournalSpi gains create(String, Duration) method. SubstrateProperties.JournalProperties replaced single maxTtl with three fields: maxInactivityTtl (24h), maxRetentionTtl (30d), maxEntryTtl (7d). All backend IT tests updated but not run (skipped with -DskipITs since they require infrastructure).

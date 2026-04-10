@@ -27,25 +27,64 @@ public class DefaultJournalFactory implements JournalFactory {
   private final JournalSpi journalSpi;
   private final CodecFactory codecFactory;
   private final NotifierSpi notifier;
-  private final Duration maxTtl;
+  private final Duration maxInactivityTtl;
+  private final Duration maxEntryTtl;
+  private final Duration maxRetentionTtl;
 
   public DefaultJournalFactory(
-      JournalSpi journalSpi, CodecFactory codecFactory, NotifierSpi notifier, Duration maxTtl) {
+      JournalSpi journalSpi,
+      CodecFactory codecFactory,
+      NotifierSpi notifier,
+      Duration maxInactivityTtl,
+      Duration maxEntryTtl,
+      Duration maxRetentionTtl) {
     this.journalSpi = journalSpi;
     this.codecFactory = codecFactory;
     this.notifier = notifier;
-    this.maxTtl = maxTtl;
+    this.maxInactivityTtl = maxInactivityTtl;
+    this.maxEntryTtl = maxEntryTtl;
+    this.maxRetentionTtl = maxRetentionTtl;
   }
 
   @Override
-  public <T> Journal<T> create(String name, Class<T> type) {
+  public <T> Journal<T> create(String name, Class<T> type, Duration inactivityTtl) {
+    validateInactivityTtl(inactivityTtl);
+    String key = journalSpi.journalKey(name);
+    journalSpi.create(key, inactivityTtl);
     return new DefaultJournal<>(
-        journalSpi, journalSpi.journalKey(name), codecFactory.create(type), notifier, maxTtl);
+        journalSpi, key, codecFactory.create(type), notifier, maxEntryTtl, maxRetentionTtl);
   }
 
   @Override
-  public <T> Journal<T> create(String name, TypeRef<T> typeRef) {
+  public <T> Journal<T> create(String name, TypeRef<T> typeRef, Duration inactivityTtl) {
+    validateInactivityTtl(inactivityTtl);
+    String key = journalSpi.journalKey(name);
+    journalSpi.create(key, inactivityTtl);
     return new DefaultJournal<>(
-        journalSpi, journalSpi.journalKey(name), codecFactory.create(typeRef), notifier, maxTtl);
+        journalSpi, key, codecFactory.create(typeRef), notifier, maxEntryTtl, maxRetentionTtl);
+  }
+
+  @Override
+  public <T> Journal<T> connect(String name, Class<T> type) {
+    String key = journalSpi.journalKey(name);
+    return new DefaultJournal<>(
+        journalSpi, key, codecFactory.create(type), notifier, maxEntryTtl, maxRetentionTtl);
+  }
+
+  @Override
+  public <T> Journal<T> connect(String name, TypeRef<T> typeRef) {
+    String key = journalSpi.journalKey(name);
+    return new DefaultJournal<>(
+        journalSpi, key, codecFactory.create(typeRef), notifier, maxEntryTtl, maxRetentionTtl);
+  }
+
+  private void validateInactivityTtl(Duration inactivityTtl) {
+    if (inactivityTtl.compareTo(maxInactivityTtl) > 0) {
+      throw new IllegalArgumentException(
+          "Journal inactivity TTL "
+              + inactivityTtl
+              + " exceeds configured maximum "
+              + maxInactivityTtl);
+    }
   }
 }

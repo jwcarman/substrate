@@ -162,7 +162,7 @@ class HazelcastJournalSpiIT extends AbstractHazelcastIT {
   void isCompleteReturnsTrueAfterComplete() {
     String key = journal.journalKey("is-complete-" + System.nanoTime());
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
-    journal.complete(key);
+    journal.complete(key, Duration.ofHours(1));
 
     assertThat(journal.isComplete(key)).isTrue();
   }

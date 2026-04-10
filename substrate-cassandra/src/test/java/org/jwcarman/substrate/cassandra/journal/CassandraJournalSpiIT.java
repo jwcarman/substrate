@@ -153,7 +153,7 @@ class CassandraJournalSpiIT {
   void completeMarksJournalAsDone() {
     String key = journal.journalKey("complete-test");
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
-    journal.complete(key);
+    journal.complete(key, Duration.ofHours(1));
 
     // Completion marker should not appear in readLast
     List<RawJournalEntry> entries = journal.readLast(key, 100);
@@ -165,7 +165,7 @@ class CassandraJournalSpiIT {
   void readAfterExcludesCompletionMarker() {
     String key = journal.journalKey("completed-read-after");
     String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
-    journal.complete(key);
+    journal.complete(key, Duration.ofHours(1));
 
     List<RawJournalEntry> entries = journal.readAfter(key, id1);
     assertThat(entries).isEmpty();

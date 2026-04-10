@@ -182,13 +182,17 @@ class SubstrateAutoConfigurationTest {
   void maxTtlConfigurationOverrideViaProperties() {
     contextRunner
         .withPropertyValues(
-            "substrate.journal.max-ttl=PT1H",
+            "substrate.journal.max-entry-ttl=PT1H",
+            "substrate.journal.max-inactivity-ttl=PT6H",
+            "substrate.journal.max-retention-ttl=P7D",
             "substrate.mailbox.max-ttl=PT10M",
             "substrate.atom.max-ttl=PT2H")
         .run(
             context -> {
               SubstrateProperties props = context.getBean(SubstrateProperties.class);
-              assertThat(props.journal().maxTtl()).isEqualTo(Duration.ofHours(1));
+              assertThat(props.journal().maxEntryTtl()).isEqualTo(Duration.ofHours(1));
+              assertThat(props.journal().maxInactivityTtl()).isEqualTo(Duration.ofHours(6));
+              assertThat(props.journal().maxRetentionTtl()).isEqualTo(Duration.ofDays(7));
               assertThat(props.mailbox().maxTtl()).isEqualTo(Duration.ofMinutes(10));
               assertThat(props.atom().maxTtl()).isEqualTo(Duration.ofHours(2));
             });
@@ -290,7 +294,12 @@ class SubstrateAutoConfigurationTest {
     }
 
     @Override
-    public void complete(String key) {
+    public void create(String key, Duration inactivityTtl) {
+      // no-op stub for testing
+    }
+
+    @Override
+    public void complete(String key, Duration retentionTtl) {
       // no-op stub for testing
     }
 

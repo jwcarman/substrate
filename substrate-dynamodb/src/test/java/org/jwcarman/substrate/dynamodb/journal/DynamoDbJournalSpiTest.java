@@ -96,7 +96,7 @@ class DynamoDbJournalSpiTest {
 
   @Test
   void completePutsCompletionMarker() {
-    journal.complete("substrate:journal:test");
+    journal.complete("substrate:journal:test", Duration.ofHours(1));
 
     ArgumentCaptor<PutItemRequest> captor = ArgumentCaptor.forClass(PutItemRequest.class);
     verify(client).putItem(captor.capture());

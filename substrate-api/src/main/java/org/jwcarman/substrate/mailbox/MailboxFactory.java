@@ -23,4 +23,8 @@ public interface MailboxFactory {
   <T> Mailbox<T> create(String name, Class<T> type, Duration ttl);
 
   <T> Mailbox<T> create(String name, TypeRef<T> typeRef, Duration ttl);
+
+  <T> Mailbox<T> connect(String name, Class<T> type);
+
+  <T> Mailbox<T> connect(String name, TypeRef<T> typeRef);
 }

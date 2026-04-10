@@ -157,11 +157,16 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public void complete(String key) {
+  public void complete(String key, Duration retentionTtl) {
     Map<String, AttributeValue> item = new HashMap<>();
     item.put(FIELD_KEY, AttributeValue.builder().s(key).build());
     item.put(FIELD_ENTRY_ID, AttributeValue.builder().s(COMPLETED_ENTRY_ID).build());
     item.put(FIELD_TIMESTAMP, AttributeValue.builder().s(Instant.now().toString()).build());
+
+    if (retentionTtl != null && !retentionTtl.isZero()) {
+      long ttlEpoch = Instant.now().plus(retentionTtl).getEpochSecond();
+      item.put(FIELD_TTL, AttributeValue.builder().n(String.valueOf(ttlEpoch)).build());
+    }
 
     client.putItem(PutItemRequest.builder().tableName(tableName).item(item).build());
   }

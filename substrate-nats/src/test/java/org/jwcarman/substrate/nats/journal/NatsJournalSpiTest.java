@@ -128,7 +128,7 @@ class NatsJournalSpiTest {
     when(connection.keyValueManagement()).thenThrow(new IOException("kv failed"));
 
     NatsJournalSpi journal = createJournal();
-    assertThatThrownBy(() -> journal.complete("substrate:journal:test"))
+    assertThatThrownBy(() -> journal.complete("substrate:journal:test", Duration.ofHours(1)))
         .isInstanceOf(UncheckedIOException.class)
         .hasMessageContaining("Failed to mark journal as complete");
   }
@@ -145,7 +145,7 @@ class NatsJournalSpiTest {
     when(kv.put(anyString(), any(byte[].class))).thenThrow(apiException);
 
     NatsJournalSpi journal = createJournal();
-    assertThatThrownBy(() -> journal.complete("substrate:journal:test"))
+    assertThatThrownBy(() -> journal.complete("substrate:journal:test", Duration.ofHours(1)))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("Failed to mark journal as complete");
   }

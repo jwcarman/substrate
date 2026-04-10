@@ -198,15 +198,16 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public void complete(String key) {
+  public void complete(String key, Duration retentionTtl) {
     UUID entryId = Uuids.timeBased();
     Instant now = Instant.now();
     ByteBuffer completedMarker = COMPLETED_DATA.duplicate();
 
-    if (defaultTtl != null && !defaultTtl.isZero()) {
+    Duration effectiveTtl = retentionTtl != null ? retentionTtl : defaultTtl;
+    if (effectiveTtl != null && !effectiveTtl.isZero()) {
       session.execute(
           insertWithTtlStatement.bind(
-              key, entryId, completedMarker, now, (int) defaultTtl.toSeconds()));
+              key, entryId, completedMarker, now, (int) effectiveTtl.toSeconds()));
     } else {
       session.execute(insertStatement.bind(key, entryId, completedMarker, now));
     }

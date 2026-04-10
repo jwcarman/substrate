@@ -114,7 +114,7 @@ class CassandraJournalSpiTest {
 
   @Test
   void completeExecutesPreparedStatement() {
-    journal.complete("substrate:journal:test");
+    journal.complete("substrate:journal:test", Duration.ofHours(1));
 
     verify(session, atLeast(1)).execute(any(BoundStatement.class));
   }

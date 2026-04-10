@@ -70,9 +70,14 @@ class HazelcastJournalSpiTest {
     when(hazelcastInstance.<String, Boolean>getMap("substrate-journal-completed"))
         .thenReturn(completedMap);
 
-    journal.complete("test-key");
+    journal.complete("test-key", Duration.ofHours(1));
 
-    verify(completedMap).put("test-key", Boolean.TRUE);
+    verify(completedMap)
+        .put(
+            "test-key",
+            Boolean.TRUE,
+            Duration.ofHours(1).toMillis(),
+            java.util.concurrent.TimeUnit.MILLISECONDS);
   }
 
   @Test

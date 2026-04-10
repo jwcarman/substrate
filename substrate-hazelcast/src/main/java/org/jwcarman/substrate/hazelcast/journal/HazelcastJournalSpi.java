@@ -115,9 +115,14 @@ public class HazelcastJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public void complete(String key) {
+  public void complete(String key, Duration retentionTtl) {
     IMap<String, Boolean> completedMap = hazelcast.getMap(COMPLETED_MAP_NAME);
-    completedMap.put(key, Boolean.TRUE);
+    if (retentionTtl != null && !retentionTtl.isZero()) {
+      completedMap.put(
+          key, Boolean.TRUE, retentionTtl.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
+    } else {
+      completedMap.put(key, Boolean.TRUE);
+    }
   }
 
   @Override

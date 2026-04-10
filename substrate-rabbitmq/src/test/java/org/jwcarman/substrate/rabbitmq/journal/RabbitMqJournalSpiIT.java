@@ -138,7 +138,7 @@ class RabbitMqJournalSpiIT extends AbstractRabbitMqIT {
     String key = journal.journalKey("complete-" + System.nanoTime());
     journal.append(key, "data1".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     journal.append(key, "data2".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
-    journal.complete(key);
+    journal.complete(key, Duration.ofHours(1));
 
     List<RawJournalEntry> entries = journal.readLast(key, 100);
 
@@ -194,7 +194,7 @@ class RabbitMqJournalSpiIT extends AbstractRabbitMqIT {
   void isCompleteReturnsTrueAfterComplete() {
     String key = journal.journalKey("is-complete-" + System.nanoTime());
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
-    journal.complete(key);
+    journal.complete(key, Duration.ofHours(1));
 
     assertThat(journal.isComplete(key)).isTrue();
   }

@@ -103,7 +103,7 @@ class PostgresJournalSpiIT extends AbstractPostgresIT {
   void completeStoresCompletionMarker() {
     String key = journal.journalKey("complete-test");
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
-    journal.complete(key);
+    journal.complete(key, Duration.ofHours(1));
 
     Integer count =
         jdbcTemplate.queryForObject(
@@ -115,7 +115,7 @@ class PostgresJournalSpiIT extends AbstractPostgresIT {
   void deleteRemovesCompletionMarker() {
     String key = journal.journalKey("complete-delete-test");
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
-    journal.complete(key);
+    journal.complete(key, Duration.ofHours(1));
     journal.delete(key);
 
     Integer count =
@@ -171,8 +171,8 @@ class PostgresJournalSpiIT extends AbstractPostgresIT {
   @Test
   void completeIsIdempotent() {
     String key = journal.journalKey("idempotent-complete");
-    journal.complete(key);
-    journal.complete(key);
+    journal.complete(key, Duration.ofHours(1));
+    journal.complete(key, Duration.ofHours(1));
 
     Integer count =
         jdbcTemplate.queryForObject(
@@ -192,7 +192,7 @@ class PostgresJournalSpiIT extends AbstractPostgresIT {
   void isCompleteReturnsTrueAfterComplete() {
     String key = journal.journalKey("is-complete-test");
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
-    journal.complete(key);
+    journal.complete(key, Duration.ofHours(1));
 
     assertThat(journal.isComplete(key)).isTrue();
   }

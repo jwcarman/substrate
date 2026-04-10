@@ -17,6 +17,7 @@ package org.jwcarman.substrate.core.journal;
 
 import com.fasterxml.uuid.Generators;
 import com.fasterxml.uuid.impl.TimeBasedEpochGenerator;
+import java.time.Duration;
 
 public abstract class AbstractJournalSpi implements JournalSpi {
 
@@ -36,6 +37,11 @@ public abstract class AbstractJournalSpi implements JournalSpi {
   @Override
   public String journalKey(String name) {
     return prefix + name;
+  }
+
+  @Override
+  public void create(String key, Duration inactivityTtl) {
+    // Default no-op for backends that don't need explicit journal creation
   }
 
   @Override

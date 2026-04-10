@@ -127,7 +127,7 @@ public class NatsJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public void complete(String key) {
+  public void complete(String key, Duration retentionTtl) {
     try {
       ensureCompletedBucketExists();
       var kv = connection.keyValue(COMPLETED_BUCKET);

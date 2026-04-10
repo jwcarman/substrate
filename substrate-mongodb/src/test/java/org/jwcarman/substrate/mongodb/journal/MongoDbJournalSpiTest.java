@@ -95,7 +95,7 @@ class MongoDbJournalSpiTest {
 
   @Test
   void completeInsertsCompletionMarker() {
-    journal.complete("substrate:journal:test");
+    journal.complete("substrate:journal:test", Duration.ofHours(1));
 
     ArgumentCaptor<Document> captor = ArgumentCaptor.forClass(Document.class);
     verify(mongoTemplate).insert(captor.capture(), eq("substrate_journal"));

@@ -54,11 +54,29 @@ class SubstratePropertiesTest {
   }
 
   @Test
-  void defaultJournalMaxTtlIs7Days() {
+  void defaultJournalMaxEntryTtlIs7Days() {
     contextRunner.run(
         context -> {
           SubstrateProperties props = context.getBean(SubstrateProperties.class);
-          assertEquals(Duration.ofDays(7), props.journal().maxTtl());
+          assertEquals(Duration.ofDays(7), props.journal().maxEntryTtl());
+        });
+  }
+
+  @Test
+  void defaultJournalMaxInactivityTtlIs24Hours() {
+    contextRunner.run(
+        context -> {
+          SubstrateProperties props = context.getBean(SubstrateProperties.class);
+          assertEquals(Duration.ofHours(24), props.journal().maxInactivityTtl());
+        });
+  }
+
+  @Test
+  void defaultJournalMaxRetentionTtlIs30Days() {
+    contextRunner.run(
+        context -> {
+          SubstrateProperties props = context.getBean(SubstrateProperties.class);
+          assertEquals(Duration.ofDays(30), props.journal().maxRetentionTtl());
         });
   }
 

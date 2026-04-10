@@ -81,7 +81,7 @@ public class PostgresJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public void complete(String key) {
+  public void complete(String key, Duration retentionTtl) {
     jdbcTemplate.update(
         "INSERT INTO substrate_journal_completed (key) VALUES (?) ON CONFLICT (key) DO NOTHING",
         key);

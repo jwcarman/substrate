@@ -51,7 +51,8 @@ class DefaultJournalTest {
         .when(codec.decode(any(byte[].class)))
         .thenAnswer(inv -> new String((byte[]) inv.getArgument(0), UTF_8));
     lenient().when(notifier.subscribe(any())).thenReturn(() -> {});
-    journal = new DefaultJournal<>(spi, KEY, codec, notifier, Duration.ofDays(7));
+    journal =
+        new DefaultJournal<>(spi, KEY, codec, notifier, Duration.ofDays(7), Duration.ofDays(30));
   }
 
   @Test
@@ -72,11 +73,22 @@ class DefaultJournalTest {
   }
 
   @Test
-  void completeDelegatesToSpiWithBoundKey() {
-    journal.complete();
+  void appendThrowsWhenEntryTtlExceedsMax() {
+    assertThrows(IllegalArgumentException.class, () -> journal.append("data", Duration.ofDays(30)));
+  }
 
-    verify(spi).complete(KEY);
+  @Test
+  void completeDelegatesToSpiWithBoundKey() {
+    Duration retentionTtl = Duration.ofDays(1);
+    journal.complete(retentionTtl);
+
+    verify(spi).complete(KEY, retentionTtl);
     verify(notifier).notify(KEY, "__COMPLETED__");
+  }
+
+  @Test
+  void completeThrowsWhenRetentionTtlExceedsMax() {
+    assertThrows(IllegalArgumentException.class, () -> journal.complete(Duration.ofDays(60)));
   }
 
   @Test

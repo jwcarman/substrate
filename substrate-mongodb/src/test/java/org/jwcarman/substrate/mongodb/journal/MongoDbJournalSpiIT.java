@@ -126,7 +126,7 @@ class MongoDbJournalSpiIT extends AbstractMongoDbIT {
   void completeMarksJournalAsDone() {
     String key = journal.journalKey("complete-test");
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
-    journal.complete(key);
+    journal.complete(key, Duration.ofHours(1));
 
     List<RawJournalEntry> entries = journal.readLast(key, 100);
     assertThat(entries).hasSize(1);
@@ -202,7 +202,7 @@ class MongoDbJournalSpiIT extends AbstractMongoDbIT {
   void isCompleteReturnsTrueAfterComplete() {
     String key = journal.journalKey("is-complete");
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
-    journal.complete(key);
+    journal.complete(key, Duration.ofHours(1));
 
     assertThat(journal.isComplete(key)).isTrue();
   }
@@ -211,7 +211,7 @@ class MongoDbJournalSpiIT extends AbstractMongoDbIT {
   void readAfterExcludesCompletionMarker() {
     String key = journal.journalKey("completed-read-after");
     String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
-    journal.complete(key);
+    journal.complete(key, Duration.ofHours(1));
 
     List<RawJournalEntry> entries = journal.readAfter(key, id1);
     assertThat(entries).isEmpty();

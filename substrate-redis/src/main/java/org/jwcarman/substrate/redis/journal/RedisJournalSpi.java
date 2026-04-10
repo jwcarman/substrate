@@ -85,8 +85,12 @@ public class RedisJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public void complete(String key) {
+  public void complete(String key, Duration retentionTtl) {
     commands.set(key + COMPLETED_SUFFIX, "true");
+    if (retentionTtl != null && !retentionTtl.isZero()) {
+      commands.expire(key + COMPLETED_SUFFIX, retentionTtl.toSeconds());
+      commands.expire(key, retentionTtl.toSeconds());
+    }
   }
 
   @Override

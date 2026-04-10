@@ -85,7 +85,7 @@ public class RabbitMqJournalSpi extends AbstractJournalSpi implements AutoClosea
   }
 
   @Override
-  public void complete(String key) {
+  public void complete(String key, Duration retentionTtl) {
     String streamName = toStreamName(key);
     ensureStreamExists(streamName);
     Producer producer = getOrCreateProducer(streamName);

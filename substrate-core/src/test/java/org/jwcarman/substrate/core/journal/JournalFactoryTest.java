@@ -49,9 +49,15 @@ class JournalFactoryTest {
     InMemoryJournalSpi spi = new InMemoryJournalSpi();
     when(codecFactory.create(String.class)).thenReturn(stringCodec);
     JournalFactory factory =
-        new DefaultJournalFactory(spi, codecFactory, new InMemoryNotifier(), Duration.ofDays(7));
+        new DefaultJournalFactory(
+            spi,
+            codecFactory,
+            new InMemoryNotifier(),
+            Duration.ofHours(24),
+            Duration.ofDays(7),
+            Duration.ofDays(30));
 
-    Journal<String> journal = factory.create("my-stream", String.class);
+    Journal<String> journal = factory.create("my-stream", String.class, Duration.ofHours(1));
 
     assertEquals("substrate:journal:my-stream", journal.key());
   }
@@ -65,9 +71,15 @@ class JournalFactoryTest {
     when(stringCodec.decode(any(byte[].class)))
         .thenAnswer(inv -> new String((byte[]) inv.getArgument(0), UTF_8));
     JournalFactory factory =
-        new DefaultJournalFactory(spi, codecFactory, new InMemoryNotifier(), Duration.ofDays(7));
+        new DefaultJournalFactory(
+            spi,
+            codecFactory,
+            new InMemoryNotifier(),
+            Duration.ofHours(24),
+            Duration.ofDays(7),
+            Duration.ofDays(30));
 
-    Journal<String> journal = factory.create("test", String.class);
+    Journal<String> journal = factory.create("test", String.class, Duration.ofHours(1));
     String id = journal.append("hello", Duration.ofHours(1));
 
     assertNotNull(id);
@@ -85,9 +97,15 @@ class JournalFactoryTest {
         .when(listCodec.encode(any()))
         .thenAnswer(inv -> inv.getArgument(0).toString().getBytes(UTF_8));
     JournalFactory factory =
-        new DefaultJournalFactory(spi, codecFactory, new InMemoryNotifier(), Duration.ofDays(7));
+        new DefaultJournalFactory(
+            spi,
+            codecFactory,
+            new InMemoryNotifier(),
+            Duration.ofHours(24),
+            Duration.ofDays(7),
+            Duration.ofDays(30));
 
-    Journal<List<String>> journal = factory.create("typed-stream", typeRef);
+    Journal<List<String>> journal = factory.create("typed-stream", typeRef, Duration.ofHours(1));
 
     assertEquals("substrate:journal:typed-stream", journal.key());
     String id = journal.append(List.of("a", "b"), Duration.ofHours(1));

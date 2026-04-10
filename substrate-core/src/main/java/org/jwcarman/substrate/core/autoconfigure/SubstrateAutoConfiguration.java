@@ -104,8 +104,14 @@ public class SubstrateAutoConfiguration {
       CodecFactory codecFactory,
       NotifierSpi notifier,
       SubstrateProperties properties) {
+    var jp = properties.journal();
     return new DefaultJournalFactory(
-        journalSpi, codecFactory, notifier, properties.journal().maxTtl());
+        journalSpi,
+        codecFactory,
+        notifier,
+        jp.maxInactivityTtl(),
+        jp.maxEntryTtl(),
+        jp.maxRetentionTtl());
   }
 
   @Bean

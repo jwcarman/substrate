@@ -87,7 +87,7 @@ class AbstractJournalSpiTest {
     }
 
     @Override
-    public void complete(String key) {
+    public void complete(String key, Duration retentionTtl) {
       throw new UnsupportedOperationException();
     }
 

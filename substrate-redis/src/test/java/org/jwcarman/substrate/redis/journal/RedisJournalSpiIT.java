@@ -110,7 +110,7 @@ class RedisJournalSpiIT extends AbstractRedisIT {
   void completeAndDeleteRemovesCompletionFlag() {
     String key = journal.journalKey("complete-test");
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
-    journal.complete(key);
+    journal.complete(key, Duration.ofHours(1));
 
     assertThat(commands.get(key + ":completed")).isEqualTo("true");
 

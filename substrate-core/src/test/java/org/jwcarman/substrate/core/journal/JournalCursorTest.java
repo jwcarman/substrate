@@ -58,9 +58,15 @@ class JournalCursorTest {
   void setUp() {
     journalSpi = new InMemoryJournalSpi();
     notifier = new InMemoryNotifier();
+    journalSpi.create("substrate:journal:test", Duration.ofHours(24));
     journal =
         new DefaultJournal<>(
-            journalSpi, "substrate:journal:test", STRING_CODEC, notifier, Duration.ofDays(7));
+            journalSpi,
+            "substrate:journal:test",
+            STRING_CODEC,
+            notifier,
+            Duration.ofDays(7),
+            Duration.ofDays(30));
   }
 
   @Test
@@ -75,7 +81,7 @@ class JournalCursorTest {
                 for (int i = 0; i < count; i++) {
                   journal.append("msg-" + i, Duration.ofHours(1));
                 }
-                journal.complete();
+                journal.complete(Duration.ofDays(1));
               });
 
       while (cursor.isOpen()) {
@@ -98,7 +104,7 @@ class JournalCursorTest {
           .start(
               () -> {
                 journal.append("data", Duration.ofHours(1));
-                journal.complete();
+                journal.complete(Duration.ofDays(1));
               });
 
       while (cursor.isOpen()) {
@@ -282,7 +288,7 @@ class JournalCursorTest {
                     for (int i = 0; i < count; i++) {
                       journal.append("bp-" + i, Duration.ofHours(1));
                     }
-                    journal.complete();
+                    journal.complete(Duration.ofDays(1));
                   });
 
       // Slow consumer — small delay between polls to exercise backpressure

@@ -28,22 +28,29 @@ public class DefaultJournal<T> implements Journal<T> {
   private final String key;
   private final Codec<T> codec;
   private final NotifierSpi notifier;
-  private final Duration maxTtl;
+  private final Duration maxEntryTtl;
+  private final Duration maxRetentionTtl;
 
   public DefaultJournal(
-      JournalSpi journalSpi, String key, Codec<T> codec, NotifierSpi notifier, Duration maxTtl) {
+      JournalSpi journalSpi,
+      String key,
+      Codec<T> codec,
+      NotifierSpi notifier,
+      Duration maxEntryTtl,
+      Duration maxRetentionTtl) {
     this.journalSpi = journalSpi;
     this.key = key;
     this.codec = codec;
     this.notifier = notifier;
-    this.maxTtl = maxTtl;
+    this.maxEntryTtl = maxEntryTtl;
+    this.maxRetentionTtl = maxRetentionTtl;
   }
 
   @Override
   public String append(T data, Duration ttl) {
-    if (ttl.compareTo(maxTtl) > 0) {
+    if (ttl.compareTo(maxEntryTtl) > 0) {
       throw new IllegalArgumentException(
-          "Journal TTL " + ttl + " exceeds configured maximum " + maxTtl);
+          "Journal entry TTL " + ttl + " exceeds configured maximum " + maxEntryTtl);
     }
     byte[] bytes = codec.encode(data);
     String entryId = journalSpi.append(key, bytes, ttl);
@@ -52,8 +59,15 @@ public class DefaultJournal<T> implements Journal<T> {
   }
 
   @Override
-  public void complete() {
-    journalSpi.complete(key);
+  public void complete(Duration retentionTtl) {
+    if (retentionTtl.compareTo(maxRetentionTtl) > 0) {
+      throw new IllegalArgumentException(
+          "Journal retention TTL "
+              + retentionTtl
+              + " exceeds configured maximum "
+              + maxRetentionTtl);
+    }
+    journalSpi.complete(key, retentionTtl);
     notifier.notify(key, "__COMPLETED__");
   }
 

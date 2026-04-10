@@ -21,7 +21,7 @@ public interface Journal<T> {
 
   String append(T data, Duration ttl);
 
-  void complete();
+  void complete(Duration retentionTtl);
 
   void delete();
 

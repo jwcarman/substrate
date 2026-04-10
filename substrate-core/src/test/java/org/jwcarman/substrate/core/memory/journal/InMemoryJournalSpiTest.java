@@ -17,6 +17,7 @@ package org.jwcarman.substrate.core.memory.journal;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -25,6 +26,9 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.core.journal.RawJournalEntry;
+import org.jwcarman.substrate.journal.JournalAlreadyExistsException;
+import org.jwcarman.substrate.journal.JournalCompletedException;
+import org.jwcarman.substrate.journal.JournalExpiredException;
 
 class InMemoryJournalSpiTest {
 
@@ -38,7 +42,34 @@ class InMemoryJournalSpiTest {
   }
 
   @Test
+  void createMakesJournalAvailableForAppends() {
+    journal.create(KEY, Duration.ofHours(1));
+
+    String id = journal.append(KEY, "data".getBytes(UTF_8), Duration.ofHours(1));
+
+    assertNotNull(id);
+  }
+
+  @Test
+  void createThrowsOnDuplicateLiveJournal() {
+    journal.create(KEY, Duration.ofHours(1));
+
+    assertThatThrownBy(() -> journal.create(KEY, Duration.ofHours(1)))
+        .isInstanceOf(JournalAlreadyExistsException.class);
+  }
+
+  @Test
+  void createSucceedsAfterDeadJournal() {
+    journal.create(KEY, Duration.ofMillis(50));
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(() -> assertDoesNotThrow(() -> journal.create(KEY, Duration.ofHours(1))));
+  }
+
+  @Test
   void appendReturnsMonotonicallyIncreasingIds() {
+    journal.create(KEY, Duration.ofHours(1));
     String id1 = journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
     String id2 = journal.append(KEY, "data2".getBytes(UTF_8), Duration.ofHours(1));
     String id3 = journal.append(KEY, "data3".getBytes(UTF_8), Duration.ofHours(1));
@@ -48,7 +79,51 @@ class InMemoryJournalSpiTest {
   }
 
   @Test
+  void appendResetsInactivityTimer() {
+    journal.create(KEY, Duration.ofMillis(200));
+    journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
+
+    // Wait a bit, then append again to reset the timer
+    await().pollDelay(Duration.ofMillis(100)).atMost(Duration.ofSeconds(1)).until(() -> true);
+    journal.append(KEY, "data2".getBytes(UTF_8), Duration.ofHours(1));
+
+    // Wait a bit more — journal should still be alive because append reset the timer
+    await().pollDelay(Duration.ofMillis(100)).atMost(Duration.ofSeconds(1)).until(() -> true);
+    assertDoesNotThrow(() -> journal.append(KEY, "data3".getBytes(UTF_8), Duration.ofHours(1)));
+  }
+
+  @Test
+  void appendOnExpiredJournalThrowsJournalExpiredException() {
+    journal.create(KEY, Duration.ofMillis(50));
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(
+            () ->
+                assertThatThrownBy(
+                        () -> journal.append(KEY, "data".getBytes(UTF_8), Duration.ofHours(1)))
+                    .isInstanceOf(JournalExpiredException.class));
+  }
+
+  @Test
+  void appendOnNonExistentJournalThrowsJournalExpiredException() {
+    assertThatThrownBy(() -> journal.append(KEY, "data".getBytes(UTF_8), Duration.ofHours(1)))
+        .isInstanceOf(JournalExpiredException.class);
+  }
+
+  @Test
+  void appendOnCompletedJournalThrowsJournalCompletedException() {
+    journal.create(KEY, Duration.ofHours(1));
+    journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
+    journal.complete(KEY, Duration.ofHours(1));
+
+    assertThatThrownBy(() -> journal.append(KEY, "data2".getBytes(UTF_8), Duration.ofHours(1)))
+        .isInstanceOf(JournalCompletedException.class);
+  }
+
+  @Test
   void appendAndReadAfterReturnsEntriesAfterCursor() {
+    journal.create(KEY, Duration.ofHours(1));
     String id1 = journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
     String id2 = journal.append(KEY, "data2".getBytes(UTF_8), Duration.ofHours(1));
     String id3 = journal.append(KEY, "data3".getBytes(UTF_8), Duration.ofHours(1));
@@ -62,6 +137,7 @@ class InMemoryJournalSpiTest {
 
   @Test
   void readAfterWithZeroCursorReturnsAllEntries() {
+    journal.create(KEY, Duration.ofHours(1));
     journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
     journal.append(KEY, "data2".getBytes(UTF_8), Duration.ofHours(1));
 
@@ -71,14 +147,14 @@ class InMemoryJournalSpiTest {
   }
 
   @Test
-  void readAfterOnNonExistentKeyReturnsEmpty() {
-    List<RawJournalEntry> entries = journal.readAfter("nonexistent", "0-0");
-
-    assertTrue(entries.isEmpty());
+  void readAfterOnNonExistentKeyThrowsJournalExpiredException() {
+    assertThatThrownBy(() -> journal.readAfter("nonexistent", "0-0"))
+        .isInstanceOf(JournalExpiredException.class);
   }
 
   @Test
   void readLastReturnsLastNEntriesInOrder() {
+    journal.create(KEY, Duration.ofHours(1));
     journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
     journal.append(KEY, "data2".getBytes(UTF_8), Duration.ofHours(1));
     journal.append(KEY, "data3".getBytes(UTF_8), Duration.ofHours(1));
@@ -93,6 +169,7 @@ class InMemoryJournalSpiTest {
 
   @Test
   void readLastWithCountExceedingSizeReturnsAll() {
+    journal.create(KEY, Duration.ofHours(1));
     journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
     journal.append(KEY, "data2".getBytes(UTF_8), Duration.ofHours(1));
 
@@ -102,15 +179,15 @@ class InMemoryJournalSpiTest {
   }
 
   @Test
-  void readLastOnNonExistentKeyReturnsEmpty() {
-    List<RawJournalEntry> entries = journal.readLast("nonexistent", 5);
-
-    assertTrue(entries.isEmpty());
+  void readLastOnNonExistentKeyThrowsJournalExpiredException() {
+    assertThatThrownBy(() -> journal.readLast("nonexistent", 5))
+        .isInstanceOf(JournalExpiredException.class);
   }
 
   @Test
   void evictionRemovesOldestEntriesWhenFull() {
     InMemoryJournalSpi smallJournal = new InMemoryJournalSpi(3);
+    smallJournal.create(KEY, Duration.ofHours(1));
 
     smallJournal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
     smallJournal.append(KEY, "data2".getBytes(UTF_8), Duration.ofHours(1));
@@ -128,16 +205,18 @@ class InMemoryJournalSpiTest {
 
   @Test
   void deleteRemovesJournal() {
+    journal.create(KEY, Duration.ofHours(1));
     journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
 
     journal.delete(KEY);
 
-    List<RawJournalEntry> entries = journal.readAfter(KEY, "0-0");
-    assertTrue(entries.isEmpty());
+    assertThatThrownBy(() -> journal.readAfter(KEY, "0-0"))
+        .isInstanceOf(JournalExpiredException.class);
   }
 
   @Test
   void appendPreservesEntryFields() {
+    journal.create(KEY, Duration.ofHours(1));
     String id = journal.append(KEY, "myData".getBytes(UTF_8), Duration.ofHours(1));
 
     List<RawJournalEntry> entries = journal.readAfter(KEY, "0-0");
@@ -152,6 +231,7 @@ class InMemoryJournalSpiTest {
 
   @Test
   void readAfterHandlesIdWithoutDash() {
+    journal.create(KEY, Duration.ofHours(1));
     journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
 
     List<RawJournalEntry> entries = journal.readAfter(KEY, "0");
@@ -164,6 +244,9 @@ class InMemoryJournalSpiTest {
     String key1 = "substrate:journal:one";
     String key2 = "substrate:journal:two";
 
+    journal.create(key1, Duration.ofHours(1));
+    journal.create(key2, Duration.ofHours(1));
+
     journal.append(key1, "data1".getBytes(UTF_8), Duration.ofHours(1));
     journal.append(key2, "data2".getBytes(UTF_8), Duration.ofHours(1));
 
@@ -172,33 +255,126 @@ class InMemoryJournalSpiTest {
 
     journal.delete(key1);
 
-    assertTrue(journal.readAfter(key1, "0-0").isEmpty());
+    assertThatThrownBy(() -> journal.readAfter(key1, "0-0"))
+        .isInstanceOf(JournalExpiredException.class);
     assertEquals(1, journal.readAfter(key2, "0-0").size());
   }
 
   @Test
   void completeBlocksFurtherAppends() {
+    journal.create(KEY, Duration.ofHours(1));
     journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
-
-    journal.complete(KEY);
+    journal.complete(KEY, Duration.ofHours(1));
 
     byte[] data2 = "data2".getBytes(UTF_8);
     assertThrows(
-        IllegalStateException.class, () -> journal.append(KEY, data2, Duration.ofHours(1)));
+        JournalCompletedException.class, () -> journal.append(KEY, data2, Duration.ofHours(1)));
+  }
+
+  @Test
+  void completeUpdatesRetentionOnSecondCall() {
+    journal.create(KEY, Duration.ofHours(1));
+    journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
+    journal.complete(KEY, Duration.ofMillis(50));
+
+    // Update with longer retention — should still be readable
+    journal.complete(KEY, Duration.ofHours(1));
+
+    List<RawJournalEntry> entries = journal.readAfter(KEY, "0-0");
+    assertThat(entries).hasSize(1);
+  }
+
+  @Test
+  void completedJournalReadsStillWork() {
+    journal.create(KEY, Duration.ofHours(1));
+    journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
+    journal.complete(KEY, Duration.ofHours(1));
+
+    List<RawJournalEntry> entries = journal.readAfter(KEY, "0-0");
+    assertThat(entries).hasSize(1);
+  }
+
+  @Test
+  void completedJournalExpiresAfterRetentionTtl() {
+    journal.create(KEY, Duration.ofHours(1));
+    journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
+    journal.complete(KEY, Duration.ofMillis(50));
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(
+            () ->
+                assertThatThrownBy(() -> journal.readAfter(KEY, "0-0"))
+                    .isInstanceOf(JournalExpiredException.class));
+  }
+
+  @Test
+  void activeJournalExpiresViaInactivityTimeout() {
+    journal.create(KEY, Duration.ofMillis(50));
+    journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(
+            () ->
+                assertThatThrownBy(
+                        () -> journal.append(KEY, "data2".getBytes(UTF_8), Duration.ofHours(1)))
+                    .isInstanceOf(JournalExpiredException.class));
+  }
+
+  @Test
+  void completeOnExpiredJournalThrowsJournalExpiredException() {
+    journal.create(KEY, Duration.ofMillis(50));
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(
+            () ->
+                assertThatThrownBy(() -> journal.complete(KEY, Duration.ofHours(1)))
+                    .isInstanceOf(JournalExpiredException.class));
   }
 
   @Test
   void deleteRemovesCompletedStatus() {
+    journal.create(KEY, Duration.ofHours(1));
     journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
-    journal.complete(KEY);
+    journal.complete(KEY, Duration.ofHours(1));
 
     journal.delete(KEY);
 
+    journal.create(KEY, Duration.ofHours(1));
     assertDoesNotThrow(() -> journal.append(KEY, "data3".getBytes(UTF_8), Duration.ofHours(1)));
   }
 
   @Test
+  void isCompleteReturnsTrueForCompletedJournal() {
+    journal.create(KEY, Duration.ofHours(1));
+    journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
+    journal.complete(KEY, Duration.ofHours(1));
+
+    assertTrue(journal.isComplete(KEY));
+  }
+
+  @Test
+  void isCompleteReturnsFalseForActiveJournal() {
+    journal.create(KEY, Duration.ofHours(1));
+    journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
+
+    assertFalse(journal.isComplete(KEY));
+  }
+
+  @Test
+  void isCompleteReturnsFalseForExpiredJournal() {
+    journal.create(KEY, Duration.ofMillis(50));
+    journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
+    journal.complete(KEY, Duration.ofMillis(50));
+
+    await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> assertFalse(journal.isComplete(KEY)));
+  }
+
+  @Test
   void expiredEntriesAreExcludedFromReads() {
+    journal.create(KEY, Duration.ofHours(1));
     journal.append(KEY, "short-lived".getBytes(UTF_8), Duration.ofMillis(50));
 
     await()
@@ -211,37 +387,32 @@ class InMemoryJournalSpiTest {
   }
 
   @Test
-  void sweepRemovesExpiredEntries() {
-    for (int i = 0; i < 5; i++) {
-      journal.append(KEY, ("data-" + i).getBytes(UTF_8), Duration.ofMillis(50));
-    }
+  void sweepRemovesDeadJournals() {
+    journal.create(KEY, Duration.ofMillis(50));
+    journal.append(KEY, "data".getBytes(UTF_8), Duration.ofHours(1));
 
     await()
         .atMost(Duration.ofSeconds(2))
-        .untilAsserted(
-            () -> {
-              int removed = journal.sweep(10);
-              assertThat(removed).isEqualTo(5);
-            });
-
-    assertThat(journal.readAfter(KEY, "0-0")).isEmpty();
+        .untilAsserted(() -> assertThat(journal.sweep(10)).isEqualTo(1));
   }
 
   @Test
   void sweepRespectsMaxToSweep() {
-    for (int i = 0; i < 10; i++) {
-      journal.append(KEY, ("data-" + i).getBytes(UTF_8), Duration.ofMillis(50));
-    }
+    String key1 = "substrate:journal:one";
+    String key2 = "substrate:journal:two";
+    journal.create(key1, Duration.ofMillis(50));
+    journal.create(key2, Duration.ofMillis(50));
 
     await()
         .atMost(Duration.ofSeconds(2))
-        .untilAsserted(() -> assertThat(journal.sweep(3)).isEqualTo(3));
+        .untilAsserted(() -> assertThat(journal.sweep(1)).isEqualTo(1));
 
-    assertThat(journal.sweep(10)).isEqualTo(7);
+    assertThat(journal.sweep(10)).isEqualTo(1);
   }
 
   @Test
   void sweepReturnsZeroWhenNothingExpired() {
+    journal.create(KEY, Duration.ofHours(1));
     journal.append(KEY, "alive".getBytes(UTF_8), Duration.ofSeconds(10));
 
     assertThat(journal.sweep(1000)).isZero();

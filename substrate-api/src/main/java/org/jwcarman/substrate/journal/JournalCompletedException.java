@@ -15,16 +15,9 @@
  */
 package org.jwcarman.substrate.journal;
 
-import java.time.Duration;
-import org.jwcarman.codec.spi.TypeRef;
+public class JournalCompletedException extends RuntimeException {
 
-public interface JournalFactory {
-
-  <T> Journal<T> create(String name, Class<T> type, Duration inactivityTtl);
-
-  <T> Journal<T> create(String name, TypeRef<T> typeRef, Duration inactivityTtl);
-
-  <T> Journal<T> connect(String name, Class<T> type);
-
-  <T> Journal<T> connect(String name, TypeRef<T> typeRef);
+  public JournalCompletedException(String key) {
+    super("Journal has been completed: " + key);
+  }
 }

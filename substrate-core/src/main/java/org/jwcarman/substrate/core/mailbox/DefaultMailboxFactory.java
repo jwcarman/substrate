@@ -58,4 +58,16 @@ public class DefaultMailboxFactory implements MailboxFactory {
     mailboxSpi.create(key, ttl);
     return new DefaultMailbox<>(mailboxSpi, key, codecFactory.create(typeRef), notifier);
   }
+
+  @Override
+  public <T> Mailbox<T> connect(String name, Class<T> type) {
+    String key = mailboxSpi.mailboxKey(name);
+    return new DefaultMailbox<>(mailboxSpi, key, codecFactory.create(type), notifier);
+  }
+
+  @Override
+  public <T> Mailbox<T> connect(String name, TypeRef<T> typeRef) {
+    String key = mailboxSpi.mailboxKey(name);
+    return new DefaultMailbox<>(mailboxSpi, key, codecFactory.create(typeRef), notifier);
+  }
 }

@@ -20,19 +20,42 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 import org.jwcarman.substrate.core.journal.AbstractJournalSpi;
 import org.jwcarman.substrate.core.journal.RawJournalEntry;
+import org.jwcarman.substrate.journal.JournalAlreadyExistsException;
+import org.jwcarman.substrate.journal.JournalCompletedException;
+import org.jwcarman.substrate.journal.JournalExpiredException;
 
 public class InMemoryJournalSpi extends AbstractJournalSpi {
 
   private static final int DEFAULT_MAX_LEN = 100_000;
 
-  private final ConcurrentMap<String, BoundedEntryList> journals = new ConcurrentHashMap<>();
-  private final Set<String> completed = ConcurrentHashMap.newKeySet();
+  private sealed interface State permits Active, Completed {
+    boolean isDead(Instant now);
+
+    BoundedEntryList entries();
+  }
+
+  private record Active(Instant lastAppendAt, Duration inactivityTtl, BoundedEntryList entries)
+      implements State {
+    @Override
+    public boolean isDead(Instant now) {
+      return now.isAfter(lastAppendAt.plus(inactivityTtl));
+    }
+  }
+
+  private record Completed(Instant completedAt, Duration retentionTtl, BoundedEntryList entries)
+      implements State {
+    @Override
+    public boolean isDead(Instant now) {
+      return now.isAfter(completedAt.plus(retentionTtl));
+    }
+  }
+
+  private final ConcurrentMap<String, State> store = new ConcurrentHashMap<>();
   private final int maxLen;
   private final AtomicLong counter = new AtomicLong(0);
 
@@ -46,26 +69,56 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public String append(String key, byte[] data, Duration ttl) {
-    if (completed.contains(key)) {
-      throw new IllegalStateException("Journal '" + key + "' is completed");
+  public void create(String key, Duration inactivityTtl) {
+    Instant now = Instant.now();
+    State newState = new Active(now, inactivityTtl, new BoundedEntryList(maxLen));
+    State existing = store.putIfAbsent(key, newState);
+    if (existing != null) {
+      if (!existing.isDead(now)) {
+        throw new JournalAlreadyExistsException(key);
+      }
+      // Dead journal — replace it
+      store.put(key, newState);
     }
+  }
+
+  @Override
+  public String append(String key, byte[] data, Duration entryTtl) {
+    Instant now = Instant.now();
     String entryId = counter.incrementAndGet() + "-0";
-    Instant expiresAt = Instant.now().plus(ttl);
-    RawJournalEntry entry = new RawJournalEntry(entryId, key, data, Instant.now());
-    journals.computeIfAbsent(key, k -> new BoundedEntryList(maxLen)).add(entry, expiresAt);
+    Instant expiresAt = now.plus(entryTtl);
+    RawJournalEntry entry = new RawJournalEntry(entryId, key, data, now);
+
+    store.compute(
+        key,
+        (k, state) -> {
+          if (state == null || state.isDead(now)) {
+            throw new JournalExpiredException(k);
+          }
+          return switch (state) {
+            case Active active -> {
+              active.entries().add(entry, expiresAt);
+              yield new Active(now, active.inactivityTtl(), active.entries());
+            }
+            case Completed _ -> throw new JournalCompletedException(k);
+          };
+        });
+
     return entryId;
   }
 
   @Override
   public List<RawJournalEntry> readAfter(String key, String afterId) {
-    BoundedEntryList list = journals.get(key);
-    if (list == null) {
-      return List.of();
+    Instant now = Instant.now();
+    State state = store.get(key);
+    if (state == null) {
+      throw new JournalExpiredException(key);
+    }
+    if (state.isDead(now)) {
+      throw new JournalExpiredException(key);
     }
     long cursor = parseId(afterId);
-    Instant now = Instant.now();
-    return list.snapshot().stream()
+    return state.entries().snapshot().stream()
         .filter(e -> parseId(e.entry().id()) > cursor && e.expiresAt().isAfter(now))
         .map(TimedEntry::entry)
         .toList();
@@ -73,13 +126,16 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
 
   @Override
   public List<RawJournalEntry> readLast(String key, int count) {
-    BoundedEntryList list = journals.get(key);
-    if (list == null) {
-      return List.of();
-    }
     Instant now = Instant.now();
+    State state = store.get(key);
+    if (state == null) {
+      throw new JournalExpiredException(key);
+    }
+    if (state.isDead(now)) {
+      throw new JournalExpiredException(key);
+    }
     List<RawJournalEntry> live =
-        list.snapshot().stream()
+        state.entries().snapshot().stream()
             .filter(e -> e.expiresAt().isAfter(now))
             .map(TimedEntry::entry)
             .toList();
@@ -88,32 +144,47 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public void complete(String key) {
-    completed.add(key);
+  public void complete(String key, Duration retentionTtl) {
+    Instant now = Instant.now();
+    store.compute(
+        key,
+        (k, state) -> {
+          if (state == null || state.isDead(now)) {
+            throw new JournalExpiredException(k);
+          }
+          return switch (state) {
+            case Active active -> new Completed(now, retentionTtl, active.entries());
+            case Completed completed ->
+                new Completed(completed.completedAt(), retentionTtl, completed.entries());
+          };
+        });
   }
 
   @Override
   public boolean isComplete(String key) {
-    return completed.contains(key);
+    Instant now = Instant.now();
+    State state = store.get(key);
+    return state instanceof Completed && !state.isDead(now);
   }
 
   @Override
   public int sweep(int maxToSweep) {
     Instant now = Instant.now();
     int removed = 0;
-    for (BoundedEntryList list : journals.values()) {
-      if (removed >= maxToSweep) {
-        break;
+    var iterator = store.entrySet().iterator();
+    while (iterator.hasNext() && removed < maxToSweep) {
+      var entry = iterator.next();
+      if (entry.getValue().isDead(now)) {
+        iterator.remove();
+        removed++;
       }
-      removed += list.removeExpired(now, maxToSweep - removed);
     }
     return removed;
   }
 
   @Override
   public void delete(String key) {
-    journals.remove(key);
-    completed.remove(key);
+    store.remove(key);
   }
 
   private static long parseId(String id) {
@@ -121,9 +192,9 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
     return Long.parseLong(dash >= 0 ? id.substring(0, dash) : id);
   }
 
-  private record TimedEntry(RawJournalEntry entry, Instant expiresAt) {}
+  record TimedEntry(RawJournalEntry entry, Instant expiresAt) {}
 
-  private static final class BoundedEntryList {
+  static final class BoundedEntryList {
 
     private final int maxSize;
     private final LinkedList<TimedEntry> entries = new LinkedList<>();
@@ -133,7 +204,6 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
     }
 
     synchronized void add(RawJournalEntry entry, Instant expiresAt) {
-      // Lazy sweep: remove expired entries
       Instant now = Instant.now();
       entries.removeIf(e -> e.expiresAt().isBefore(now));
 

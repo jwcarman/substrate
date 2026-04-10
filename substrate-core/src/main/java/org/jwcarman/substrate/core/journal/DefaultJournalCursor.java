@@ -27,6 +27,7 @@ import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.notifier.NotifierSubscription;
 import org.jwcarman.substrate.journal.JournalCursor;
 import org.jwcarman.substrate.journal.JournalEntry;
+import org.jwcarman.substrate.journal.JournalExpiredException;
 
 class DefaultJournalCursor<T> implements JournalCursor<T> {
 
@@ -37,6 +38,8 @@ class DefaultJournalCursor<T> implements JournalCursor<T> {
     record Entry<T>(JournalEntry<T> entry) implements QueueItem<T> {}
 
     record Complete<T>() implements QueueItem<T> {}
+
+    record Expired<T>(JournalExpiredException exception) implements QueueItem<T> {}
   }
 
   private final AtomicBoolean open = new AtomicBoolean(true);
@@ -91,10 +94,15 @@ class DefaultJournalCursor<T> implements JournalCursor<T> {
     try {
       while (open.get()) {
         List<RawJournalEntry> entries;
-        if (readerId != null) {
-          entries = journalSpi.readAfter(key, readerId);
-        } else {
-          entries = journalSpi.readLast(key, Integer.MAX_VALUE);
+        try {
+          if (readerId != null) {
+            entries = journalSpi.readAfter(key, readerId);
+          } else {
+            entries = journalSpi.readLast(key, Integer.MAX_VALUE);
+          }
+        } catch (JournalExpiredException e) {
+          queue.put(new QueueItem.Expired<>(e));
+          return;
         }
 
         for (RawJournalEntry raw : entries) {
@@ -104,8 +112,13 @@ class DefaultJournalCursor<T> implements JournalCursor<T> {
           readerId = raw.id();
         }
 
-        if (journalSpi.isComplete(key) && entries.isEmpty()) {
-          queue.put(new QueueItem.Complete<>());
+        try {
+          if (journalSpi.isComplete(key) && entries.isEmpty()) {
+            queue.put(new QueueItem.Complete<>());
+            return;
+          }
+        } catch (JournalExpiredException e) {
+          queue.put(new QueueItem.Expired<>(e));
           return;
         }
 
@@ -137,6 +150,10 @@ class DefaultJournalCursor<T> implements JournalCursor<T> {
         case QueueItem.Complete<T> _ -> {
           open.set(false);
           yield Optional.empty();
+        }
+        case QueueItem.Expired<T>(var exception) -> {
+          open.set(false);
+          throw exception;
         }
       };
     } catch (InterruptedException _) {

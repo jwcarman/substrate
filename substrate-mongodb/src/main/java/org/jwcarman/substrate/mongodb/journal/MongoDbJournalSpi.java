@@ -117,11 +117,20 @@ public class MongoDbJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
-  public void complete(String key) {
+  public void complete(String key, Duration retentionTtl) {
     Document doc = new Document();
     doc.put(FIELD_KEY, key);
     doc.put(FIELD_ENTRY_ID, COMPLETED_ENTRY_ID);
     doc.put(FIELD_TIMESTAMP, Instant.now());
+
+    if (retentionTtl != null && !retentionTtl.isZero()) {
+      doc.put(FIELD_EXPIRE_AT, Instant.now().plus(retentionTtl));
+    }
+
+    // Remove any existing completion marker before inserting
+    Query removeQuery =
+        new Query(Criteria.where(FIELD_KEY).is(key).and(FIELD_ENTRY_ID).is(COMPLETED_ENTRY_ID));
+    mongoTemplate.remove(removeQuery, collectionName);
 
     mongoTemplate.insert(doc, collectionName);
   }

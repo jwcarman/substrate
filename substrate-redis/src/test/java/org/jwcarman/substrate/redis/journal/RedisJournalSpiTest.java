@@ -191,7 +191,7 @@ class RedisJournalSpiTest {
 
   @Test
   void completeSetsCompletionFlag() {
-    journal.complete("substrate:journal:test");
+    journal.complete("substrate:journal:test", Duration.ofHours(1));
 
     verify(commands).set("substrate:journal:test:completed", "true");
   }

@@ -24,7 +24,7 @@ public record SubstrateProperties(
 
   public SubstrateProperties {
     if (atom == null) atom = new AtomProperties(null, null);
-    if (journal == null) journal = new JournalProperties(null, null);
+    if (journal == null) journal = new JournalProperties(null, null, null, null);
     if (mailbox == null) mailbox = new MailboxProperties(null, null);
   }
 
@@ -35,9 +35,15 @@ public record SubstrateProperties(
     }
   }
 
-  public record JournalProperties(Duration maxTtl, SweepProperties sweep) {
+  public record JournalProperties(
+      Duration maxInactivityTtl,
+      Duration maxRetentionTtl,
+      Duration maxEntryTtl,
+      SweepProperties sweep) {
     public JournalProperties {
-      if (maxTtl == null) maxTtl = Duration.ofDays(7);
+      if (maxInactivityTtl == null) maxInactivityTtl = Duration.ofHours(24);
+      if (maxRetentionTtl == null) maxRetentionTtl = Duration.ofDays(30);
+      if (maxEntryTtl == null) maxEntryTtl = Duration.ofDays(7);
       if (sweep == null) sweep = SweepProperties.defaults();
     }
   }
