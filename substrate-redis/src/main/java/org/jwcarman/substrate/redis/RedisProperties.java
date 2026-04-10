@@ -20,11 +20,16 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "substrate.redis")
 public record RedisProperties(
-    JournalProperties journal, MailboxProperties mailbox, NotifierProperties notifier) {
+    JournalProperties journal,
+    MailboxProperties mailbox,
+    NotifierProperties notifier,
+    AtomProperties atom) {
   public record JournalProperties(
       boolean enabled, String prefix, long maxLen, Duration defaultTtl) {}
 
   public record MailboxProperties(boolean enabled, String prefix) {}
 
   public record NotifierProperties(boolean enabled, String channelPrefix) {}
+
+  public record AtomProperties(boolean enabled, String prefix) {}
 }
