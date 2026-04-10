@@ -36,6 +36,11 @@
         <dependencies>
             <dependency>
                 <groupId>org.jwcarman.substrate</groupId>
+                <artifactId>substrate-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jwcarman.substrate</groupId>
                 <artifactId>substrate-core</artifactId>
                 <version>${project.version}</version>
             </dependency>

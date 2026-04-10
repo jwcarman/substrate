@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-07T15:49:00Z
-ITERATION: 18
-SPEC_COMPLETED: 017-semaphore-nudge-model.md
-WHAT_WAS_DONE: Refactored JournalCursor and Mailbox to use dedicated reader virtual threads — DefaultJournalCursor now uses a reader virtual thread that reads from SPI and pushes decoded entries into a bounded LinkedBlockingQueue (capacity 1024) with Semaphore(0) nudge signaling and drainPermits(); consumer poll() delegates to queue.poll(timeout); journal completion signaled via sealed QueueItem.Complete sentinel through the queue; DefaultMailbox now uses a reader virtual thread with CompletableFuture<T> — reader loops checking SPI on each nudge, completes the future when value found, consumer poll() delegates to future.get(timeout); both use "just in case" reads before waiting on semaphore; no synchronized blocks or Object.wait()
-VERIFICATION: ./mvnw verify -DskipITs — BUILD SUCCESS (all 23 modules pass); ./mvnw spotless:check — PASS; all 26 substrate-core tests pass including 3 new tests (stacked nudges, missed nudge, backpressure)
+LAST_RUN: 2026-04-10T17:25:00Z
+ITERATION: 19
+SPEC_COMPLETED: 018-atom-primitive.md
+WHAT_WAS_DONE: Implemented the Atom primitive — created substrate-api module with user-facing interfaces (Atom, AtomFactory, Snapshot, AtomExpiredException, AtomAlreadyExistsException), created substrate-core implementation types (DefaultAtom, DefaultAtomFactory, AtomSpi, AbstractAtomSpi, AtomRecord, InMemoryAtomSpi), deleted the old Atom.java stub, wired autoconfiguration beans, and wrote comprehensive tests (DefaultAtomTest, DefaultAtomFactoryTest, InMemoryAtomSpiTest) covering all acceptance criteria including watch semantics, token staleness detection, TTL expiry, concurrent creation, and lazy connect behavior.
+VERIFICATION: ./mvnw verify -DskipITs — BUILD SUCCESS (all 24 modules pass including new substrate-api); ./mvnw spotless:check — PASS; substrate-core tests include 30+ new atom tests all passing
 STATUS: MORE_WORK
-NEXT_SPEC: none
-NOTES: Used sealed interface QueueItem<T> (Entry/Complete) to avoid @SuppressWarnings("unchecked") on the queue — fully type-safe poison pill pattern. Preloaded entries (for readLast) are now passed as a constructor parameter to DefaultJournalCursor instead of a separate preload() method. Reader thread handles null readerId by calling readLast(key, MAX_VALUE) instead of readAfter. close() offers a Complete sentinel into the queue to immediately unblock consumers blocked on queue.poll(). Mailbox reader thread exits naturally when future.complete() is called. delete() cancels the future and releases the semaphore.
+NEXT_SPEC: none (specs/ directory has no remaining specs; backlog specs need promotion)
+NOTES: substrate-api uses codec-core (not codec-spi as the spec text mentioned — codec-spi doesn't exist as a separate artifact; TypeRef and Codec live in codec-core). Added awaitility test dependency to substrate-core/pom.xml since it wasn't already present. The core/ directory under substrate-core/src/main/java still has DefaultJournal, DefaultMailbox etc. — the old Atom.java stub was the only file deleted. Specs 019/020/021 remain in backlog for future promotion.

@@ -103,6 +103,7 @@
 
     <modules>
         <module>substrate-bom</module>
+        <module>substrate-api</module>
         <module>substrate-core</module>
         <module>substrate-notifier-redis</module>
         <module>substrate-journal-redis</module>

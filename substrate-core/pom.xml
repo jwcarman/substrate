@@ -33,6 +33,11 @@
 
     <dependencies>
         <dependency>
+            <groupId>org.jwcarman.substrate</groupId>
+            <artifactId>substrate-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.jwcarman.codec</groupId>
             <artifactId>codec-core</artifactId>
         </dependency>
@@ -73,6 +78,11 @@
         <dependency>
             <groupId>org.jwcarman.codec</groupId>
             <artifactId>codec-jackson</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

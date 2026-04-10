@@ -18,8 +18,12 @@ package org.jwcarman.substrate.autoconfigure;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.jwcarman.codec.spi.CodecFactory;
+import org.jwcarman.substrate.atom.AtomFactory;
 import org.jwcarman.substrate.core.JournalFactory;
 import org.jwcarman.substrate.core.MailboxFactory;
+import org.jwcarman.substrate.core.atom.AtomSpi;
+import org.jwcarman.substrate.core.atom.DefaultAtomFactory;
+import org.jwcarman.substrate.core.memory.atom.InMemoryAtomSpi;
 import org.jwcarman.substrate.memory.InMemoryJournalSpi;
 import org.jwcarman.substrate.memory.InMemoryMailboxSpi;
 import org.jwcarman.substrate.memory.InMemoryNotifier;
@@ -65,6 +69,22 @@ public class SubstrateAutoConfiguration {
         "No Notifier implementation found; using in-memory fallback (single-node only). "
             + "For clustered deployments, add a backend module (e.g. substrate-notifier-redis).");
     return new InMemoryNotifier();
+  }
+
+  @Bean
+  @ConditionalOnMissingBean(AtomSpi.class)
+  public InMemoryAtomSpi atomSpi() {
+    log.warn(
+        "No Atom implementation found; using in-memory fallback "
+            + "(single-node only). For clustered deployments, add a backend "
+            + "module (e.g. substrate-atom-redis).");
+    return new InMemoryAtomSpi();
+  }
+
+  @Bean
+  @ConditionalOnBean({AtomSpi.class, CodecFactory.class, Notifier.class})
+  public AtomFactory atomFactory(AtomSpi atomSpi, CodecFactory codecFactory, Notifier notifier) {
+    return new DefaultAtomFactory(atomSpi, codecFactory, notifier);
   }
 
   @Bean
