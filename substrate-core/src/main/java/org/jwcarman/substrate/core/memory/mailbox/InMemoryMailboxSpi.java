@@ -73,6 +73,20 @@ public class InMemoryMailboxSpi extends AbstractMailboxSpi {
   }
 
   @Override
+  public int sweep(int maxToSweep) {
+    Instant now = Instant.now();
+    int removed = 0;
+    var iterator = store.entrySet().iterator();
+    while (iterator.hasNext() && removed < maxToSweep) {
+      if (!iterator.next().getValue().isAlive(now)) {
+        iterator.remove();
+        removed++;
+      }
+    }
+    return removed;
+  }
+
+  @Override
   public void delete(String key) {
     store.remove(key);
   }

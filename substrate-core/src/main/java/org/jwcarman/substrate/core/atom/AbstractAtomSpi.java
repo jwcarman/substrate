@@ -28,6 +28,11 @@ public abstract class AbstractAtomSpi implements AtomSpi {
   }
 
   @Override
+  public int sweep(int maxToSweep) {
+    return 0;
+  }
+
+  @Override
   public String atomKey(String name) {
     return prefix + name;
   }

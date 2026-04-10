@@ -20,11 +20,14 @@ import org.apache.commons.logging.LogFactory;
 import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.substrate.atom.AtomFactory;
 import org.jwcarman.substrate.core.atom.AtomSpi;
+import org.jwcarman.substrate.core.atom.AtomSweeper;
 import org.jwcarman.substrate.core.atom.DefaultAtomFactory;
 import org.jwcarman.substrate.core.journal.DefaultJournalFactory;
 import org.jwcarman.substrate.core.journal.JournalSpi;
+import org.jwcarman.substrate.core.journal.JournalSweeper;
 import org.jwcarman.substrate.core.mailbox.DefaultMailboxFactory;
 import org.jwcarman.substrate.core.mailbox.MailboxSpi;
+import org.jwcarman.substrate.core.mailbox.MailboxSweeper;
 import org.jwcarman.substrate.core.memory.atom.InMemoryAtomSpi;
 import org.jwcarman.substrate.core.memory.journal.InMemoryJournalSpi;
 import org.jwcarman.substrate.core.memory.mailbox.InMemoryMailboxSpi;
@@ -35,6 +38,7 @@ import org.jwcarman.substrate.mailbox.MailboxFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.PropertySource;
@@ -113,5 +117,41 @@ public class SubstrateAutoConfiguration {
       SubstrateProperties properties) {
     return new DefaultMailboxFactory(
         mailboxSpi, codecFactory, notifier, properties.mailbox().maxTtl());
+  }
+
+  @Bean(destroyMethod = "close")
+  @ConditionalOnBean(AtomSpi.class)
+  @ConditionalOnProperty(
+      prefix = "substrate.atom.sweep",
+      name = "enabled",
+      havingValue = "true",
+      matchIfMissing = true)
+  public AtomSweeper atomSweeper(AtomSpi atomSpi, SubstrateProperties props) {
+    var sweep = props.atom().sweep();
+    return new AtomSweeper(atomSpi, sweep.interval(), sweep.batchSize());
+  }
+
+  @Bean(destroyMethod = "close")
+  @ConditionalOnBean(JournalSpi.class)
+  @ConditionalOnProperty(
+      prefix = "substrate.journal.sweep",
+      name = "enabled",
+      havingValue = "true",
+      matchIfMissing = true)
+  public JournalSweeper journalSweeper(JournalSpi journalSpi, SubstrateProperties props) {
+    var sweep = props.journal().sweep();
+    return new JournalSweeper(journalSpi, sweep.interval(), sweep.batchSize());
+  }
+
+  @Bean(destroyMethod = "close")
+  @ConditionalOnBean(MailboxSpi.class)
+  @ConditionalOnProperty(
+      prefix = "substrate.mailbox.sweep",
+      name = "enabled",
+      havingValue = "true",
+      matchIfMissing = true)
+  public MailboxSweeper mailboxSweeper(MailboxSpi mailboxSpi, SubstrateProperties props) {
+    var sweep = props.mailbox().sweep();
+    return new MailboxSweeper(mailboxSpi, sweep.interval(), sweep.batchSize());
   }
 }

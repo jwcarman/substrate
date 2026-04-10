@@ -98,6 +98,19 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
+  public int sweep(int maxToSweep) {
+    Instant now = Instant.now();
+    int removed = 0;
+    for (BoundedEntryList list : journals.values()) {
+      if (removed >= maxToSweep) {
+        break;
+      }
+      removed += list.removeExpired(now, maxToSweep - removed);
+    }
+    return removed;
+  }
+
+  @Override
   public void delete(String key) {
     journals.remove(key);
     completed.remove(key);
@@ -128,6 +141,18 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
       while (entries.size() > maxSize) {
         entries.removeFirst();
       }
+    }
+
+    synchronized int removeExpired(Instant now, int max) {
+      int removed = 0;
+      var iterator = entries.iterator();
+      while (iterator.hasNext() && removed < max) {
+        if (iterator.next().expiresAt().isBefore(now)) {
+          iterator.remove();
+          removed++;
+        }
+      }
+      return removed;
     }
 
     synchronized List<TimedEntry> snapshot() {

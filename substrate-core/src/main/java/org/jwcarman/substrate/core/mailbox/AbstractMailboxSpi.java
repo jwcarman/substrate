@@ -28,6 +28,11 @@ public abstract class AbstractMailboxSpi implements MailboxSpi {
   }
 
   @Override
+  public int sweep(int maxToSweep) {
+    return 0;
+  }
+
+  @Override
   public String mailboxKey(String name) {
     return prefix + name;
   }

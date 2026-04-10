@@ -23,26 +23,40 @@ public record SubstrateProperties(
     AtomProperties atom, JournalProperties journal, MailboxProperties mailbox) {
 
   public SubstrateProperties {
-    if (atom == null) atom = new AtomProperties(Duration.ofHours(24));
-    if (journal == null) journal = new JournalProperties(Duration.ofDays(7));
-    if (mailbox == null) mailbox = new MailboxProperties(Duration.ofMinutes(30));
+    if (atom == null) atom = new AtomProperties(null, null);
+    if (journal == null) journal = new JournalProperties(null, null);
+    if (mailbox == null) mailbox = new MailboxProperties(null, null);
   }
 
-  public record AtomProperties(Duration maxTtl) {
+  public record AtomProperties(Duration maxTtl, SweepProperties sweep) {
     public AtomProperties {
       if (maxTtl == null) maxTtl = Duration.ofHours(24);
+      if (sweep == null) sweep = SweepProperties.defaults();
     }
   }
 
-  public record JournalProperties(Duration maxTtl) {
+  public record JournalProperties(Duration maxTtl, SweepProperties sweep) {
     public JournalProperties {
       if (maxTtl == null) maxTtl = Duration.ofDays(7);
+      if (sweep == null) sweep = SweepProperties.defaults();
     }
   }
 
-  public record MailboxProperties(Duration maxTtl) {
+  public record MailboxProperties(Duration maxTtl, SweepProperties sweep) {
     public MailboxProperties {
       if (maxTtl == null) maxTtl = Duration.ofMinutes(30);
+      if (sweep == null) sweep = SweepProperties.defaults();
+    }
+  }
+
+  public record SweepProperties(boolean enabled, Duration interval, int batchSize) {
+    public SweepProperties {
+      if (interval == null) interval = Duration.ofMinutes(1);
+      if (batchSize <= 0) batchSize = 1000;
+    }
+
+    public static SweepProperties defaults() {
+      return new SweepProperties(true, null, 0);
     }
   }
 }

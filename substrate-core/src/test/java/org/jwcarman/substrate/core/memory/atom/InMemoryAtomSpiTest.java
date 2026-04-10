@@ -202,4 +202,43 @@ class InMemoryAtomSpiTest {
   void atomKeyAppliesPrefix() {
     assertThat(spi.atomKey("test")).isEqualTo("substrate:atom:test");
   }
+
+  @Test
+  void sweepRemovesExpiredEntries() {
+    for (int i = 0; i < 5; i++) {
+      spi.create("key-" + i, new byte[] {(byte) i}, "t" + i, Duration.ofMillis(50));
+    }
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(
+            () -> {
+              int removed = spi.sweep(10);
+              assertThat(removed).isEqualTo(5);
+            });
+
+    for (int i = 0; i < 5; i++) {
+      assertThat(spi.read("key-" + i)).isEmpty();
+    }
+  }
+
+  @Test
+  void sweepRespectsMaxToSweep() {
+    for (int i = 0; i < 10; i++) {
+      spi.create("key-" + i, new byte[] {(byte) i}, "t" + i, Duration.ofMillis(50));
+    }
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(() -> assertThat(spi.sweep(3)).isEqualTo(3));
+
+    assertThat(spi.sweep(10)).isEqualTo(7);
+  }
+
+  @Test
+  void sweepReturnsZeroWhenNothingExpired() {
+    spi.create("key", new byte[] {1}, "t1", Duration.ofSeconds(10));
+
+    assertThat(spi.sweep(1000)).isZero();
+  }
 }

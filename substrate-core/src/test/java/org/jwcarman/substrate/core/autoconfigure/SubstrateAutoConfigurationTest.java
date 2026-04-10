@@ -24,9 +24,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.codec.jackson.JacksonCodecFactory;
 import org.jwcarman.codec.spi.CodecFactory;
+import org.jwcarman.substrate.core.atom.AtomSweeper;
 import org.jwcarman.substrate.core.journal.JournalSpi;
+import org.jwcarman.substrate.core.journal.JournalSweeper;
 import org.jwcarman.substrate.core.journal.RawJournalEntry;
 import org.jwcarman.substrate.core.mailbox.MailboxSpi;
+import org.jwcarman.substrate.core.mailbox.MailboxSweeper;
 import org.jwcarman.substrate.core.memory.journal.InMemoryJournalSpi;
 import org.jwcarman.substrate.core.memory.mailbox.InMemoryMailboxSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
@@ -191,6 +194,48 @@ class SubstrateAutoConfigurationTest {
             });
   }
 
+  @Test
+  void sweepersCreatedByDefault() {
+    contextRunner.run(
+        context -> {
+          assertThat(context).hasSingleBean(AtomSweeper.class);
+          assertThat(context).hasSingleBean(JournalSweeper.class);
+          assertThat(context).hasSingleBean(MailboxSweeper.class);
+        });
+  }
+
+  @Test
+  void atomSweeperDisabledViaProperty() {
+    contextRunner
+        .withPropertyValues("substrate.atom.sweep.enabled=false")
+        .run(context -> assertThat(context).doesNotHaveBean(AtomSweeper.class));
+  }
+
+  @Test
+  void journalSweeperDisabledViaProperty() {
+    contextRunner
+        .withPropertyValues("substrate.journal.sweep.enabled=false")
+        .run(context -> assertThat(context).doesNotHaveBean(JournalSweeper.class));
+  }
+
+  @Test
+  void mailboxSweeperDisabledViaProperty() {
+    contextRunner
+        .withPropertyValues("substrate.mailbox.sweep.enabled=false")
+        .run(context -> assertThat(context).doesNotHaveBean(MailboxSweeper.class));
+  }
+
+  @Test
+  void sweepIntervalConfigurationOverrideViaProperties() {
+    contextRunner
+        .withPropertyValues("substrate.atom.sweep.interval=PT5M")
+        .run(
+            context -> {
+              SubstrateProperties props = context.getBean(SubstrateProperties.class);
+              assertThat(props.atom().sweep().interval()).isEqualTo(Duration.ofMinutes(5));
+            });
+  }
+
   @Configuration(proxyBeanMethods = false)
   static class CodecFactoryConfiguration {
 
@@ -260,6 +305,11 @@ class SubstrateAutoConfigurationTest {
     }
 
     @Override
+    public int sweep(int maxToSweep) {
+      return 0;
+    }
+
+    @Override
     public String journalKey(String name) {
       return "stub:" + name;
     }
@@ -285,6 +335,11 @@ class SubstrateAutoConfigurationTest {
     @Override
     public void delete(String key) {
       // no-op stub for testing
+    }
+
+    @Override
+    public int sweep(int maxToSweep) {
+      return 0;
     }
 
     @Override

@@ -164,6 +164,11 @@ class DefaultAtomFactoryTest {
           }
 
           @Override
+          public int sweep(int maxToSweep) {
+            throw new AssertionError("SPI should not be called during connect");
+          }
+
+          @Override
           public String atomKey(String name) {
             return "substrate:atom:" + name;
           }

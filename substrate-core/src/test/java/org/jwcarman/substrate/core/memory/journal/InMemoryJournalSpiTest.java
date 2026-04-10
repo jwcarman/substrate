@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.core.memory.journal;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -207,6 +208,43 @@ class InMemoryJournalSpiTest {
               List<RawJournalEntry> entries = journal.readAfter(KEY, "0-0");
               assertTrue(entries.isEmpty());
             });
+  }
+
+  @Test
+  void sweepRemovesExpiredEntries() {
+    for (int i = 0; i < 5; i++) {
+      journal.append(KEY, ("data-" + i).getBytes(UTF_8), Duration.ofMillis(50));
+    }
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(
+            () -> {
+              int removed = journal.sweep(10);
+              assertThat(removed).isEqualTo(5);
+            });
+
+    assertThat(journal.readAfter(KEY, "0-0")).isEmpty();
+  }
+
+  @Test
+  void sweepRespectsMaxToSweep() {
+    for (int i = 0; i < 10; i++) {
+      journal.append(KEY, ("data-" + i).getBytes(UTF_8), Duration.ofMillis(50));
+    }
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(() -> assertThat(journal.sweep(3)).isEqualTo(3));
+
+    assertThat(journal.sweep(10)).isEqualTo(7);
+  }
+
+  @Test
+  void sweepReturnsZeroWhenNothingExpired() {
+    journal.append(KEY, "alive".getBytes(UTF_8), Duration.ofSeconds(10));
+
+    assertThat(journal.sweep(1000)).isZero();
   }
 
   private static long parseId(String id) {

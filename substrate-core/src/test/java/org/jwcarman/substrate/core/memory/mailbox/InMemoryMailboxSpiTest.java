@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.core.memory.mailbox;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -166,5 +167,45 @@ class InMemoryMailboxSpiTest {
     assertTrue(result.isPresent());
     String value = new String(result.get(), UTF_8);
     assertTrue(value.startsWith("payload-"));
+  }
+
+  @Test
+  void sweepRemovesExpiredEntries() {
+    for (int i = 0; i < 5; i++) {
+      mailbox.create("key-" + i, Duration.ofMillis(50));
+    }
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(
+            () -> {
+              int removed = mailbox.sweep(10);
+              assertThat(removed).isEqualTo(5);
+            });
+
+    for (int i = 0; i < 5; i++) {
+      final int idx = i;
+      assertThrows(MailboxExpiredException.class, () -> mailbox.get("key-" + idx));
+    }
+  }
+
+  @Test
+  void sweepRespectsMaxToSweep() {
+    for (int i = 0; i < 10; i++) {
+      mailbox.create("key-" + i, Duration.ofMillis(50));
+    }
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(() -> assertThat(mailbox.sweep(3)).isEqualTo(3));
+
+    assertThat(mailbox.sweep(10)).isEqualTo(7);
+  }
+
+  @Test
+  void sweepReturnsZeroWhenNothingExpired() {
+    mailbox.create("key", Duration.ofSeconds(10));
+
+    assertThat(mailbox.sweep(1000)).isZero();
   }
 }

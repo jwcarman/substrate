@@ -38,6 +38,11 @@ public abstract class AbstractJournalSpi implements JournalSpi {
     return prefix + name;
   }
 
+  @Override
+  public int sweep(int maxToSweep) {
+    return 0;
+  }
+
   protected String generateEntryId() {
     return UUID_GENERATOR.generate().toString();
   }
