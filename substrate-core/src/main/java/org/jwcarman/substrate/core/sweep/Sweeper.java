@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.substrate.core.atom;
+package org.jwcarman.substrate.core.sweep;
 
 import java.time.Duration;
 import java.util.concurrent.Executors;
@@ -23,27 +23,37 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-public class AtomSweeper implements AutoCloseable {
+public class Sweeper implements AutoCloseable {
 
-  private static final Log log = LogFactory.getLog(AtomSweeper.class);
+  private static final Log log = LogFactory.getLog(Sweeper.class);
   static final int MAX_ITERATIONS_PER_TICK = 100;
 
-  private final AtomSpi spi;
+  private final Class<?> primitiveType;
+  private final Sweepable target;
   private final int batchSize;
   private final ScheduledExecutorService scheduler;
 
-  public AtomSweeper(AtomSpi spi, Duration interval, int batchSize) {
+  public Sweeper(Class<?> primitiveType, Sweepable target, Duration interval, int batchSize) {
+    if (primitiveType == null) {
+      throw new IllegalArgumentException("primitiveType must not be null");
+    }
+    if (target == null) {
+      throw new IllegalArgumentException("target must not be null");
+    }
     if (batchSize <= 0) {
       throw new IllegalArgumentException("batchSize must be positive: " + batchSize);
     }
     if (interval.isNegative() || interval.isZero()) {
       throw new IllegalArgumentException("interval must be positive: " + interval);
     }
-    this.spi = spi;
+    this.primitiveType = primitiveType;
+    this.target = target;
     this.batchSize = batchSize;
+
+    String threadName = "substrate-" + primitiveType.getSimpleName().toLowerCase() + "-sweeper";
     this.scheduler =
         Executors.newSingleThreadScheduledExecutor(
-            Thread.ofVirtual().name("substrate-atom-sweeper", 0).factory());
+            Thread.ofVirtual().name(threadName, 0).factory());
 
     long intervalMs = interval.toMillis();
     long jitterMs = ThreadLocalRandom.current().nextLong(intervalMs / 2 + 1);
@@ -55,17 +65,19 @@ public class AtomSweeper implements AutoCloseable {
     try {
       int totalDeleted = 0;
       for (int i = 0; i < MAX_ITERATIONS_PER_TICK; i++) {
-        int deleted = spi.sweep(batchSize);
+        int deleted = target.sweep(batchSize);
         totalDeleted += deleted;
         if (deleted < batchSize) {
           break;
         }
       }
       if (totalDeleted > 0 && log.isDebugEnabled()) {
-        log.debug("Swept " + totalDeleted + " expired atoms");
+        log.debug(
+            "Swept " + totalDeleted + " expired " + primitiveType.getSimpleName() + " records");
       }
     } catch (RuntimeException e) {
-      log.warn("Atom sweep failed; will retry on next tick", e);
+      log.warn(
+          "Sweep failed for " + primitiveType.getSimpleName() + "; will retry on next tick", e);
     }
   }
 

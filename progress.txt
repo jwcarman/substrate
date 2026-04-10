@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-10T19:58:00Z
-ITERATION: 25
-SPEC_COMPLETED: 024-journal-lifecycle-and-mailbox-connect.md
-WHAT_WAS_DONE: Implemented full journal lifecycle state machine (active/completed/expired), added JournalFactory.create(name, type, inactivityTtl) with eager SPI create, added JournalFactory.connect and MailboxFactory.connect lazy handles, replaced Journal.complete() with complete(Duration retentionTtl), added three new exceptions (JournalCompletedException, JournalExpiredException, JournalAlreadyExistsException), rewrote InMemoryJournalSpi with sealed-type state machine, added max-TTL enforcement for inactivity/retention/entry TTLs in SubstrateProperties, updated all 8 backend JournalSpi implementations, updated DefaultJournalCursor to propagate JournalExpiredException to consumers, and added consumer-escape-hatch test.
+LAST_RUN: 2026-04-10T21:14:00Z
+ITERATION: 26
+SPEC_COMPLETED: 025-consolidate-sweeper.md
+WHAT_WAS_DONE: Consolidated AtomSweeper, JournalSweeper, and MailboxSweeper into a single generic Sweeper class plus a Sweepable marker interface; moved sweep(int) declaration from each SPI to Sweepable; updated SubstrateAutoConfiguration to create three Sweeper beans parameterized by Atom.class/Journal.class/Mailbox.class; deleted three sweeper classes, three sweeper test classes; created consolidated SweeperTest covering all behavior; updated SubstrateAutoConfigurationTest to use bean-name assertions.
 VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — BUILD SUCCESS (all 13 modules pass); no @SuppressWarnings annotations introduced
 STATUS: DONE
 NEXT_SPEC: none
-NOTES: Breaking changes: Journal.complete() now takes Duration retentionTtl, JournalFactory.create() now takes Duration inactivityTtl, JournalSpi.complete() now takes Duration retentionTtl, JournalSpi gains create(String, Duration) method. SubstrateProperties.JournalProperties replaced single maxTtl with three fields: maxInactivityTtl (24h), maxRetentionTtl (30d), maxEntryTtl (7d). All backend IT tests updated but not run (skipped with -DskipITs since they require infrastructure).
+NOTES: Pure refactor — zero behavior changes. Files created: Sweepable.java, Sweeper.java, SweeperTest.java in new org.jwcarman.substrate.core.sweep package. Files deleted: AtomSweeper.java, JournalSweeper.java, MailboxSweeper.java and their corresponding test classes. SPI interfaces (AtomSpi, JournalSpi, MailboxSpi) now extend Sweepable; AbstractAtomSpi/AbstractJournalSpi/AbstractMailboxSpi sweep defaults unchanged. No backend modules required changes.
