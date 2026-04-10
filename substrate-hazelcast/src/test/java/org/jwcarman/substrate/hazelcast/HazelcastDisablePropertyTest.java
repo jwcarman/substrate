@@ -26,6 +26,8 @@ import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.map.IMap;
 import com.hazelcast.topic.ITopic;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.substrate.hazelcast.atom.HazelcastAtomAutoConfiguration;
+import org.jwcarman.substrate.hazelcast.atom.HazelcastAtomSpi;
 import org.jwcarman.substrate.hazelcast.journal.HazelcastJournalAutoConfiguration;
 import org.jwcarman.substrate.hazelcast.journal.HazelcastJournalSpi;
 import org.jwcarman.substrate.hazelcast.mailbox.HazelcastMailboxAutoConfiguration;
@@ -39,6 +41,27 @@ import org.springframework.context.annotation.Configuration;
 import tools.jackson.databind.ObjectMapper;
 
 class HazelcastDisablePropertyTest {
+
+  @Test
+  void atomIsDisabledWhenPropertySetToFalse() {
+    new ApplicationContextRunner()
+        .withConfiguration(
+            AutoConfigurations.of(
+                HazelcastAutoConfiguration.class, HazelcastAtomAutoConfiguration.class))
+        .withUserConfiguration(MockHazelcastConfiguration.class)
+        .withPropertyValues("substrate.hazelcast.atom.enabled=false")
+        .run(context -> assertThat(context).doesNotHaveBean(HazelcastAtomSpi.class));
+  }
+
+  @Test
+  void atomIsEnabledByDefault() {
+    new ApplicationContextRunner()
+        .withConfiguration(
+            AutoConfigurations.of(
+                HazelcastAutoConfiguration.class, HazelcastAtomAutoConfiguration.class))
+        .withUserConfiguration(MockHazelcastConfiguration.class)
+        .run(context -> assertThat(context).hasSingleBean(HazelcastAtomSpi.class));
+  }
 
   @Test
   void journalIsDisabledWhenPropertySetToFalse() {

@@ -1,4 +1,5 @@
 org.jwcarman.substrate.hazelcast.HazelcastAutoConfiguration
+org.jwcarman.substrate.hazelcast.atom.HazelcastAtomAutoConfiguration
 org.jwcarman.substrate.hazelcast.journal.HazelcastJournalAutoConfiguration
 org.jwcarman.substrate.hazelcast.mailbox.HazelcastMailboxAutoConfiguration
 org.jwcarman.substrate.hazelcast.notifier.HazelcastNotifierAutoConfiguration

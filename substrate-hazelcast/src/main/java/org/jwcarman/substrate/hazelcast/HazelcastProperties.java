@@ -20,7 +20,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "substrate.hazelcast")
 public record HazelcastProperties(
-    JournalProperties journal, MailboxProperties mailbox, NotifierProperties notifier) {
+    AtomProperties atom,
+    JournalProperties journal,
+    MailboxProperties mailbox,
+    NotifierProperties notifier) {
+  public record AtomProperties(boolean enabled, String prefix, String mapName) {}
+
   public record JournalProperties(
       boolean enabled, String prefix, int ringbufferCapacity, Duration ringbufferTtl) {}
 
