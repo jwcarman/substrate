@@ -29,6 +29,8 @@ import io.nats.client.MessageHandler;
 import io.nats.client.api.KeyValueStatus;
 import io.nats.client.api.StreamConfiguration;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.substrate.nats.atom.NatsAtomAutoConfiguration;
+import org.jwcarman.substrate.nats.atom.NatsAtomSpi;
 import org.jwcarman.substrate.nats.journal.NatsJournalAutoConfiguration;
 import org.jwcarman.substrate.nats.journal.NatsJournalSpi;
 import org.jwcarman.substrate.nats.mailbox.NatsMailboxAutoConfiguration;
@@ -41,6 +43,16 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 class NatsDisablePropertyTest {
+
+  @Test
+  void atomDisabledWhenPropertyIsFalse() {
+    new ApplicationContextRunner()
+        .withConfiguration(
+            AutoConfigurations.of(NatsAutoConfiguration.class, NatsAtomAutoConfiguration.class))
+        .withUserConfiguration(MockNatsConfiguration.class)
+        .withPropertyValues("substrate.nats.atom.enabled=false")
+        .run(context -> assertThat(context).doesNotHaveBean(NatsAtomSpi.class));
+  }
 
   @Test
   void journalDisabledWhenPropertyIsFalse() {
@@ -85,6 +97,7 @@ class NatsDisablePropertyTest {
       when(jsm.addStream(any(StreamConfiguration.class))).thenReturn(null);
       KeyValueManagement kvm = mock(KeyValueManagement.class);
       when(conn.keyValueManagement()).thenReturn(kvm);
+      when(kvm.getStatus("substrate-atoms")).thenReturn(mock(KeyValueStatus.class));
       when(kvm.getStatus("substrate-mailbox")).thenReturn(mock(KeyValueStatus.class));
       Dispatcher dispatcher = mock(Dispatcher.class);
       when(conn.createDispatcher(any(MessageHandler.class))).thenReturn(dispatcher);

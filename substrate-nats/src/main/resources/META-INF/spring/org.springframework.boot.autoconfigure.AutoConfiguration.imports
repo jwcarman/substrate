@@ -1,4 +1,5 @@
 org.jwcarman.substrate.nats.NatsAutoConfiguration
+org.jwcarman.substrate.nats.atom.NatsAtomAutoConfiguration
 org.jwcarman.substrate.nats.journal.NatsJournalAutoConfiguration
 org.jwcarman.substrate.nats.mailbox.NatsMailboxAutoConfiguration
 org.jwcarman.substrate.nats.notifier.NatsNotifierAutoConfiguration

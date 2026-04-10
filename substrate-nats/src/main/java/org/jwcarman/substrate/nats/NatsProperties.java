@@ -20,7 +20,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "substrate.nats")
 public record NatsProperties(
-    JournalProperties journal, MailboxProperties mailbox, NotifierProperties notifier) {
+    AtomProperties atom,
+    JournalProperties journal,
+    MailboxProperties mailbox,
+    NotifierProperties notifier) {
+
+  public record AtomProperties(
+      boolean enabled, String prefix, String bucketName, Duration defaultTtl) {}
 
   public record JournalProperties(
       boolean enabled, String prefix, String streamName, Duration maxAge, long maxMessages) {}
