@@ -19,7 +19,9 @@ import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "substrate.dynamodb")
-public record DynamoDbProperties(JournalProperties journal, MailboxProperties mailbox) {
+public record DynamoDbProperties(
+    JournalProperties journal, MailboxProperties mailbox, AtomProperties atom) {
+
   public record JournalProperties(
       boolean enabled, String prefix, String tableName, boolean autoCreateTable, Duration ttl) {}
 
@@ -29,4 +31,7 @@ public record DynamoDbProperties(JournalProperties journal, MailboxProperties ma
       String tableName,
       boolean autoCreateTable,
       Duration defaultTtl) {}
+
+  public record AtomProperties(
+      boolean enabled, String prefix, String tableName, boolean autoCreateTable) {}
 }

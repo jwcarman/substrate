@@ -19,6 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import org.junit.jupiter.api.Test;
+import org.jwcarman.substrate.dynamodb.atom.DynamoDbAtomAutoConfiguration;
+import org.jwcarman.substrate.dynamodb.atom.DynamoDbAtomSpi;
 import org.jwcarman.substrate.dynamodb.journal.DynamoDbJournalAutoConfiguration;
 import org.jwcarman.substrate.dynamodb.journal.DynamoDbJournalSpi;
 import org.jwcarman.substrate.dynamodb.mailbox.DynamoDbMailboxAutoConfiguration;
@@ -71,6 +73,27 @@ class DynamoDbDisablePropertyTest {
                 DynamoDbAutoConfiguration.class, DynamoDbMailboxAutoConfiguration.class))
         .withUserConfiguration(MockDynamoDbConfiguration.class)
         .run(context -> assertThat(context).hasSingleBean(DynamoDbMailboxSpi.class));
+  }
+
+  @Test
+  void atomIsDisabledWhenPropertySetToFalse() {
+    new ApplicationContextRunner()
+        .withConfiguration(
+            AutoConfigurations.of(
+                DynamoDbAutoConfiguration.class, DynamoDbAtomAutoConfiguration.class))
+        .withUserConfiguration(MockDynamoDbConfiguration.class)
+        .withPropertyValues("substrate.dynamodb.atom.enabled=false")
+        .run(context -> assertThat(context).doesNotHaveBean(DynamoDbAtomSpi.class));
+  }
+
+  @Test
+  void atomIsEnabledByDefault() {
+    new ApplicationContextRunner()
+        .withConfiguration(
+            AutoConfigurations.of(
+                DynamoDbAutoConfiguration.class, DynamoDbAtomAutoConfiguration.class))
+        .withUserConfiguration(MockDynamoDbConfiguration.class)
+        .run(context -> assertThat(context).hasSingleBean(DynamoDbAtomSpi.class));
   }
 
   @Configuration(proxyBeanMethods = false)

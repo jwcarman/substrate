@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-10T21:25:00Z
-ITERATION: 27
-SPEC_COMPLETED: 026-atom-cassandra.md
-WHAT_WAS_DONE: Implemented CassandraAtomSpi with LWT-based create (INSERT IF NOT EXISTS), conditional set/touch/delete (IF EXISTS), native Cassandra TTL via USING TTL, and read-then-update touch for TTL refresh; added CassandraAtomAutoConfiguration with ConditionalOnProperty gating; extended CassandraProperties with AtomProperties record; registered auto-config in imports; added defaults to properties file; wrote unit tests (CassandraAtomSpiTest) and integration tests (CassandraAtomSpiIT) including concurrent-create collision and TTL expiry; updated CassandraDisablePropertyTest with atom disable assertion.
-VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — BUILD SUCCESS (all 13 modules pass); ./mvnw verify -pl substrate-cassandra — BUILD SUCCESS (25 unit + 32 integration tests pass, including 16 new atom IT tests)
-STATUS: DONE
-NEXT_SPEC: none
-NOTES: CQL reserved word "token" required double-quoting in all CQL statements (q() helper method). Touch uses read-then-update pattern since CQL doesn't support column self-reference assignments. TTL minimum enforced at 1 second via Math.max. No new dependencies added. Files created: CassandraAtomSpi.java, CassandraAtomAutoConfiguration.java, CassandraAtomSpiTest.java, CassandraAtomSpiIT.java. Files modified: CassandraProperties.java, substrate-cassandra-defaults.properties, AutoConfiguration.imports, CassandraDisablePropertyTest.java.
+LAST_RUN: 2026-04-10T21:30:00Z
+ITERATION: 28
+SPEC_COMPLETED: 027-atom-dynamodb.md
+WHAT_WAS_DONE: Implemented DynamoDbAtomSpi with conditional PutItem for atomic create (attribute_not_exists), conditional PutItem for set (attribute_exists AND ttl > :now), conditional UpdateItem for touch, consistent-read GetItem with application-side TTL filtering for expired items, and unconditional DeleteItem; added DynamoDbAtomAutoConfiguration with ConditionalOnProperty gating; extended DynamoDbProperties with AtomProperties record; registered auto-config in imports; added defaults to properties file; wrote unit tests (DynamoDbAtomSpiTest) and integration tests (DynamoDbAtomIT) including concurrent-create collision, TTL expiry via read-side check, and createTable idempotency; updated DynamoDbDisablePropertyTest with atom disable/enable assertions.
+VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — BUILD SUCCESS (all 13 modules pass); ./mvnw verify -pl substrate-dynamodb — BUILD SUCCESS (40 unit + 43 integration tests pass, including 13 new atom unit tests and 16 new atom IT tests)
+STATUS: MORE_WORK
+NEXT_SPEC: 028-atom-hazelcast.md
+NOTES: DynamoDB TTL sweep is eventually consistent so read/set/touch all check TTL in application code. TTL stored as Unix epoch seconds. Used LocalStack via AbstractDynamoDbIT for integration tests. No new dependencies added. Files created: DynamoDbAtomSpi.java, DynamoDbAtomAutoConfiguration.java, DynamoDbAtomSpiTest.java, DynamoDbAtomIT.java. Files modified: DynamoDbProperties.java, substrate-dynamodb-defaults.properties, AutoConfiguration.imports, DynamoDbDisablePropertyTest.java.
