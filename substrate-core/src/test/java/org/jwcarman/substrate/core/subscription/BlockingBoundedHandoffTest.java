@@ -47,6 +47,23 @@ class BlockingBoundedHandoffTest {
   }
 
   @Test
+  void markCancelledIsIdempotent() {
+    var handoff = new BlockingBoundedHandoff<String>(10);
+
+    // First call wins and drops a Cancelled into the queue.
+    handoff.markCancelled();
+    // Second call hits the compareAndSet false branch and does nothing.
+    handoff.markCancelled();
+    // Third call ditto, for good measure.
+    handoff.markCancelled();
+
+    // Exactly one Cancelled value is visible to the consumer; subsequent pulls
+    // time out (nothing else was queued and no other marker was set).
+    assertThat(handoff.pull(SHORT_TIMEOUT)).isInstanceOf(NextResult.Cancelled.class);
+    assertThat(handoff.pull(SHORT_TIMEOUT)).isInstanceOf(NextResult.Timeout.class);
+  }
+
+  @Test
   void valuesDeliveredBeforeTerminalMarker() {
     var handoff = new BlockingBoundedHandoff<String>(10);
     handoff.push("a");

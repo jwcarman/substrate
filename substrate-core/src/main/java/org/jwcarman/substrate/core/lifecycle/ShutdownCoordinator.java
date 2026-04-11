@@ -154,7 +154,7 @@ public class ShutdownCoordinator implements SmartLifecycle {
       }
       try {
         worker.join(Duration.ofNanos(remainingNanos));
-      } catch (InterruptedException e) {
+      } catch (InterruptedException _) {
         Thread.currentThread().interrupt();
         return;
       }

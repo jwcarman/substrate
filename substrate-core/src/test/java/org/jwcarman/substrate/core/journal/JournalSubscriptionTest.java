@@ -53,6 +53,7 @@ class JournalSubscriptionTest {
       };
 
   private final ShutdownCoordinator coordinator = new ShutdownCoordinator();
+  private final JournalLimits limits = JournalLimits.defaults();
   private InMemoryJournalSpi journalSpi;
   private InMemoryNotifier notifier;
   private DefaultJournal<String> journal;
@@ -64,14 +65,7 @@ class JournalSubscriptionTest {
     journalSpi.create("substrate:journal:test", Duration.ofHours(24));
     journal =
         new DefaultJournal<>(
-            journalSpi,
-            "substrate:journal:test",
-            STRING_CODEC,
-            notifier,
-            1024,
-            Duration.ofDays(7),
-            Duration.ofDays(30),
-            coordinator);
+            journalSpi, "substrate:journal:test", STRING_CODEC, notifier, limits, coordinator);
   }
 
   @Test
@@ -505,16 +499,11 @@ class JournalSubscriptionTest {
 
   @Test
   void checkpointAdvancesMonotonically() {
+    var smallLimits =
+        new JournalLimits(1, Duration.ofHours(24), Duration.ofDays(7), Duration.ofDays(30));
     DefaultJournal<String> smallJournal =
         new DefaultJournal<>(
-            journalSpi,
-            "substrate:journal:test",
-            STRING_CODEC,
-            notifier,
-            1,
-            Duration.ofDays(7),
-            Duration.ofDays(30),
-            coordinator);
+            journalSpi, "substrate:journal:test", STRING_CODEC, notifier, smallLimits, coordinator);
 
     journal.append("e1", Duration.ofHours(1));
     journal.append("e2", Duration.ofHours(1));

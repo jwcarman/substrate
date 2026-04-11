@@ -60,14 +60,7 @@ class DefaultJournalFactoryTest {
         .thenAnswer(inv -> new String((byte[]) inv.getArgument(0), UTF_8));
     factory =
         new DefaultJournalFactory(
-            spi,
-            codecFactory,
-            new InMemoryNotifier(),
-            1024,
-            Duration.ofHours(24),
-            Duration.ofDays(7),
-            Duration.ofDays(30),
-            coordinator);
+            spi, codecFactory, new InMemoryNotifier(), JournalLimits.defaults(), coordinator);
   }
 
   @Test

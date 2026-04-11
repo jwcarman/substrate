@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.core.subscription;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -34,7 +35,7 @@ class ConfiguredSubscriberTest {
   @Test
   void onNextWithNullHandlerIsNoOp() {
     var sub = new ConfiguredSubscriber<String>(null, null, null, null, null, null);
-    sub.onNext("value");
+    assertThatNoException().isThrownBy(() -> sub.onNext("value"));
   }
 
   @Test
@@ -49,7 +50,7 @@ class ConfiguredSubscriberTest {
   @Test
   void onCompletedWithNullHandlerIsNoOp() {
     var sub = new ConfiguredSubscriber<String>(null, null, null, null, null, null);
-    sub.onCompleted();
+    assertThatNoException().isThrownBy(sub::onCompleted);
   }
 
   @Test
@@ -64,7 +65,7 @@ class ConfiguredSubscriberTest {
   @Test
   void onExpiredWithNullHandlerIsNoOp() {
     var sub = new ConfiguredSubscriber<String>(null, null, null, null, null, null);
-    sub.onExpired();
+    assertThatNoException().isThrownBy(sub::onExpired);
   }
 
   @Test
@@ -79,7 +80,7 @@ class ConfiguredSubscriberTest {
   @Test
   void onDeletedWithNullHandlerIsNoOp() {
     var sub = new ConfiguredSubscriber<String>(null, null, null, null, null, null);
-    sub.onDeleted();
+    assertThatNoException().isThrownBy(sub::onDeleted);
   }
 
   @Test
@@ -94,7 +95,7 @@ class ConfiguredSubscriberTest {
   @Test
   void onCancelledWithNullHandlerIsNoOp() {
     var sub = new ConfiguredSubscriber<String>(null, null, null, null, null, null);
-    sub.onCancelled();
+    assertThatNoException().isThrownBy(sub::onCancelled);
   }
 
   @Test
@@ -109,6 +110,6 @@ class ConfiguredSubscriberTest {
   @Test
   void onErrorWithNullHandlerIsNoOp() {
     var sub = new ConfiguredSubscriber<String>(null, null, null, null, null, null);
-    sub.onError(new RuntimeException("boom"));
+    assertThatNoException().isThrownBy(() -> sub.onError(new RuntimeException("boom")));
   }
 }

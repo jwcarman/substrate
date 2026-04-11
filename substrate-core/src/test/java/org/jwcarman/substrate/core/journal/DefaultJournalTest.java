@@ -59,8 +59,7 @@ class DefaultJournalTest {
         .thenAnswer(inv -> new String((byte[]) inv.getArgument(0), UTF_8));
     lenient().when(notifier.subscribe(any())).thenReturn(() -> {});
     journal =
-        new DefaultJournal<>(
-            spi, KEY, codec, notifier, 1024, Duration.ofDays(7), Duration.ofDays(30), coordinator);
+        new DefaultJournal<>(spi, KEY, codec, notifier, JournalLimits.defaults(), coordinator);
   }
 
   @Test

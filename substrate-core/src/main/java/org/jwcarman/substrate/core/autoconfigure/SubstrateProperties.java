@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.core.autoconfigure;
 
 import java.time.Duration;
+import org.jwcarman.substrate.core.journal.JournalLimits;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "substrate")
@@ -42,11 +43,14 @@ public record SubstrateProperties(
       SweepProperties sweep,
       SubscriptionProperties subscription) {
     public JournalProperties {
-      if (maxInactivityTtl == null) maxInactivityTtl = Duration.ofHours(24);
-      if (maxRetentionTtl == null) maxRetentionTtl = Duration.ofDays(30);
-      if (maxEntryTtl == null) maxEntryTtl = Duration.ofDays(7);
+      if (maxInactivityTtl == null) maxInactivityTtl = JournalLimits.DEFAULT_MAX_INACTIVITY_TTL;
+      if (maxRetentionTtl == null) maxRetentionTtl = JournalLimits.DEFAULT_MAX_RETENTION_TTL;
+      if (maxEntryTtl == null) maxEntryTtl = JournalLimits.DEFAULT_MAX_ENTRY_TTL;
       if (sweep == null) sweep = SweepProperties.defaults();
-      if (subscription == null) subscription = new SubscriptionProperties(1024);
+      if (subscription == null) {
+        subscription =
+            new SubscriptionProperties(JournalLimits.DEFAULT_SUBSCRIPTION_QUEUE_CAPACITY);
+      }
     }
   }
 

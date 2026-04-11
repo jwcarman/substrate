@@ -61,9 +61,9 @@ public class DefaultBlockingSubscription<T> implements BlockingSubscription<T> {
   public void cancel() {
     if (markDone()) {
       canceller.run();
-      // Unblock any thread currently inside next() via the handoff's own
-      // wakeup mechanism. The woken pull() returns Cancelled, the caller's
-      // while (sub.isActive()) check sees false, and the loop exits.
+      // markCancelled unblocks any thread parked inside next() by waking the
+      // handoff's internal condition. The woken pull returns Cancelled, the
+      // caller observes isActive false on the next loop turn, and exits.
       handoff.markCancelled();
     }
   }

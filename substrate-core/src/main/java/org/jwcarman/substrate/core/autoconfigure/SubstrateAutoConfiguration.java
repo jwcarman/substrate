@@ -23,6 +23,7 @@ import org.jwcarman.substrate.atom.AtomFactory;
 import org.jwcarman.substrate.core.atom.AtomSpi;
 import org.jwcarman.substrate.core.atom.DefaultAtomFactory;
 import org.jwcarman.substrate.core.journal.DefaultJournalFactory;
+import org.jwcarman.substrate.core.journal.JournalLimits;
 import org.jwcarman.substrate.core.journal.JournalSpi;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.mailbox.DefaultMailboxFactory;
@@ -114,15 +115,14 @@ public class SubstrateAutoConfiguration {
       SubstrateProperties properties,
       ShutdownCoordinator shutdownCoordinator) {
     var jp = properties.journal();
+    var limits =
+        new JournalLimits(
+            jp.subscription().queueCapacity(),
+            jp.maxInactivityTtl(),
+            jp.maxEntryTtl(),
+            jp.maxRetentionTtl());
     return new DefaultJournalFactory(
-        journalSpi,
-        codecFactory,
-        notifier,
-        jp.subscription().queueCapacity(),
-        jp.maxInactivityTtl(),
-        jp.maxEntryTtl(),
-        jp.maxRetentionTtl(),
-        shutdownCoordinator);
+        journalSpi, codecFactory, notifier, limits, shutdownCoordinator);
   }
 
   @Bean

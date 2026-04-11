@@ -56,14 +56,7 @@ class ConsumerEscapeHatchTest {
 
     DefaultJournal<String> journal =
         new DefaultJournal<>(
-            spi,
-            key,
-            STRING_CODEC,
-            notifier,
-            1024,
-            Duration.ofDays(7),
-            Duration.ofDays(30),
-            new ShutdownCoordinator());
+            spi, key, STRING_CODEC, notifier, JournalLimits.defaults(), new ShutdownCoordinator());
 
     journal.append("one-entry", Duration.ofHours(1));
 

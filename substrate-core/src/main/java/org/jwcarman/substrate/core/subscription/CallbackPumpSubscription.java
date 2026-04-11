@@ -72,11 +72,11 @@ public final class CallbackPumpSubscription<T> implements Subscription {
   }
 
   private static <T> void pumpLoop(BlockingSubscription<T> source, Subscriber<T> subscriber) {
-    // do-while so the first pull always happens — if the source was already
-    // cancelled or terminated before the pump thread started, the handoff
-    // will have a terminal marker waiting and we'll dispatch it on the first
-    // iteration. A plain while(isActive()) would skip the loop entirely in
-    // that case and the subscriber would never see onCancelled / onCompleted.
+    // Use do-while so the first pull always happens. If the source was already
+    // cancelled or terminated before the pump thread started, the handoff will
+    // have a terminal marker waiting and we dispatch it on the first iteration.
+    // A plain while(isActive()) would skip the loop and the subscriber would
+    // never see onCancelled or onCompleted.
     do {
       NextResult<T> result = source.next(MAX_POLL_DURATION);
       dispatch(result, subscriber);

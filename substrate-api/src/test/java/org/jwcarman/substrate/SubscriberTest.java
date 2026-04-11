@@ -16,6 +16,7 @@
 package org.jwcarman.substrate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -33,30 +34,30 @@ class SubscriberTest {
   @Test
   void defaultOnCompletedDoesNotThrow() {
     Subscriber<String> sub = value -> {};
-    sub.onCompleted();
+    assertThatNoException().isThrownBy(sub::onCompleted);
   }
 
   @Test
   void defaultOnExpiredDoesNotThrow() {
     Subscriber<String> sub = value -> {};
-    sub.onExpired();
+    assertThatNoException().isThrownBy(sub::onExpired);
   }
 
   @Test
   void defaultOnDeletedDoesNotThrow() {
     Subscriber<String> sub = value -> {};
-    sub.onDeleted();
+    assertThatNoException().isThrownBy(sub::onDeleted);
   }
 
   @Test
   void defaultOnCancelledDoesNotThrow() {
     Subscriber<String> sub = value -> {};
-    sub.onCancelled();
+    assertThatNoException().isThrownBy(sub::onCancelled);
   }
 
   @Test
   void defaultOnErrorDoesNotThrow() {
     Subscriber<String> sub = value -> {};
-    sub.onError(new RuntimeException("boom"));
+    assertThatNoException().isThrownBy(() -> sub.onError(new RuntimeException("boom")));
   }
 }

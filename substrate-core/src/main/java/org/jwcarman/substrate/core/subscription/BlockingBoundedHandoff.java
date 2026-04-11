@@ -87,7 +87,10 @@ public class BlockingBoundedHandoff<T> extends AbstractHandoff<T> {
     // value and return from next(), after which the consumer's isActive()
     // check will already be false and the loop will exit on the next turn.
     if (marked.compareAndSet(false, true)) {
-      queue.offer(new NextResult.Cancelled<>());
+      // Best-effort offer: if the queue is full, the comment above explains
+      // why that's still safe. Bind to an unnamed variable so the ignored
+      // return value is explicit.
+      boolean _ = queue.offer(new NextResult.Cancelled<>());
     }
   }
 }

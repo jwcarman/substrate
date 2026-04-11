@@ -28,28 +28,19 @@ public class DefaultJournalFactory implements JournalFactory {
   private final JournalSpi journalSpi;
   private final CodecFactory codecFactory;
   private final NotifierSpi notifier;
-  private final int subscriptionQueueCapacity;
-  private final Duration maxInactivityTtl;
-  private final Duration maxEntryTtl;
-  private final Duration maxRetentionTtl;
+  private final JournalLimits limits;
   private final ShutdownCoordinator shutdownCoordinator;
 
   public DefaultJournalFactory(
       JournalSpi journalSpi,
       CodecFactory codecFactory,
       NotifierSpi notifier,
-      int subscriptionQueueCapacity,
-      Duration maxInactivityTtl,
-      Duration maxEntryTtl,
-      Duration maxRetentionTtl,
+      JournalLimits limits,
       ShutdownCoordinator shutdownCoordinator) {
     this.journalSpi = journalSpi;
     this.codecFactory = codecFactory;
     this.notifier = notifier;
-    this.subscriptionQueueCapacity = subscriptionQueueCapacity;
-    this.maxInactivityTtl = maxInactivityTtl;
-    this.maxEntryTtl = maxEntryTtl;
-    this.maxRetentionTtl = maxRetentionTtl;
+    this.limits = limits;
     this.shutdownCoordinator = shutdownCoordinator;
   }
 
@@ -59,14 +50,7 @@ public class DefaultJournalFactory implements JournalFactory {
     String key = journalSpi.journalKey(name);
     journalSpi.create(key, inactivityTtl);
     return new DefaultJournal<>(
-        journalSpi,
-        key,
-        codecFactory.create(type),
-        notifier,
-        subscriptionQueueCapacity,
-        maxEntryTtl,
-        maxRetentionTtl,
-        shutdownCoordinator);
+        journalSpi, key, codecFactory.create(type), notifier, limits, shutdownCoordinator);
   }
 
   @Override
@@ -75,51 +59,30 @@ public class DefaultJournalFactory implements JournalFactory {
     String key = journalSpi.journalKey(name);
     journalSpi.create(key, inactivityTtl);
     return new DefaultJournal<>(
-        journalSpi,
-        key,
-        codecFactory.create(typeRef),
-        notifier,
-        subscriptionQueueCapacity,
-        maxEntryTtl,
-        maxRetentionTtl,
-        shutdownCoordinator);
+        journalSpi, key, codecFactory.create(typeRef), notifier, limits, shutdownCoordinator);
   }
 
   @Override
   public <T> Journal<T> connect(String name, Class<T> type) {
     String key = journalSpi.journalKey(name);
     return new DefaultJournal<>(
-        journalSpi,
-        key,
-        codecFactory.create(type),
-        notifier,
-        subscriptionQueueCapacity,
-        maxEntryTtl,
-        maxRetentionTtl,
-        shutdownCoordinator);
+        journalSpi, key, codecFactory.create(type), notifier, limits, shutdownCoordinator);
   }
 
   @Override
   public <T> Journal<T> connect(String name, TypeRef<T> typeRef) {
     String key = journalSpi.journalKey(name);
     return new DefaultJournal<>(
-        journalSpi,
-        key,
-        codecFactory.create(typeRef),
-        notifier,
-        subscriptionQueueCapacity,
-        maxEntryTtl,
-        maxRetentionTtl,
-        shutdownCoordinator);
+        journalSpi, key, codecFactory.create(typeRef), notifier, limits, shutdownCoordinator);
   }
 
   private void validateInactivityTtl(Duration inactivityTtl) {
-    if (inactivityTtl.compareTo(maxInactivityTtl) > 0) {
+    if (inactivityTtl.compareTo(limits.maxInactivityTtl()) > 0) {
       throw new IllegalArgumentException(
           "Journal inactivity TTL "
               + inactivityTtl
               + " exceeds configured maximum "
-              + maxInactivityTtl);
+              + limits.maxInactivityTtl());
     }
   }
 }

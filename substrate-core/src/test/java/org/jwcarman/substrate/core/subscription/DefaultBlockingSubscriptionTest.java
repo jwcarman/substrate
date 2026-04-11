@@ -189,6 +189,11 @@ class DefaultBlockingSubscriptionTest {
     assertThat(new NextResult.Errored<>(new RuntimeException("x")).isTerminal()).isTrue();
   }
 
+  @Test
+  void cancelledIsTerminal() {
+    assertThat(new NextResult.Cancelled<>().isTerminal()).isTrue();
+  }
+
   // --- Interrupt handling tests ---
 
   @Test

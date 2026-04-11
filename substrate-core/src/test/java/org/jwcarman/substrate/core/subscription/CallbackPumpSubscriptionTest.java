@@ -67,13 +67,10 @@ class CallbackPumpSubscriptionTest {
 
     startPump(
         handoff,
-        new Subscriber<>() {
-          @Override
-          public void onNext(String value) {
-            received.add(value);
-            if (value.equals("throw")) {
-              throw new RuntimeException("handler error");
-            }
+        value -> {
+          received.add(value);
+          if (value.equals("throw")) {
+            throw new RuntimeException("handler error");
           }
         });
 
@@ -92,15 +89,10 @@ class CallbackPumpSubscriptionTest {
     var sub =
         startPump(
             handoff,
-            new Subscriber<>() {
-              @Override
-              public void onNext(String value) {}
-
-              @Override
-              public void onCompleted() {
-                completedRef.countDown();
-              }
-            });
+            new DefaultSubscriberBuilder<String>()
+                .onNext(v -> {})
+                .onCompleted(completedRef::countDown)
+                .build());
 
     handoff.markCompleted();
 
@@ -116,15 +108,10 @@ class CallbackPumpSubscriptionTest {
     var sub =
         startPump(
             handoff,
-            new Subscriber<>() {
-              @Override
-              public void onNext(String value) {}
-
-              @Override
-              public void onExpired() {
-                expiredLatch.countDown();
-              }
-            });
+            new DefaultSubscriberBuilder<String>()
+                .onNext(v -> {})
+                .onExpired(expiredLatch::countDown)
+                .build());
 
     handoff.markExpired();
 
@@ -140,15 +127,10 @@ class CallbackPumpSubscriptionTest {
     var sub =
         startPump(
             handoff,
-            new Subscriber<>() {
-              @Override
-              public void onNext(String value) {}
-
-              @Override
-              public void onDeleted() {
-                deletedLatch.countDown();
-              }
-            });
+            new DefaultSubscriberBuilder<String>()
+                .onNext(v -> {})
+                .onDeleted(deletedLatch::countDown)
+                .build());
 
     handoff.markDeleted();
 
@@ -165,16 +147,14 @@ class CallbackPumpSubscriptionTest {
     var sub =
         startPump(
             handoff,
-            new Subscriber<>() {
-              @Override
-              public void onNext(String value) {}
-
-              @Override
-              public void onError(Throwable cause) {
-                errorRef.set(cause);
-                errorLatch.countDown();
-              }
-            });
+            new DefaultSubscriberBuilder<String>()
+                .onNext(v -> {})
+                .onError(
+                    cause -> {
+                      errorRef.set(cause);
+                      errorLatch.countDown();
+                    })
+                .build());
 
     var boom = new RuntimeException("boom");
     handoff.error(boom);
@@ -192,15 +172,10 @@ class CallbackPumpSubscriptionTest {
     var sub =
         startPump(
             handoff,
-            new Subscriber<>() {
-              @Override
-              public void onNext(String value) {}
-
-              @Override
-              public void onCancelled() {
-                cancelledLatch.countDown();
-              }
-            });
+            new DefaultSubscriberBuilder<String>()
+                .onNext(v -> {})
+                .onCancelled(cancelledLatch::countDown)
+                .build());
 
     handoff.markCancelled();
 
@@ -428,15 +403,10 @@ class CallbackPumpSubscriptionTest {
 
     startPump(
         capturingHandoff,
-        new Subscriber<>() {
-          @Override
-          public void onNext(String value) {}
-
-          @Override
-          public void onError(Throwable cause) {
-            errorFired.set(true);
-          }
-        });
+        new DefaultSubscriberBuilder<String>()
+            .onNext(v -> {})
+            .onError(cause -> errorFired.set(true))
+            .build());
 
     assertThat(started.await(2, TimeUnit.SECONDS)).isTrue();
     threadRef.get().interrupt();
@@ -454,15 +424,13 @@ class CallbackPumpSubscriptionTest {
     var sub =
         startPump(
             handoff,
-            new Subscriber<>() {
-              @Override
-              public void onNext(String value) {}
-
-              @Override
-              public void onCompleted() {
-                throw new RuntimeException("onComplete blew up");
-              }
-            });
+            new DefaultSubscriberBuilder<String>()
+                .onNext(v -> {})
+                .onCompleted(
+                    () -> {
+                      throw new RuntimeException("onComplete blew up");
+                    })
+                .build());
 
     handoff.markCompleted();
 
@@ -476,15 +444,13 @@ class CallbackPumpSubscriptionTest {
     var sub =
         startPump(
             handoff,
-            new Subscriber<>() {
-              @Override
-              public void onNext(String value) {}
-
-              @Override
-              public void onExpired() {
-                throw new RuntimeException("onExpiration blew up");
-              }
-            });
+            new DefaultSubscriberBuilder<String>()
+                .onNext(v -> {})
+                .onExpired(
+                    () -> {
+                      throw new RuntimeException("onExpiration blew up");
+                    })
+                .build());
 
     handoff.markExpired();
 
@@ -498,15 +464,13 @@ class CallbackPumpSubscriptionTest {
     var sub =
         startPump(
             handoff,
-            new Subscriber<>() {
-              @Override
-              public void onNext(String value) {}
-
-              @Override
-              public void onDeleted() {
-                throw new RuntimeException("onDelete blew up");
-              }
-            });
+            new DefaultSubscriberBuilder<String>()
+                .onNext(v -> {})
+                .onDeleted(
+                    () -> {
+                      throw new RuntimeException("onDelete blew up");
+                    })
+                .build());
 
     handoff.markDeleted();
 
@@ -520,15 +484,13 @@ class CallbackPumpSubscriptionTest {
     var sub =
         startPump(
             handoff,
-            new Subscriber<>() {
-              @Override
-              public void onNext(String value) {}
-
-              @Override
-              public void onError(Throwable cause) {
-                throw new RuntimeException("onError blew up");
-              }
-            });
+            new DefaultSubscriberBuilder<String>()
+                .onNext(v -> {})
+                .onError(
+                    cause -> {
+                      throw new RuntimeException("onError blew up");
+                    })
+                .build());
 
     handoff.error(new RuntimeException("original"));
 
@@ -542,15 +504,13 @@ class CallbackPumpSubscriptionTest {
     var sub =
         startPump(
             handoff,
-            new Subscriber<>() {
-              @Override
-              public void onNext(String value) {}
-
-              @Override
-              public void onCancelled() {
-                throw new RuntimeException("onCancelled blew up");
-              }
-            });
+            new DefaultSubscriberBuilder<String>()
+                .onNext(v -> {})
+                .onCancelled(
+                    () -> {
+                      throw new RuntimeException("onCancelled blew up");
+                    })
+                .build());
 
     handoff.markCancelled();
 
@@ -591,16 +551,14 @@ class CallbackPumpSubscriptionTest {
     var sub =
         new CallbackPumpSubscription<>(
             source,
-            new Subscriber<>() {
-              @Override
-              public void onNext(String value) {}
-
-              @Override
-              public void onCancelled() {
-                cancelledCount.incrementAndGet();
-                latch.countDown();
-              }
-            });
+            new DefaultSubscriberBuilder<String>()
+                .onNext(v -> {})
+                .onCancelled(
+                    () -> {
+                      cancelledCount.incrementAndGet();
+                      latch.countDown();
+                    })
+                .build());
 
     await().atMost(Duration.ofSeconds(1)).until(() -> latch.getCount() == 0);
     await().atMost(Duration.ofMillis(500)).until(() -> !sub.isActive());

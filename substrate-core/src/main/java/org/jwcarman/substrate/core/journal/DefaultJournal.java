@@ -42,9 +42,7 @@ public class DefaultJournal<T> implements Journal<T> {
   private final String key;
   private final Codec<T> codec;
   private final NotifierSpi notifier;
-  private final int subscriptionQueueCapacity;
-  private final Duration maxEntryTtl;
-  private final Duration maxRetentionTtl;
+  private final JournalLimits limits;
   private final ShutdownCoordinator shutdownCoordinator;
 
   public DefaultJournal(
@@ -52,25 +50,21 @@ public class DefaultJournal<T> implements Journal<T> {
       String key,
       Codec<T> codec,
       NotifierSpi notifier,
-      int subscriptionQueueCapacity,
-      Duration maxEntryTtl,
-      Duration maxRetentionTtl,
+      JournalLimits limits,
       ShutdownCoordinator shutdownCoordinator) {
     this.journalSpi = journalSpi;
     this.key = key;
     this.codec = codec;
     this.notifier = notifier;
-    this.subscriptionQueueCapacity = subscriptionQueueCapacity;
-    this.maxEntryTtl = maxEntryTtl;
-    this.maxRetentionTtl = maxRetentionTtl;
+    this.limits = limits;
     this.shutdownCoordinator = shutdownCoordinator;
   }
 
   @Override
   public String append(T data, Duration ttl) {
-    if (ttl.compareTo(maxEntryTtl) > 0) {
+    if (ttl.compareTo(limits.maxEntryTtl()) > 0) {
       throw new IllegalArgumentException(
-          "Journal entry TTL " + ttl + " exceeds configured maximum " + maxEntryTtl);
+          "Journal entry TTL " + ttl + " exceeds configured maximum " + limits.maxEntryTtl());
     }
     byte[] bytes = codec.encode(data);
     String entryId = journalSpi.append(key, bytes, ttl);
@@ -80,12 +74,12 @@ public class DefaultJournal<T> implements Journal<T> {
 
   @Override
   public void complete(Duration retentionTtl) {
-    if (retentionTtl.compareTo(maxRetentionTtl) > 0) {
+    if (retentionTtl.compareTo(limits.maxRetentionTtl()) > 0) {
       throw new IllegalArgumentException(
           "Journal retention TTL "
               + retentionTtl
               + " exceeds configured maximum "
-              + maxRetentionTtl);
+              + limits.maxRetentionTtl());
     }
     journalSpi.complete(key, retentionTtl);
     notifier.notify(key, "__COMPLETED__");
@@ -120,7 +114,7 @@ public class DefaultJournal<T> implements Journal<T> {
   public Subscription subscribe(Subscriber<JournalEntry<T>> subscriber) {
     List<RawJournalEntry> lastEntries = journalSpi.readLast(key, 1);
     String startingCheckpoint = lastEntries.isEmpty() ? null : lastEntries.getLast().id();
-    return buildCallbackPumpSubscription(startingCheckpoint, List.of(), subscriber);
+    return buildCallbackSubscription(startingCheckpoint, List.of(), subscriber);
   }
 
   @Override
@@ -130,7 +124,7 @@ public class DefaultJournal<T> implements Journal<T> {
 
   @Override
   public Subscription subscribeAfter(String afterId, Subscriber<JournalEntry<T>> subscriber) {
-    return buildCallbackPumpSubscription(afterId, List.of(), subscriber);
+    return buildCallbackSubscription(afterId, List.of(), subscriber);
   }
 
   @Override
@@ -143,7 +137,7 @@ public class DefaultJournal<T> implements Journal<T> {
   public Subscription subscribeLast(int count, Subscriber<JournalEntry<T>> subscriber) {
     List<RawJournalEntry> preload = journalSpi.readLast(key, count);
     String startingCheckpoint = preload.isEmpty() ? null : preload.getLast().id();
-    return buildCallbackPumpSubscription(startingCheckpoint, preload, subscriber);
+    return buildCallbackSubscription(startingCheckpoint, preload, subscriber);
   }
 
   @Override
@@ -160,17 +154,17 @@ public class DefaultJournal<T> implements Journal<T> {
   private BlockingSubscription<JournalEntry<T>> buildBlockingSubscription(
       String startingCheckpoint, List<RawJournalEntry> preload) {
     BlockingBoundedHandoff<JournalEntry<T>> handoff =
-        new BlockingBoundedHandoff<>(subscriptionQueueCapacity);
+        new BlockingBoundedHandoff<>(limits.subscriptionQueueCapacity());
     Runnable canceller = startFeeder(handoff, startingCheckpoint, preload);
     return new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
   }
 
-  private Subscription buildCallbackPumpSubscription(
+  private Subscription buildCallbackSubscription(
       String startingCheckpoint,
       List<RawJournalEntry> preload,
       Subscriber<JournalEntry<T>> subscriber) {
     BlockingBoundedHandoff<JournalEntry<T>> handoff =
-        new BlockingBoundedHandoff<>(subscriptionQueueCapacity);
+        new BlockingBoundedHandoff<>(limits.subscriptionQueueCapacity());
     Runnable canceller = startFeeder(handoff, startingCheckpoint, preload);
     var source = new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
     return new CallbackPumpSubscription<>(source, subscriber);

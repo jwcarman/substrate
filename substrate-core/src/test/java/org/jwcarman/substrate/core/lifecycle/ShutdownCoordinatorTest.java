@@ -16,14 +16,17 @@
 package org.jwcarman.substrate.core.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.awaitility.Awaitility.await;
 
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.NextResult;
+import org.jwcarman.substrate.Subscription;
 import org.jwcarman.substrate.core.subscription.BlockingBoundedHandoff;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
 
@@ -63,17 +66,26 @@ class ShutdownCoordinatorTest {
     var exited = new CountDownLatch(1);
     var result = new java.util.concurrent.atomic.AtomicReference<NextResult<String>>();
 
-    Thread.ofVirtual()
-        .start(
-            () -> {
-              entered.countDown();
-              result.set(sub.next(Duration.ofMinutes(10)));
-              exited.countDown();
-            });
+    Thread consumer =
+        Thread.ofVirtual()
+            .start(
+                () -> {
+                  entered.countDown();
+                  result.set(sub.next(Duration.ofMinutes(10)));
+                  exited.countDown();
+                });
 
     assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
-    // Give the consumer a beat to enter the blocking pull
-    Thread.sleep(50);
+    // Wait until the consumer is actually parked inside next() before we
+    // fire stop() — otherwise stop() could race ahead and the test would
+    // no longer cover the "unblock an in-flight next()" behavior.
+    await()
+        .atMost(Duration.ofSeconds(1))
+        .until(
+            () -> {
+              var state = consumer.getState();
+              return state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING;
+            });
 
     coordinator.stop();
 
@@ -191,5 +203,109 @@ class ShutdownCoordinatorTest {
     assertThat(sub.isActive()).isFalse();
     assertThat(sub2.isActive()).isFalse();
     await().atMost(Duration.ofSeconds(1)).until(() -> !coordinator.isRunning());
+  }
+
+  @Test
+  void cancelThrowingDuringShutdownIsLoggedButNotPropagated() {
+    var coordinator = new ShutdownCoordinator();
+    coordinator.register(throwingSubscription());
+
+    // stop() must not propagate the RuntimeException from the fan-out workers.
+    assertThatNoException().isThrownBy(coordinator::stop);
+  }
+
+  @Test
+  void lateRegistrationWhereCancelThrowsIsLoggedButNotPropagated() {
+    var coordinator = new ShutdownCoordinator();
+    coordinator.stop();
+
+    // register() after stop() fires cancel() synchronously. If cancel() throws,
+    // register() must swallow the exception rather than propagate to the caller.
+    assertThatNoException().isThrownBy(() -> coordinator.register(throwingSubscription()));
+  }
+
+  @Test
+  void deadlineExceededAbandonsRemainingWorkers() {
+    var coordinator = new ShutdownCoordinator(Duration.ofMillis(100));
+    var cancelStarted = new CountDownLatch(1);
+    var neverSignalled = new CountDownLatch(1);
+    coordinator.register(blockingSubscription(cancelStarted, neverSignalled));
+
+    long start = System.nanoTime();
+    coordinator.stop();
+    var elapsed = Duration.ofNanos(System.nanoTime() - start);
+
+    // The slow cancel never completes, but stop() returns after the deadline.
+    assertThat(cancelStarted.getCount()).isZero();
+    assertThat(elapsed).isLessThan(Duration.ofSeconds(2));
+  }
+
+  @Test
+  void interruptDuringJoinRestoresInterruptFlag() {
+    var coordinator = new ShutdownCoordinator(Duration.ofSeconds(10));
+    var cancelStarted = new CountDownLatch(1);
+    var neverSignalled = new CountDownLatch(1);
+    coordinator.register(blockingSubscription(cancelStarted, neverSignalled));
+
+    var stopperInterrupted = new AtomicBoolean(false);
+    var stopperDone = new CountDownLatch(1);
+    Thread stopper =
+        Thread.ofVirtual()
+            .start(
+                () -> {
+                  try {
+                    coordinator.stop();
+                  } finally {
+                    stopperInterrupted.set(Thread.currentThread().isInterrupted());
+                    stopperDone.countDown();
+                  }
+                });
+
+    // Wait until the stopper is actually parked inside worker.join() before
+    // interrupting it.
+    await()
+        .atMost(Duration.ofSeconds(1))
+        .until(
+            () -> {
+              var state = stopper.getState();
+              return state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING;
+            });
+    stopper.interrupt();
+
+    await().atMost(Duration.ofSeconds(1)).until(() -> stopperDone.getCount() == 0);
+    assertThat(stopperInterrupted.get()).isTrue();
+  }
+
+  private static Subscription throwingSubscription() {
+    return new Subscription() {
+      @Override
+      public boolean isActive() {
+        return true;
+      }
+
+      @Override
+      public void cancel() {
+        throw new RuntimeException("boom from cancel()");
+      }
+    };
+  }
+
+  private static Subscription blockingSubscription(CountDownLatch started, CountDownLatch release) {
+    return new Subscription() {
+      @Override
+      public boolean isActive() {
+        return true;
+      }
+
+      @Override
+      public void cancel() {
+        started.countDown();
+        try {
+          release.await();
+        } catch (InterruptedException _) {
+          Thread.currentThread().interrupt();
+        }
+      }
+    };
   }
 }
