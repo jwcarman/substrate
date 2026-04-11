@@ -164,55 +164,79 @@ public class DefaultAtom<T> implements Atom<T> {
 
     NotifierSubscription notifierSub =
         notifier.subscribe(
-            (notifiedKey, payload) -> {
-              if (!key.equals(notifiedKey)) {
-                return;
-              }
-              if (DELETED_PAYLOAD.equals(payload)) {
-                handoff.markDeleted();
-                running.set(false);
-                semaphore.release();
-              } else {
-                semaphore.release();
-              }
-            });
+            (notifiedKey, payload) ->
+                handleNotification(notifiedKey, payload, handoff, running, semaphore));
 
     Thread feederThread =
         Thread.ofVirtual()
             .name("substrate-atom-feeder", 0)
-            .start(
-                () -> {
-                  try {
-                    while (running.get() && !Thread.currentThread().isInterrupted()) {
-                      Optional<RawAtom> raw = atomSpi.read(key);
-                      if (raw.isEmpty()) {
-                        handoff.markExpired();
-                        return;
-                      }
-                      if (!raw.get().token().equals(lastToken.get())) {
-                        Snapshot<T> snap =
-                            new Snapshot<>(codec.decode(raw.get().value()), raw.get().token());
-                        handoff.push(snap);
-                        lastToken.set(snap.token());
-                      }
-                      if (semaphore.tryAcquire(1, TimeUnit.SECONDS)) {
-                        semaphore.drainPermits();
-                      }
-                    }
-                  } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                  } catch (RuntimeException e) {
-                    handoff.error(e);
-                  } finally {
-                    notifierSub.cancel();
-                  }
-                });
+            .start(() -> runFeederLoop(handoff, running, semaphore, lastToken, notifierSub));
 
     return () -> {
       running.set(false);
       feederThread.interrupt();
       notifierSub.cancel();
     };
+  }
+
+  private void handleNotification(
+      String notifiedKey,
+      String payload,
+      CoalescingHandoff<Snapshot<T>> handoff,
+      AtomicBoolean running,
+      Semaphore semaphore) {
+    if (!key.equals(notifiedKey)) {
+      return;
+    }
+    if (DELETED_PAYLOAD.equals(payload)) {
+      handoff.markDeleted();
+      running.set(false);
+    }
+    semaphore.release();
+  }
+
+  private void runFeederLoop(
+      CoalescingHandoff<Snapshot<T>> handoff,
+      AtomicBoolean running,
+      Semaphore semaphore,
+      AtomicReference<String> lastToken,
+      NotifierSubscription notifierSub) {
+    try {
+      while (running.get() && !Thread.currentThread().isInterrupted()) {
+        if (!readAndPushIfChanged(handoff, lastToken)) {
+          return;
+        }
+        waitForNudge(semaphore);
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    } catch (RuntimeException e) {
+      handoff.error(e);
+    } finally {
+      notifierSub.cancel();
+    }
+  }
+
+  private boolean readAndPushIfChanged(
+      CoalescingHandoff<Snapshot<T>> handoff, AtomicReference<String> lastToken) {
+    Optional<RawAtom> raw = atomSpi.read(key);
+    if (raw.isEmpty()) {
+      handoff.markExpired();
+      return false;
+    }
+    String currentToken = raw.get().token();
+    if (!currentToken.equals(lastToken.get())) {
+      Snapshot<T> snap = new Snapshot<>(codec.decode(raw.get().value()), currentToken);
+      handoff.push(snap);
+      lastToken.set(currentToken);
+    }
+    return true;
+  }
+
+  private static void waitForNudge(Semaphore semaphore) throws InterruptedException {
+    if (semaphore.tryAcquire(1, TimeUnit.SECONDS)) {
+      semaphore.drainPermits();
+    }
   }
 
   static String token(byte[] encodedBytes) {

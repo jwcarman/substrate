@@ -36,6 +36,8 @@ import org.jwcarman.substrate.mailbox.MailboxFullException;
 
 public class DefaultMailbox<T> implements Mailbox<T> {
 
+  private static final String DELETED_PAYLOAD = "__DELETED__";
+
   private final MailboxSpi mailboxSpi;
   private final String key;
   private final Codec<T> codec;
@@ -61,7 +63,7 @@ public class DefaultMailbox<T> implements Mailbox<T> {
   @Override
   public void delete() {
     mailboxSpi.delete(key);
-    notifier.notify(key, "__DELETED__");
+    notifier.notify(key, DELETED_PAYLOAD);
   }
 
   @Override
@@ -103,49 +105,73 @@ public class DefaultMailbox<T> implements Mailbox<T> {
 
     NotifierSubscription notifierSub =
         notifier.subscribe(
-            (notifiedKey, payload) -> {
-              if (!key.equals(notifiedKey)) {
-                return;
-              }
-              if ("__DELETED__".equals(payload)) {
-                handoff.markDeleted();
-                running.set(false);
-              }
-              semaphore.release();
-            });
+            (notifiedKey, payload) ->
+                handleNotification(notifiedKey, payload, handoff, running, semaphore));
 
     Thread feederThread =
         Thread.ofVirtual()
             .name("substrate-mailbox-feeder", 0)
-            .start(
-                () -> {
-                  try {
-                    while (running.get() && !Thread.currentThread().isInterrupted()) {
-                      Optional<byte[]> value = mailboxSpi.get(key);
-                      if (value.isPresent()) {
-                        handoff.push(codec.decode(value.get()));
-                        return;
-                      }
-                      if (semaphore.tryAcquire(1, TimeUnit.SECONDS)) {
-                        semaphore.drainPermits();
-                      }
-                    }
-                  } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                  } catch (MailboxExpiredException e) {
-                    handoff.markExpired();
-                  } catch (RuntimeException e) {
-                    handoff.error(e);
-                  } finally {
-                    notifierSub.cancel();
-                  }
-                });
+            .start(() -> runFeederLoop(handoff, running, semaphore, notifierSub));
 
     return () -> {
       running.set(false);
       feederThread.interrupt();
       notifierSub.cancel();
     };
+  }
+
+  private void handleNotification(
+      String notifiedKey,
+      String payload,
+      SingleShotHandoff<T> handoff,
+      AtomicBoolean running,
+      Semaphore semaphore) {
+    if (!key.equals(notifiedKey)) {
+      return;
+    }
+    if (DELETED_PAYLOAD.equals(payload)) {
+      handoff.markDeleted();
+      running.set(false);
+    }
+    semaphore.release();
+  }
+
+  private void runFeederLoop(
+      SingleShotHandoff<T> handoff,
+      AtomicBoolean running,
+      Semaphore semaphore,
+      NotifierSubscription notifierSub) {
+    try {
+      while (running.get() && !Thread.currentThread().isInterrupted()) {
+        if (tryPushDelivery(handoff)) {
+          return;
+        }
+        waitForNudge(semaphore);
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    } catch (MailboxExpiredException e) {
+      handoff.markExpired();
+    } catch (RuntimeException e) {
+      handoff.error(e);
+    } finally {
+      notifierSub.cancel();
+    }
+  }
+
+  private boolean tryPushDelivery(SingleShotHandoff<T> handoff) {
+    Optional<byte[]> value = mailboxSpi.get(key);
+    if (value.isPresent()) {
+      handoff.push(codec.decode(value.get()));
+      return true;
+    }
+    return false;
+  }
+
+  private static void waitForNudge(Semaphore semaphore) throws InterruptedException {
+    if (semaphore.tryAcquire(1, TimeUnit.SECONDS)) {
+      semaphore.drainPermits();
+    }
   }
 
   @Override

@@ -38,6 +38,8 @@ import org.jwcarman.substrate.journal.JournalExpiredException;
 
 public class DefaultJournal<T> implements Journal<T> {
 
+  private static final String DELETED_PAYLOAD = "__DELETED__";
+
   private final JournalSpi journalSpi;
   private final String key;
   private final Codec<T> codec;
@@ -91,7 +93,7 @@ public class DefaultJournal<T> implements Journal<T> {
   @Override
   public void delete() {
     journalSpi.delete(key);
-    notifier.notify(key, "__DELETED__");
+    notifier.notify(key, DELETED_PAYLOAD);
   }
 
   @Override
@@ -208,69 +210,110 @@ public class DefaultJournal<T> implements Journal<T> {
 
     NotifierSubscription notifierSub =
         notifier.subscribe(
-            (notifiedKey, payload) -> {
-              if (!key.equals(notifiedKey)) {
-                return;
-              }
-              if ("__DELETED__".equals(payload)) {
-                handoff.markDeleted();
-                running.set(false);
-              }
-              semaphore.release();
-            });
+            (notifiedKey, payload) ->
+                handleNotification(notifiedKey, payload, handoff, running, semaphore));
 
     Thread feederThread =
         Thread.ofVirtual()
             .name("substrate-journal-feeder", 0)
             .start(
-                () -> {
-                  try {
-                    for (RawJournalEntry raw : preload) {
-                      if (!running.get()) return;
-                      handoff.push(decode(raw));
-                      checkpoint.set(raw.id());
-                    }
-
-                    while (running.get() && !Thread.currentThread().isInterrupted()) {
-                      List<RawJournalEntry> batch = readAfterCheckpoint(checkpoint.get());
-
-                      for (RawJournalEntry raw : batch) {
-                        if (!running.get()) return;
-                        handoff.push(decode(raw));
-                        checkpoint.set(raw.id());
-                      }
-
-                      if (journalSpi.isComplete(key)) {
-                        List<RawJournalEntry> finalBatch = readAfterCheckpoint(checkpoint.get());
-                        for (RawJournalEntry raw : finalBatch) {
-                          if (!running.get()) return;
-                          handoff.push(decode(raw));
-                          checkpoint.set(raw.id());
-                        }
-                        handoff.markCompleted();
-                        return;
-                      }
-
-                      if (semaphore.tryAcquire(1, TimeUnit.SECONDS)) {
-                        semaphore.drainPermits();
-                      }
-                    }
-                  } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                  } catch (JournalExpiredException e) {
-                    handoff.markExpired();
-                  } catch (RuntimeException e) {
-                    handoff.error(e);
-                  } finally {
-                    notifierSub.cancel();
-                  }
-                });
+                () -> runFeederLoop(handoff, running, semaphore, checkpoint, preload, notifierSub));
 
     return () -> {
       running.set(false);
       feederThread.interrupt();
       notifierSub.cancel();
     };
+  }
+
+  private void handleNotification(
+      String notifiedKey,
+      String payload,
+      BlockingBoundedHandoff<JournalEntry<T>> handoff,
+      AtomicBoolean running,
+      Semaphore semaphore) {
+    if (!key.equals(notifiedKey)) {
+      return;
+    }
+    if (DELETED_PAYLOAD.equals(payload)) {
+      handoff.markDeleted();
+      running.set(false);
+    }
+    semaphore.release();
+  }
+
+  private void runFeederLoop(
+      BlockingBoundedHandoff<JournalEntry<T>> handoff,
+      AtomicBoolean running,
+      Semaphore semaphore,
+      AtomicReference<String> checkpoint,
+      List<RawJournalEntry> preload,
+      NotifierSubscription notifierSub) {
+    try {
+      pushPreload(handoff, running, checkpoint, preload);
+      while (running.get() && !Thread.currentThread().isInterrupted()) {
+        readBatchAndPush(handoff, running, checkpoint);
+        if (drainIfCompleted(handoff, running, checkpoint)) {
+          return;
+        }
+        waitForNudge(semaphore);
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    } catch (JournalExpiredException e) {
+      handoff.markExpired();
+    } catch (RuntimeException e) {
+      handoff.error(e);
+    } finally {
+      notifierSub.cancel();
+    }
+  }
+
+  private void pushPreload(
+      BlockingBoundedHandoff<JournalEntry<T>> handoff,
+      AtomicBoolean running,
+      AtomicReference<String> checkpoint,
+      List<RawJournalEntry> preload) {
+    for (RawJournalEntry raw : preload) {
+      if (!running.get()) return;
+      handoff.push(decode(raw));
+      checkpoint.set(raw.id());
+    }
+  }
+
+  private void readBatchAndPush(
+      BlockingBoundedHandoff<JournalEntry<T>> handoff,
+      AtomicBoolean running,
+      AtomicReference<String> checkpoint) {
+    List<RawJournalEntry> batch = readAfterCheckpoint(checkpoint.get());
+    for (RawJournalEntry raw : batch) {
+      if (!running.get()) return;
+      handoff.push(decode(raw));
+      checkpoint.set(raw.id());
+    }
+  }
+
+  private boolean drainIfCompleted(
+      BlockingBoundedHandoff<JournalEntry<T>> handoff,
+      AtomicBoolean running,
+      AtomicReference<String> checkpoint) {
+    if (!journalSpi.isComplete(key)) {
+      return false;
+    }
+    List<RawJournalEntry> finalBatch = readAfterCheckpoint(checkpoint.get());
+    for (RawJournalEntry raw : finalBatch) {
+      if (!running.get()) return true;
+      handoff.push(decode(raw));
+      checkpoint.set(raw.id());
+    }
+    handoff.markCompleted();
+    return true;
+  }
+
+  private static void waitForNudge(Semaphore semaphore) throws InterruptedException {
+    if (semaphore.tryAcquire(1, TimeUnit.SECONDS)) {
+      semaphore.drainPermits();
+    }
   }
 
   private List<RawJournalEntry> readAfterCheckpoint(String cp) {
