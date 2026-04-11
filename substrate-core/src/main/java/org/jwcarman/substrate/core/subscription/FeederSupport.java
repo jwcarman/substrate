@@ -18,6 +18,8 @@ package org.jwcarman.substrate.core.subscription;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.notifier.NotifierSubscription;
 
@@ -31,6 +33,8 @@ import org.jwcarman.substrate.core.notifier.NotifierSubscription;
  * virtual thread and returns the canceller closure as the subscription's cleanup hook.
  */
 public final class FeederSupport {
+
+  private static final Log log = LogFactory.getLog(FeederSupport.class);
 
   private static final String DELETED_PAYLOAD = "__DELETED__";
 
@@ -74,7 +78,7 @@ public final class FeederSupport {
     Thread feederThread =
         Thread.ofVirtual()
             .name(threadName, 0)
-            .start(() -> runLoop(running, semaphore, handoff, step, notifierSub));
+            .start(() -> runLoop(running, semaphore, handoff, step, notifierSub, threadName, key));
 
     return () -> {
       running.set(false);
@@ -105,7 +109,12 @@ public final class FeederSupport {
       Semaphore semaphore,
       NextHandoff<?> handoff,
       FeederStep step,
-      NotifierSubscription notifierSub) {
+      NotifierSubscription notifierSub,
+      String threadName,
+      String key) {
+    if (log.isDebugEnabled()) {
+      log.debug("Feeder '" + threadName + "' started for key '" + key + "'");
+    }
     try {
       while (running.get() && !Thread.currentThread().isInterrupted()) {
         if (!step.runOnce()) {
@@ -116,9 +125,13 @@ public final class FeederSupport {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     } catch (RuntimeException e) {
+      log.warn("Feeder '" + threadName + "' for key '" + key + "' caught unexpected error", e);
       handoff.error(e);
     } finally {
       notifierSub.cancel();
+      if (log.isDebugEnabled()) {
+        log.debug("Feeder '" + threadName + "' exited for key '" + key + "'");
+      }
     }
   }
 

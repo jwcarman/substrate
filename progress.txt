@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T02:58:00Z
-ITERATION: 41
-SPEC_COMPLETED: 038-reduce-feeder-cognitive-complexity.md
-WHAT_WAS_DONE: Extracted shared feeder scaffolding into FeederSupport utility class, refactored DefaultAtom.startFeeder (~58→~20 lines), DefaultJournal.startFeeder (~75→~55 lines across 4 small methods), and DefaultMailbox.startFeeder (~50→~17 lines) to delegate to FeederSupport.start() with primitive-specific step lambdas. Created FeederSupportTest with 7 tests covering loop continuation, clean exit on step returning false, RuntimeException→handoff.error, __DELETED__ notification→markDeleted, canceller stopping the thread, interrupt without error, and key filtering.
-VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — BUILD SUCCESS (all 13 modules, 308 tests, zero failures); no @SuppressWarnings introduced; no code logic changes to existing behavior
+LAST_RUN: 2026-04-11T03:12:00Z
+ITERATION: 42
+SPEC_COMPLETED: 040-feeder-lifecycle-logging.md
+WHAT_WAS_DONE: Added feeder thread lifecycle logging to FeederSupport — DEBUG log on feeder start (before while loop), DEBUG log on feeder exit (in finally block after notifierSub.cancel()), and WARN log on unexpected RuntimeException (before handoff.error). Logger uses Apache commons-logging matching existing convention. The runLoop method now takes threadName and key as additional parameters for log message context; the start method's public signature is unchanged.
+VERIFICATION: ./mvnw spotless:check — PASS (after spotless:apply fixed one line-wrap); ./mvnw verify -DskipITs — BUILD SUCCESS (all modules, zero failures); no @SuppressWarnings introduced; no new dependencies added
 STATUS: DONE
 NEXT_SPEC: none
-NOTES: DELETED_PAYLOAD constants removed from Default* classes and inlined as string literals in delete() methods since the constant is now private in FeederSupport. Journal's JournalExpiredException and Mailbox's MailboxExpiredException are now caught inside the step lambdas rather than at the loop level, per the FeederSupport design — this preserves correct semantic mapping to markExpired() instead of handoff.error(). The Journal preload pattern uses AtomicBoolean compareAndSet to run exactly once inside the step loop.
+NOTES: The log.warn call for RuntimeException does not use an isDebugEnabled/isWarnEnabled guard per the spec — warnings are rare enough that concatenation cost is irrelevant. The two DEBUG calls are guarded by isDebugEnabled() to avoid unnecessary string concatenation.
