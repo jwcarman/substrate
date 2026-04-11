@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T05:00:00Z
-ITERATION: 51
-SPEC_COMPLETED: 049-abstract-handoff-extraction.md
-WHAT_WAS_DONE: Extracted two-level abstract hierarchy from the three NextHandoff implementations: AbstractHandoff (terminal-mark dispatch) and AbstractSingleSlotHandoff (shared lock/condition/slot/pull loop), then refactored CoalescingHandoff, SingleShotHandoff, and BlockingBoundedHandoff to extend them, eliminating ~40% duplication.
+LAST_RUN: 2026-04-11T05:10:00Z
+ITERATION: 52
+SPEC_COMPLETED: 050-expiring-entry-helper.md
+WHAT_WAS_DONE: Extracted shared ExpiringEntry<V> record with isExpired() and static sweepExpired() helper into org.jwcarman.substrate.core.memory, then refactored InMemoryAtomSpi to use ExpiringEntry<RawAtom> and InMemoryMailboxSpi to use ExpiringEntry<Optional<byte[]>>, eliminating the private Entry records and duplicated sweep loops from both SPIs.
 VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw -pl substrate-core verify -DskipITs — BUILD SUCCESS (308 tests, 0 failures)
 STATUS: DONE
 NEXT_SPEC: none
-NOTES: CoalescingHandoff renamed its `terminal` field to `sealed` (now inherited from AbstractSingleSlotHandoff). CoalescingHandoff went from 113 lines to 52, SingleShotHandoff from 114 to 52, BlockingBoundedHandoff from 100 to 84. No new @SuppressWarnings added. All existing tests pass unchanged.
+NOTES: InMemoryAtomSpi went from 146 lines to ~100 (removed Entry record with byte[]-safe equals/hashCode/toString plus sweep loop). InMemoryMailboxSpi went from 93 lines to ~78 (removed Entry record plus sweep loop). The isAlive(Instant now) pattern was replaced by no-arg isExpired() that reads Instant.now() internally, matching the design decision in the spec. No new @SuppressWarnings added.

@@ -17,48 +17,17 @@ package org.jwcarman.substrate.core.memory.atom;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Arrays;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
 import org.jwcarman.substrate.core.atom.AbstractAtomSpi;
 import org.jwcarman.substrate.core.atom.RawAtom;
+import org.jwcarman.substrate.core.memory.ExpiringEntry;
 
 public class InMemoryAtomSpi extends AbstractAtomSpi {
 
-  private record Entry(byte[] value, String token, Instant expiresAt) {
-    boolean isAlive(Instant now) {
-      return now.isBefore(expiresAt);
-    }
-
-    @Override
-    public boolean equals(Object other) {
-      return other instanceof Entry(byte[] v, String t, Instant e)
-          && Arrays.equals(value, v)
-          && Objects.equals(token, t)
-          && Objects.equals(expiresAt, e);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(Arrays.hashCode(value), token, expiresAt);
-    }
-
-    @Override
-    public String toString() {
-      return "Entry[value="
-          + Arrays.toString(value)
-          + ", token="
-          + token
-          + ", expiresAt="
-          + expiresAt
-          + "]";
-    }
-  }
-
-  private final ConcurrentMap<String, Entry> store = new ConcurrentHashMap<>();
+  private final ConcurrentMap<String, ExpiringEntry<RawAtom>> store = new ConcurrentHashMap<>();
 
   public InMemoryAtomSpi() {
     super("substrate:atom:");
@@ -66,12 +35,13 @@ public class InMemoryAtomSpi extends AbstractAtomSpi {
 
   @Override
   public void create(String key, byte[] value, String token, Duration ttl) {
-    Entry entry = new Entry(value, token, Instant.now().plus(ttl));
-    Entry previous =
+    ExpiringEntry<RawAtom> entry =
+        new ExpiringEntry<>(new RawAtom(value, token), Instant.now().plus(ttl));
+    ExpiringEntry<RawAtom> previous =
         store.compute(
             key,
             (k, existing) -> {
-              if (existing != null && existing.isAlive(Instant.now())) {
+              if (existing != null && !existing.isExpired()) {
                 return existing;
               }
               return entry;
@@ -83,26 +53,26 @@ public class InMemoryAtomSpi extends AbstractAtomSpi {
 
   @Override
   public Optional<RawAtom> read(String key) {
-    Entry entry = store.get(key);
+    ExpiringEntry<RawAtom> entry = store.get(key);
     if (entry == null) {
       return Optional.empty();
     }
-    if (!entry.isAlive(Instant.now())) {
+    if (entry.isExpired()) {
       store.remove(key, entry);
       return Optional.empty();
     }
-    return Optional.of(new RawAtom(entry.value(), entry.token()));
+    return Optional.of(entry.value());
   }
 
   @Override
   public boolean set(String key, byte[] value, String token, Duration ttl) {
-    Instant now = Instant.now();
-    Entry next = new Entry(value, token, now.plus(ttl));
-    Entry result =
+    ExpiringEntry<RawAtom> next =
+        new ExpiringEntry<>(new RawAtom(value, token), Instant.now().plus(ttl));
+    ExpiringEntry<RawAtom> result =
         store.compute(
             key,
             (k, existing) -> {
-              if (existing == null || !existing.isAlive(now)) {
+              if (existing == null || existing.isExpired()) {
                 return null;
               }
               return next;
@@ -112,31 +82,21 @@ public class InMemoryAtomSpi extends AbstractAtomSpi {
 
   @Override
   public boolean touch(String key, Duration ttl) {
-    Instant now = Instant.now();
-    Entry result =
+    ExpiringEntry<RawAtom> result =
         store.compute(
             key,
             (k, existing) -> {
-              if (existing == null || !existing.isAlive(now)) {
+              if (existing == null || existing.isExpired()) {
                 return null;
               }
-              return new Entry(existing.value(), existing.token(), now.plus(ttl));
+              return new ExpiringEntry<>(existing.value(), Instant.now().plus(ttl));
             });
     return result != null;
   }
 
   @Override
   public int sweep(int maxToSweep) {
-    Instant now = Instant.now();
-    int removed = 0;
-    var iterator = store.entrySet().iterator();
-    while (iterator.hasNext() && removed < maxToSweep) {
-      if (!iterator.next().getValue().isAlive(now)) {
-        iterator.remove();
-        removed++;
-      }
-    }
-    return removed;
+    return ExpiringEntry.sweepExpired(store, maxToSweep);
   }
 
   @Override

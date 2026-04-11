@@ -21,18 +21,14 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.jwcarman.substrate.core.mailbox.AbstractMailboxSpi;
+import org.jwcarman.substrate.core.memory.ExpiringEntry;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 import org.jwcarman.substrate.mailbox.MailboxFullException;
 
 public class InMemoryMailboxSpi extends AbstractMailboxSpi {
 
-  private record Entry(Optional<byte[]> value, Instant expiresAt) {
-    boolean isAlive(Instant now) {
-      return now.isBefore(expiresAt);
-    }
-  }
-
-  private final ConcurrentMap<String, Entry> store = new ConcurrentHashMap<>();
+  private final ConcurrentMap<String, ExpiringEntry<Optional<byte[]>>> store =
+      new ConcurrentHashMap<>();
 
   public InMemoryMailboxSpi() {
     super("substrate:mailbox:");
@@ -40,30 +36,28 @@ public class InMemoryMailboxSpi extends AbstractMailboxSpi {
 
   @Override
   public void create(String key, Duration ttl) {
-    store.put(key, new Entry(Optional.empty(), Instant.now().plus(ttl)));
+    store.put(key, new ExpiringEntry<>(Optional.empty(), Instant.now().plus(ttl)));
   }
 
   @Override
   public void deliver(String key, byte[] value) {
-    Instant now = Instant.now();
     store.compute(
         key,
         (k, existing) -> {
-          if (existing == null || !existing.isAlive(now)) {
+          if (existing == null || existing.isExpired()) {
             throw new MailboxExpiredException(key);
           }
           if (existing.value().isPresent()) {
             throw new MailboxFullException(key);
           }
-          return new Entry(Optional.of(value), existing.expiresAt());
+          return new ExpiringEntry<>(Optional.of(value), existing.expiresAt());
         });
   }
 
   @Override
   public Optional<byte[]> get(String key) {
-    Entry entry = store.get(key);
-    Instant now = Instant.now();
-    if (entry == null || !entry.isAlive(now)) {
+    ExpiringEntry<Optional<byte[]>> entry = store.get(key);
+    if (entry == null || entry.isExpired()) {
       if (entry != null) {
         store.remove(key, entry);
       }
@@ -74,16 +68,7 @@ public class InMemoryMailboxSpi extends AbstractMailboxSpi {
 
   @Override
   public int sweep(int maxToSweep) {
-    Instant now = Instant.now();
-    int removed = 0;
-    var iterator = store.entrySet().iterator();
-    while (iterator.hasNext() && removed < maxToSweep) {
-      if (!iterator.next().getValue().isAlive(now)) {
-        iterator.remove();
-        removed++;
-      }
-    }
-    return removed;
+    return ExpiringEntry.sweepExpired(store, maxToSweep);
   }
 
   @Override
