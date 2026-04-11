@@ -43,10 +43,7 @@ public class DynamoDbJournalAutoConfiguration {
       DynamoDbClient dynamoDbClient, DynamoDbProperties properties) {
     DynamoDbJournalSpi journal =
         new DynamoDbJournalSpi(
-            dynamoDbClient,
-            properties.journal().prefix(),
-            properties.journal().tableName(),
-            properties.journal().ttl());
+            dynamoDbClient, properties.journal().prefix(), properties.journal().tableName());
 
     if (properties.journal().autoCreateTable()) {
       journal.createTable();

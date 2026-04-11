@@ -243,7 +243,7 @@ class PostgresAtomIT {
             t -> {
               try {
                 t.join();
-              } catch (InterruptedException e) {
+              } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
               }
             });
@@ -354,7 +354,7 @@ class PostgresAtomIT {
             t -> {
               try {
                 t.join(Duration.ofSeconds(10));
-              } catch (InterruptedException e) {
+              } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
               }
             });

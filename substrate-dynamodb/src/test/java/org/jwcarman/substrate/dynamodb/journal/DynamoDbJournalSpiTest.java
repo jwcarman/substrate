@@ -45,9 +45,7 @@ class DynamoDbJournalSpiTest {
 
   @BeforeEach
   void setUp() {
-    journal =
-        new DynamoDbJournalSpi(
-            client, "substrate:journal:", "substrate_journal", Duration.ofHours(24));
+    journal = new DynamoDbJournalSpi(client, "substrate:journal:", "substrate_journal");
   }
 
   @Test
@@ -84,7 +82,7 @@ class DynamoDbJournalSpiTest {
   @Test
   void appendWithNullTtlOmitsTtlField() {
     DynamoDbJournalSpi noTtlJournal =
-        new DynamoDbJournalSpi(client, "substrate:journal:", "substrate_journal", Duration.ZERO);
+        new DynamoDbJournalSpi(client, "substrate:journal:", "substrate_journal");
     noTtlJournal.append(
         "substrate:journal:test", "data".getBytes(StandardCharsets.UTF_8), Duration.ZERO);
 

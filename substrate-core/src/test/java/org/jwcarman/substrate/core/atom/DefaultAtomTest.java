@@ -154,13 +154,6 @@ class DefaultAtomTest {
   }
 
   @Test
-  void deleteRemovesAtom() {
-    atom.delete();
-
-    assertThatThrownBy(atom::get).isInstanceOf(AtomExpiredException.class);
-  }
-
-  @Test
   void deletePublishesDeletedNotification() {
     AtomicReference<String> notifiedPayload = new AtomicReference<>();
     notifier.subscribe(

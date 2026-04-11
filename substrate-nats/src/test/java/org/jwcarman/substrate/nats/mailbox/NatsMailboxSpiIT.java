@@ -138,7 +138,7 @@ class NatsMailboxSpiIT extends AbstractNatsIT {
             t -> {
               try {
                 t.join();
-              } catch (InterruptedException e) {
+              } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
               }
             });

@@ -178,7 +178,7 @@ class HazelcastAtomIT extends AbstractHazelcastIT {
             t -> {
               try {
                 t.join();
-              } catch (InterruptedException e) {
+              } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
               }
             });

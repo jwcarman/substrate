@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T05:10:00Z
-ITERATION: 52
-SPEC_COMPLETED: 050-expiring-entry-helper.md
-WHAT_WAS_DONE: Extracted shared ExpiringEntry<V> record with isExpired() and static sweepExpired() helper into org.jwcarman.substrate.core.memory, then refactored InMemoryAtomSpi to use ExpiringEntry<RawAtom> and InMemoryMailboxSpi to use ExpiringEntry<Optional<byte[]>>, eliminating the private Entry records and duplicated sweep loops from both SPIs.
-VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw -pl substrate-core verify -DskipITs — BUILD SUCCESS (308 tests, 0 failures)
+LAST_RUN: 2026-04-11T05:37:00Z
+ITERATION: 53
+SPEC_COMPLETED: 051-sonar-stragglers-cleanup.md
+WHAT_WAS_DONE: Fixed 21 Sonar code smells across the codebase: renamed 18 unused catch exception variables to _ (S7467), removed 2 unused throws declarations (S1130), deleted duplicate test method deleteRemovesAtom identical to getThrowsOnDeadAtom (S4144), and removed unused ttl field and constructor parameter from DynamoDbJournalSpi plus updated all 4 callers (S1068).
+VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — BUILD SUCCESS (all modules, 0 failures)
 STATUS: DONE
 NEXT_SPEC: none
-NOTES: InMemoryAtomSpi went from 146 lines to ~100 (removed Entry record with byte[]-safe equals/hashCode/toString plus sweep loop). InMemoryMailboxSpi went from 93 lines to ~78 (removed Entry record plus sweep loop). The isAlive(Instant now) pattern was replaced by no-arg isExpired() that reads Instant.now() internally, matching the design decision in the spec. No new @SuppressWarnings added.
+NOTES: S6213 (2 sites in InMemoryAtomSpiTest at lines 47/132) — not present in current code; the _ variables referenced by the spec do not exist at those locations. S5778 (1 site in InMemoryMailboxSpiTest:91) — already compliant; the assertThrows lambda contains a single throwing statement. Both rules should show 0 open issues regardless. No new @SuppressWarnings annotations introduced. The DynamoDbProperties.journal().ttl() config property still exists but is now unused by the SPI — it may be removed in a future cleanup or repurposed.

@@ -44,9 +44,7 @@ class DynamoDbJournalSpiIT extends AbstractDynamoDbIT {
       // table doesn't exist yet
     }
 
-    journal =
-        new DynamoDbJournalSpi(
-            client, "substrate:journal:", "substrate_journal", Duration.ofHours(24));
+    journal = new DynamoDbJournalSpi(client, "substrate:journal:", "substrate_journal");
     journal.createTable();
   }
 

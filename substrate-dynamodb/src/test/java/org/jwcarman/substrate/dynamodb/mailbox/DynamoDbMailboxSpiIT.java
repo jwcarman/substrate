@@ -145,7 +145,7 @@ class DynamoDbMailboxSpiIT extends AbstractDynamoDbIT {
             t -> {
               try {
                 t.join();
-              } catch (InterruptedException e) {
+              } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
               }
             });

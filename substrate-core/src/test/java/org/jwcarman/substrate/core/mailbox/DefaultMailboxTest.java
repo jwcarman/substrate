@@ -167,14 +167,14 @@ class DefaultMailboxTest {
   }
 
   @Test
-  void subscribeReturnsValueWhenNotificationArrivesForMatchingKey() throws InterruptedException {
+  void subscribeReturnsValueWhenNotificationArrivesForMatchingKey() {
     CountDownLatch readyToDeliver = new CountDownLatch(1);
     Thread.ofVirtual()
         .start(
             () -> {
               try {
                 readyToDeliver.await(5, TimeUnit.SECONDS);
-              } catch (InterruptedException e) {
+              } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
                 return;
               }

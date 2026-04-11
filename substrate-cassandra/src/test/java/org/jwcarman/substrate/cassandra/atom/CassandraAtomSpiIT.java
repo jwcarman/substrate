@@ -111,9 +111,9 @@ class CassandraAtomSpiIT {
                     "tok" + idx,
                     Duration.ofMinutes(5));
                 successes.incrementAndGet();
-              } catch (AtomAlreadyExistsException e) {
+              } catch (AtomAlreadyExistsException _) {
                 failures.incrementAndGet();
-              } catch (InterruptedException e) {
+              } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
               }
             });

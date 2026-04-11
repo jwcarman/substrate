@@ -70,7 +70,7 @@ public class NatsMailboxSpi extends AbstractMailboxSpi {
       kv.update(toKvKey(key), value, entry.getRevision());
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to deliver to NATS KV", e);
-    } catch (JetStreamApiException e) {
+    } catch (JetStreamApiException _) {
       // Revision mismatch means another thread delivered concurrently
       throw new MailboxFullException(key);
     }

@@ -198,7 +198,7 @@ class DefaultCallbackSubscriptionTest {
   // --- Idle subscription does zero periodic work ---
 
   @Test
-  void idleSubscriptionDoesNoPeriodicWork() throws Exception {
+  void idleSubscriptionDoesNoPeriodicWork() {
     var handoff = new CoalescingHandoff<String>();
     var pullCount = new AtomicInteger(0);
 

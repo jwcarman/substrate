@@ -50,13 +50,11 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
 
   private final DynamoDbClient client;
   private final String tableName;
-  private final Duration ttl;
 
-  public DynamoDbJournalSpi(DynamoDbClient client, String prefix, String tableName, Duration ttl) {
+  public DynamoDbJournalSpi(DynamoDbClient client, String prefix, String tableName) {
     super(prefix);
     this.client = client;
     this.tableName = tableName;
-    this.ttl = ttl;
   }
 
   public void createTable() {
