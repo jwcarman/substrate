@@ -233,6 +233,184 @@ mailbox.subscribe(
 ```
 
 
+## Concepts
+
+### Subscription model
+
+All three primitives expose the same subscription contract via two flavors:
+
+- **`BlockingSubscription<T>`** — pull-based. The caller invokes
+  `next(Duration)` and blocks until a value arrives, the timeout elapses,
+  or the subscription reaches a terminal state. Implements `AutoCloseable`
+  so try-with-resources cancels the subscription on scope exit.
+- **`CallbackSubscription`** — push-based. Values are delivered to a
+  registered `Consumer<T>` handler on a background virtual thread.
+  Cancel by calling `cancel()`.
+
+Every `BlockingSubscription.next(Duration)` returns a `NextResult<T>`
+sealed type with six exhaustive variants:
+
+| Variant | Meaning | Subscription stays active? |
+|---|---|---|
+| `Value(T value)` | A new value was delivered. | Yes |
+| `Timeout()` | The timeout elapsed without a value. | Yes |
+| `Completed()` | The primitive completed naturally (e.g., a Journal after `complete()` was drained, or a Mailbox after its single delivery was consumed). | No |
+| `Expired()` | The primitive's TTL elapsed. | No |
+| `Deleted()` | The primitive was explicitly deleted. | No |
+| `Errored(Throwable cause)` | An unexpected error occurred. | No |
+
+Pattern-match exhaustively in a `switch` and the compiler tells you when
+you've forgotten a case. The `CallbackSubscription` flavor maps these
+variants to handlers via `CallbackSubscriberBuilder`:
+
+| Builder method | Maps to |
+|---|---|
+| `onError(Consumer<Throwable>)` | `Errored(cause)` |
+| `onExpiration(Runnable)` | `Expired` |
+| `onDelete(Runnable)` | `Deleted` |
+| `onComplete(Runnable)` | `Completed` |
+
+`Value` and `Timeout` aren't in the table because the `onNext` consumer
+handles `Value` and `Timeout` is a non-event for callback subscriptions
+(they don't have a per-call timeout).
+
+### Lifecycles
+
+Each primitive has a small state machine. Subscriptions reflect these
+states via the terminal `NextResult` variants.
+
+**Atom**: `alive` → `expired` (lease elapsed) or `deleted`.
+The lease is reset by `set()` and `touch()`. Once dead, the atom is gone
+and any subscription receives `Expired` or `Deleted`.
+
+**Journal**: `active` → `completed` → `expired`.
+- *active* — accepts `append()` calls; each append resets the inactivity
+  TTL.
+- *completed* — `complete(retentionTtl)` was called. No more appends.
+  Existing entries remain readable until the retention TTL elapses, at
+  which point the journal is fully gone.
+- *expired* — either inactivity TTL elapsed without an append, or the
+  retention TTL elapsed after completion.
+
+Subscribers receive `Completed` after the journal completes and the final
+entries have been drained, or `Expired` if the journal expires without
+being completed.
+
+**Mailbox**: `pending` → `delivered` → `consumed` (or `expired` / `deleted`).
+- *pending* — `create()` was called but `deliver()` hasn't been.
+- *delivered* — exactly one `deliver()` has succeeded; the value is held.
+  A second `deliver()` throws `MailboxFullException`.
+- *consumed* — a subscriber read the delivered value. Subsequent
+  subscriptions immediately receive `Completed`.
+
+### `Snapshot<T>` and the staleness token
+
+`Atom.get()` and Atom subscriptions return `Snapshot<T>` instead of just
+`T`. A snapshot carries two things:
+
+```java
+public record Snapshot<T>(T value, String token) {}
+```
+
+The `token` is a SHA-256 fingerprint of the encoded value bytes. The SPI
+uses it for two things:
+
+1. **Change detection** — coalescing subscriptions skip deliveries when
+   the new token matches the last-delivered token. Two consecutive
+   `set()` calls with the same value never wake the subscriber.
+2. **Resume from a known state** — `subscribe(Snapshot<T> lastSeen)` only
+   delivers values whose token differs from `lastSeen.token()`. Useful
+   for reconnect-after-blip and for skipping the initial state when the
+   caller already has it locally.
+
+You don't usually inspect the token directly — just hand a snapshot back
+to `subscribe(...)` to resume.
+
+### `JournalEntry<T>`
+
+Journal subscriptions deliver `JournalEntry<T>` records:
+
+```java
+public record JournalEntry<T>(String id, String key, T data, Instant timestamp) {}
+```
+
+- **`id`** — the entry's unique id within the journal, monotonically
+  ordered. The exact format is backend-specific (TIMEUUID, sequence
+  number, etc.). Treat it as an opaque string. Use it as the
+  `afterId` argument to `Journal.subscribeAfter(...)` to resume from a
+  checkpoint.
+- **`key`** — the journal's key (the same value passed to
+  `JournalFactory.create(name, ...)`).
+- **`data`** — the typed payload, decoded via Codec.
+- **`timestamp`** — the wall-clock time when the entry was appended.
+
+### TTL semantics differ by primitive
+
+- **Atom** — *lease TTL*. The atom expires unless `set()` or `touch()`
+  resets it. Each call passes a new TTL; the atom can outlive its
+  original lease as long as something keeps renewing it.
+- **Journal** — *inactivity TTL* (renewed by `append`) plus *per-entry
+  TTL* (passed to each `append`) plus an optional *retention TTL*
+  (passed to `complete`). Entries can outlive the journal's inactivity
+  window if they were appended with a longer per-entry TTL; the journal
+  itself stays alive as long as appends keep arriving or as long as the
+  retention TTL hasn't elapsed after completion.
+- **Mailbox** — *lifetime TTL*, set once at `create` time. **Not
+  renewable.** A mailbox is short-lived by design — created, delivered
+  to, consumed, gone.
+
+### Eager `create()` vs lazy `connect()`
+
+All three factories provide both modes:
+
+- **`create(...)`** — eager. Performs backend I/O immediately to write
+  the initial state and establish the lease. Throws
+  `*AlreadyExistsException` if something is already there with that
+  name.
+- **`connect(...)`** — lazy. Returns a handle without any backend I/O.
+  The first operation on the handle (`get`, `set`, `subscribe`,
+  `append`, `deliver`, etc.) is when you'll discover whether the
+  primitive actually exists.
+
+Use `create` when your code is the producer that sets up the primitive.
+Use `connect` when another node owns creation and your code is just an
+observer or consumer.
+
+### Generic value types via `TypeRef`
+
+When the value type has its own type parameters (`List<Order>`,
+`Map<String, BigDecimal>`, etc.), the `Class<T>` overload won't capture
+the generic parameter at runtime. Use the `TypeRef<T>` overload instead:
+
+```java
+import org.jwcarman.codec.spi.TypeRef;
+
+Atom<List<Order>> orders = atomFactory.create(
+    "orders:cart:42",
+    new TypeRef<List<Order>>() {},
+    List.of(),
+    Duration.ofHours(1));
+```
+
+`TypeRef` comes from the [Codec](https://github.com/jwcarman/codec)
+library and uses the same anonymous-subclass trick as Jackson's
+`TypeReference` to capture the full generic signature.
+
+### Exception reference
+
+| Exception | Thrown when |
+|---|---|
+| `AtomAlreadyExistsException` | `AtomFactory.create(name, ...)` is called and an atom with that name already exists and is still alive. |
+| `AtomExpiredException` | `set` / `get` / `touch` is called on an atom whose lease has elapsed or which has been deleted. |
+| `JournalAlreadyExistsException` | `JournalFactory.create(name, ...)` is called and a journal with that name already exists and is still active. |
+| `JournalCompletedException` | `append()` is called on a journal that has been completed via `complete()`. |
+| `JournalExpiredException` | `append` / read is called on a journal whose retention or inactivity TTL has elapsed. |
+| `MailboxExpiredException` | `deliver` / read is called on a mailbox whose TTL has elapsed or which has been deleted. |
+| `MailboxFullException` | A second `deliver()` is attempted on a mailbox that has already received a delivery. |
+
+All seven extend `RuntimeException` — no checked exceptions in the
+substrate API.
+
 ## Architecture
 
 ```
