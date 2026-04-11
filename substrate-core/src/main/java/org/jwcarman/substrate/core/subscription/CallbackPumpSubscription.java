@@ -71,12 +71,13 @@ public final class CallbackPumpSubscription<T> implements Subscription {
     pumpThread.interrupt();
   }
 
+  /**
+   * Runs the pump loop. Always performs at least one pull so that a source which was already
+   * cancelled or terminated before the pump thread started still has its terminal marker dispatched
+   * to the subscriber. Testing liveness at the top of the loop would skip that marker and the
+   * subscriber would never see the terminal event.
+   */
   private static <T> void pumpLoop(BlockingSubscription<T> source, Subscriber<T> subscriber) {
-    // Use do-while so the first pull always happens. If the source was already
-    // cancelled or terminated before the pump thread started, the handoff will
-    // have a terminal marker waiting and we dispatch it on the first iteration.
-    // A plain while(isActive()) would skip the loop and the subscriber would
-    // never see onCancelled or onCompleted.
     do {
       NextResult<T> result = source.next(MAX_POLL_DURATION);
       dispatch(result, subscriber);

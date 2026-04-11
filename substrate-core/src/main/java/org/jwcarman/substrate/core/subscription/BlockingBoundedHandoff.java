@@ -21,6 +21,8 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.jwcarman.substrate.NextResult;
 
 /**
@@ -31,6 +33,8 @@ import org.jwcarman.substrate.NextResult;
  * @param <T> the type of values transferred through the handoff
  */
 public class BlockingBoundedHandoff<T> extends AbstractHandoff<T> {
+
+  private static final Log log = LogFactory.getLog(BlockingBoundedHandoff.class);
 
   private final BlockingQueue<NextResult<T>> queue;
   private final AtomicBoolean marked = new AtomicBoolean(false);
@@ -87,10 +91,10 @@ public class BlockingBoundedHandoff<T> extends AbstractHandoff<T> {
     // value and return from next(), after which the consumer's isActive()
     // check will already be false and the loop will exit on the next turn.
     if (marked.compareAndSet(false, true)) {
-      // Best-effort offer: if the queue is full, the comment above explains
-      // why that's still safe. Bind to an unnamed variable so the ignored
-      // return value is explicit.
-      boolean _ = queue.offer(new NextResult.Cancelled<>());
+      boolean accepted = queue.offer(new NextResult.Cancelled<>());
+      if (!accepted && log.isDebugEnabled()) {
+        log.debug("Cancelled marker dropped: handoff queue full");
+      }
     }
   }
 }
