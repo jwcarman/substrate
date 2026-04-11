@@ -18,8 +18,8 @@ package org.jwcarman.substrate.core.sweep;
 import java.time.Duration;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.random.RandomGenerator;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -56,7 +56,7 @@ public class Sweeper implements AutoCloseable {
             Thread.ofVirtual().name(threadName, 0).factory());
 
     long intervalMs = interval.toMillis();
-    long jitterMs = ThreadLocalRandom.current().nextLong(intervalMs / 2 + 1);
+    long jitterMs = RandomGenerator.getDefault().nextLong(intervalMs / 2 + 1);
     scheduler.scheduleWithFixedDelay(
         this::tick, intervalMs + jitterMs, intervalMs, TimeUnit.MILLISECONDS);
   }
