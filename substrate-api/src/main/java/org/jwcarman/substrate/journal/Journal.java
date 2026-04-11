@@ -16,6 +16,10 @@
 package org.jwcarman.substrate.journal;
 
 import java.time.Duration;
+import java.util.function.Consumer;
+import org.jwcarman.substrate.BlockingSubscription;
+import org.jwcarman.substrate.CallbackSubscriberBuilder;
+import org.jwcarman.substrate.CallbackSubscription;
 
 public interface Journal<T> {
 
@@ -25,11 +29,51 @@ public interface Journal<T> {
 
   void delete();
 
-  JournalCursor<T> read();
+  /**
+   * Subscribe from the current tail. Only entries appended after this call are delivered.
+   * Historical entries (those already in the journal when {@code subscribe} is called) are NOT
+   * replayed.
+   */
+  BlockingSubscription<JournalEntry<T>> subscribe();
 
-  JournalCursor<T> readAfter(String afterId);
+  /**
+   * Subscribe starting strictly after {@code afterId}. All entries with an id greater than {@code
+   * afterId} are delivered, followed by new entries as they arrive. Useful for resuming from a
+   * persisted checkpoint.
+   */
+  BlockingSubscription<JournalEntry<T>> subscribeAfter(String afterId);
 
-  JournalCursor<T> readLast(int count);
+  /**
+   * Subscribe starting with the last {@code count} retained entries, then continue with new entries
+   * as they arrive. Useful for "show the last N events, then tail" patterns.
+   */
+  BlockingSubscription<JournalEntry<T>> subscribeLast(int count);
+
+  /** Callback subscribe from current tail with only onNext. */
+  CallbackSubscription subscribe(Consumer<JournalEntry<T>> onNext);
+
+  /** Callback subscribe from current tail with additional handlers. */
+  CallbackSubscription subscribe(
+      Consumer<JournalEntry<T>> onNext,
+      Consumer<CallbackSubscriberBuilder<JournalEntry<T>>> customizer);
+
+  /** Callback subscribe from a checkpoint with only onNext. */
+  CallbackSubscription subscribeAfter(String afterId, Consumer<JournalEntry<T>> onNext);
+
+  /** Callback subscribe from a checkpoint with additional handlers. */
+  CallbackSubscription subscribeAfter(
+      String afterId,
+      Consumer<JournalEntry<T>> onNext,
+      Consumer<CallbackSubscriberBuilder<JournalEntry<T>>> customizer);
+
+  /** Callback subscribe from last N entries with only onNext. */
+  CallbackSubscription subscribeLast(int count, Consumer<JournalEntry<T>> onNext);
+
+  /** Callback subscribe from last N entries with additional handlers. */
+  CallbackSubscription subscribeLast(
+      int count,
+      Consumer<JournalEntry<T>> onNext,
+      Consumer<CallbackSubscriberBuilder<JournalEntry<T>>> customizer);
 
   String key();
 }

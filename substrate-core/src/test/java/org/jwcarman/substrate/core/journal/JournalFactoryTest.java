@@ -29,10 +29,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.codec.spi.TypeRef;
+import org.jwcarman.substrate.BlockingSubscription;
+import org.jwcarman.substrate.NextResult;
 import org.jwcarman.substrate.core.memory.journal.InMemoryJournalSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.journal.Journal;
-import org.jwcarman.substrate.journal.JournalCursor;
+import org.jwcarman.substrate.journal.JournalEntry;
 import org.jwcarman.substrate.journal.JournalFactory;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -53,6 +55,7 @@ class JournalFactoryTest {
             spi,
             codecFactory,
             new InMemoryNotifier(),
+            1024,
             Duration.ofHours(24),
             Duration.ofDays(7),
             Duration.ofDays(30));
@@ -75,6 +78,7 @@ class JournalFactoryTest {
             spi,
             codecFactory,
             new InMemoryNotifier(),
+            1024,
             Duration.ofHours(24),
             Duration.ofDays(7),
             Duration.ofDays(30));
@@ -83,8 +87,12 @@ class JournalFactoryTest {
     String id = journal.append("hello", Duration.ofHours(1));
 
     assertNotNull(id);
-    try (JournalCursor<String> cursor = journal.readAfter("0-0")) {
-      assertTrue(cursor.poll(Duration.ofSeconds(1)).isPresent());
+    BlockingSubscription<JournalEntry<String>> sub = journal.subscribeAfter("0-0");
+    try {
+      NextResult<JournalEntry<String>> result = sub.next(Duration.ofSeconds(1));
+      assertInstanceOf(NextResult.Value.class, result);
+    } finally {
+      sub.cancel();
     }
   }
 
@@ -101,6 +109,7 @@ class JournalFactoryTest {
             spi,
             codecFactory,
             new InMemoryNotifier(),
+            1024,
             Duration.ofHours(24),
             Duration.ofDays(7),
             Duration.ofDays(30));

@@ -207,63 +207,164 @@ Two small checks bracketing the `pull` call, plus one clean
 The handler-loop switch is different from `next()`'s — each case
 does primitive-specific work (invoke a specific callback), so the
 switch body is meaningful and shouldn't be collapsed into a
-predicate. But the handler loop also has the interrupt bug and
-should be fixed the same way:
+predicate. But the handler loop has two issues to fix: the
+interrupt bug (same as `next`) and the unnecessary 1-second
+periodic wake-up.
+
+**Pull for effectively forever.** Replace the 1-second
+`HANDLER_POLL_INTERVAL` with a near-infinite duration. The handler
+thread parks inside `handoff.pull` until one of three things
+happens:
+
+1. The feeder pushes a value → `LinkedBlockingQueue.put` signals
+   its internal `notEmpty` condition, which wakes up the pull
+   immediately. No added latency versus the 1-second version.
+2. The feeder marks a terminal state → same wake-up path via the
+   queue's condition.
+3. The handler thread is interrupted (because `cancel()` called
+   `handlerThread.interrupt()`) → the queue's `lockInterruptibly`
+   throws, the handoff's catch block restores the flag and returns
+   `NextResult.Timeout`, and the handler loop's top-of-iteration
+   `done.get()` check sees `done = true` and exits.
+
+**Track the handler thread reference** so `cancel()` can interrupt
+it. Store the `Thread` returned from `Thread.ofVirtual().start(...)`
+in a field.
+
+**`cancel()` interrupts the handler thread.** Without this, the
+handler would never notice `done = true` because it's parked
+indefinitely inside the pull.
+
+### Updated `DefaultCallbackSubscription`
 
 ```java
-private void runHandlerLoop(...) {
-  while (!done.get()) {
-    // If this thread has been interrupted (via cancel() or
-    // external interrupt), exit the loop immediately.
-    if (Thread.currentThread().isInterrupted()) {
-      done.set(true);
-      return;
-    }
+public class DefaultCallbackSubscription<T> implements CallbackSubscription {
 
-    NextResult<T> result = handoff.pull(HANDLER_POLL_INTERVAL);
+  private static final Log log = LogFactory.getLog(DefaultCallbackSubscription.class);
 
-    switch (result) {
-      case NextResult.Value<T>(T value) -> {
-        try {
-          onNext.accept(value);
-        } catch (RuntimeException e) {
-          log.warn("onNext handler threw", e);
+  /**
+   * Effectively forever — the handler loop parks inside
+   * handoff.pull until it receives a value, a terminal marker,
+   * or the handler thread is interrupted by cancel(). Using
+   * Long.MAX_VALUE milliseconds (~292 million years) means the
+   * underlying queue.poll never actually times out on its own.
+   */
+  private static final Duration MAX_POLL_DURATION =
+      Duration.ofMillis(Long.MAX_VALUE);
+
+  private final NextHandoff<T> handoff;
+  private final Runnable canceller;
+  private final AtomicBoolean done = new AtomicBoolean(false);
+  private final Thread handlerThread;
+
+  public DefaultCallbackSubscription(
+      NextHandoff<T> handoff,
+      Runnable canceller,
+      Consumer<T> onNext,
+      Consumer<Throwable> onError,
+      Runnable onExpiration,
+      Runnable onDelete,
+      Runnable onComplete) {
+    this.handoff = handoff;
+    this.canceller = canceller;
+    this.handlerThread = Thread.ofVirtual()
+        .name("substrate-callback-handler", 0)
+        .start(() -> runHandlerLoop(onNext, onError, onExpiration, onDelete, onComplete));
+  }
+
+  private void runHandlerLoop(
+      Consumer<T> onNext,
+      Consumer<Throwable> onError,
+      Runnable onExpiration,
+      Runnable onDelete,
+      Runnable onComplete) {
+
+    while (!done.get()) {
+      // Top-of-iteration check handles "thread was interrupted
+      // before or after pull, but before we looped back."
+      if (Thread.currentThread().isInterrupted()) {
+        done.set(true);
+        return;
+      }
+
+      NextResult<T> result = handoff.pull(MAX_POLL_DURATION);
+
+      switch (result) {
+        case NextResult.Value<T>(T value) -> {
+          try {
+            onNext.accept(value);
+          } catch (RuntimeException e) {
+            log.warn("onNext handler threw", e);
+          }
+        }
+        case NextResult.Timeout<T> t -> {
+          // Normally unreachable with MAX_POLL_DURATION, but this
+          // case also fires if the pull was interrupted (handoff
+          // caught InterruptedException, restored the flag, and
+          // returned Timeout). The next top-of-loop interrupt
+          // check will exit the loop on the next iteration.
+        }
+        case NextResult.Completed<T> c -> {
+          done.set(true);
+          safeRun(onComplete);
+        }
+        case NextResult.Expired<T> e -> {
+          done.set(true);
+          safeRun(onExpiration);
+        }
+        case NextResult.Deleted<T> d -> {
+          done.set(true);
+          safeRun(onDelete);
+        }
+        case NextResult.Errored<T>(Throwable cause) -> {
+          done.set(true);
+          safeAccept(onError, cause);
         }
       }
-      case NextResult.Timeout<T> t -> {
-        // keep polling
-      }
-      case NextResult.Completed<T> c -> {
-        done.set(true);
-        safeRun(onComplete);
-      }
-      case NextResult.Expired<T> e -> {
-        done.set(true);
-        safeRun(onExpiration);
-      }
-      case NextResult.Deleted<T> d -> {
-        done.set(true);
-        safeRun(onDelete);
-      }
-      case NextResult.Errored<T>(Throwable cause) -> {
-        done.set(true);
-        safeAccept(onError, cause);
-      }
-    }
 
-    // Second check: if the pull itself was interrupted, exit.
-    if (Thread.currentThread().isInterrupted()) {
-      done.set(true);
+      // Second check: if the pull was interrupted, exit now
+      // instead of looping once more.
+      if (Thread.currentThread().isInterrupted()) {
+        done.set(true);
+      }
     }
   }
+
+  @Override
+  public boolean isActive() {
+    return !done.get();
+  }
+
+  @Override
+  public void cancel() {
+    done.set(true);
+    handlerThread.interrupt();   // wake the handler loop from its pull
+    canceller.run();               // tear down the feeder + notifier
+  }
+
+  // ... safeRun / safeAccept helpers unchanged from spec 033 ...
 }
 ```
 
-The top-of-loop check handles "thread was interrupted before the
-pull" and the bottom check handles "thread was interrupted during
-the pull" (caught inside the handoff, flag restored by the catch
-block). Together they make the loop immune to the interrupt-spin
-bug.
+Together:
+
+- **Idle subscriptions do zero periodic work.** The handler thread
+  is parked inside `queue.poll(Long.MAX_VALUE, MILLISECONDS)`,
+  consuming no CPU and triggering no wake-ups.
+- **Cancel latency is microseconds**, not up to 1 second. The
+  `handlerThread.interrupt()` call immediately unblocks the pull,
+  the catch block restores the flag, pull returns Timeout, the
+  loop sees `done = true` and exits.
+- **Value and terminal delivery latency is unchanged.** The
+  underlying `LinkedBlockingQueue` signals its internal condition
+  as soon as a feeder pushes, so the handler thread wakes up just
+  as fast as it did with the 1-second poll interval.
+- **The interrupt-flag check logic from fix #1** still handles the
+  "interrupted during pull" case. Without it, the handler would
+  see Timeout from the interrupted pull and loop back to another
+  pull, which would immediately throw InterruptedException again
+  (infinite spin). With the top-of-loop and bottom-of-loop
+  interrupt checks, the spin is broken.
 
 ### Why we keep the switch in the callback handler loop
 
@@ -349,6 +450,18 @@ Spec 037 ONLY touches:
 - [ ] The switch inside the handler loop is NOT refactored — each
       case does distinct callback work and benefits from the
       exhaustiveness check.
+- [ ] The `HANDLER_POLL_INTERVAL` constant from spec 033 is
+      **removed** and replaced with `MAX_POLL_DURATION =
+      Duration.ofMillis(Long.MAX_VALUE)`. The handler loop no
+      longer periodically wakes up to check `done` — it parks
+      inside `handoff.pull` until a value, terminal, or interrupt
+      arrives.
+- [ ] `DefaultCallbackSubscription` tracks the handler thread in
+      a `private final Thread handlerThread` field.
+- [ ] `cancel()` calls `handlerThread.interrupt()` in addition to
+      flipping `done` and running the canceller closure. The
+      interrupt wakes the handler thread from its (effectively
+      infinite) pull.
 
 ### Unit tests — `DefaultBlockingSubscriptionTest`
 
@@ -391,14 +504,31 @@ Spec 037 ONLY touches:
 
 ### Unit tests — `DefaultCallbackSubscriptionTest`
 
+- [ ] A test verifies that `cancel()` on an idle subscription
+      causes the handler loop to exit within ~100 ms (not up to
+      1 second). This directly exercises the "park forever, wake
+      on interrupt" behavior — without it, the test would take
+      up to 1 second.
+
+- [ ] A test verifies that an idle subscription does zero
+      periodic work: spawn a subscription, sleep for 3 seconds
+      without pushing anything to the handoff, verify via thread
+      instrumentation that the handler thread was not scheduled
+      during that 3-second window (or at minimum that no
+      `handoff.pull` call returned during that window).
+
 - [ ] A test verifies that when the handler loop thread is
-      interrupted (via cancel or external interrupt), the loop
-      exits within one poll interval and does not continue
-      invoking callbacks.
+      interrupted externally (not via cancel), the loop exits
+      within ~100 ms and does not continue invoking callbacks.
 
 - [ ] A test verifies that interrupting the handler thread does
       NOT fire `onError` — interrupt is a cancel-like event, not
       an error.
+
+- [ ] A test verifies that a value pushed into the handoff while
+      the handler loop is parked inside pull wakes the handler
+      thread immediately (within milliseconds). This exercises
+      the "long pull, natural wake-up on queue put" path.
 
 - [ ] The existing spec 033 callback tests (onNext dispatch,
       terminal callbacks firing, handler exception swallowing) all

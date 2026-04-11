@@ -110,6 +110,7 @@ public class SubstrateAutoConfiguration {
         journalSpi,
         codecFactory,
         notifier,
+        jp.subscription().queueCapacity(),
         jp.maxInactivityTtl(),
         jp.maxEntryTtl(),
         jp.maxRetentionTtl());

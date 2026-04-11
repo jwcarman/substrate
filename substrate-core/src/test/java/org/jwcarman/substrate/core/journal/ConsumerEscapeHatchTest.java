@@ -24,10 +24,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.codec.spi.Codec;
+import org.jwcarman.substrate.BlockingSubscription;
+import org.jwcarman.substrate.NextResult;
 import org.jwcarman.substrate.core.memory.journal.InMemoryJournalSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
-import org.jwcarman.substrate.journal.JournalCursor;
-import org.jwcarman.substrate.journal.JournalExpiredException;
+import org.jwcarman.substrate.journal.JournalEntry;
 
 class ConsumerEscapeHatchTest {
 
@@ -45,7 +46,7 @@ class ConsumerEscapeHatchTest {
       };
 
   @Test
-  void consumerEscapesAbandonedJournalViaExpiredException() {
+  void consumerEscapesAbandonedJournalViaExpired() {
     InMemoryJournalSpi spi = new InMemoryJournalSpi();
     InMemoryNotifier notifier = new InMemoryNotifier();
     String key = spi.journalKey("escape-test");
@@ -54,36 +55,42 @@ class ConsumerEscapeHatchTest {
 
     DefaultJournal<String> journal =
         new DefaultJournal<>(
-            spi, key, STRING_CODEC, notifier, Duration.ofDays(7), Duration.ofDays(30));
+            spi, key, STRING_CODEC, notifier, 1024, Duration.ofDays(7), Duration.ofDays(30));
 
     journal.append("one-entry", Duration.ofHours(1));
 
     AtomicBoolean consumerExited = new AtomicBoolean(false);
-    AtomicReference<JournalExpiredException> caught = new AtomicReference<>();
+    AtomicReference<NextResult<JournalEntry<String>>> expiredResult = new AtomicReference<>();
 
-    Thread consumer =
-        Thread.ofVirtual()
-            .start(
-                () -> {
-                  try (JournalCursor<String> cursor = journal.readAfter("0-0")) {
-                    while (cursor.isOpen()) {
-                      try {
-                        cursor.poll(Duration.ofMillis(50));
-                      } catch (JournalExpiredException e) {
-                        caught.set(e);
-                        break;
-                      }
+    Thread.ofVirtual()
+        .start(
+            () -> {
+              BlockingSubscription<JournalEntry<String>> sub = journal.subscribeAfter("0-0");
+              try {
+                loop:
+                while (sub.isActive()) {
+                  NextResult<JournalEntry<String>> result = sub.next(Duration.ofMillis(50));
+                  switch (result) {
+                    case NextResult.Expired<JournalEntry<String>> e -> {
+                      expiredResult.set(e);
+                      break loop;
                     }
+                    default -> {}
                   }
-                  consumerExited.set(true);
-                });
+                }
+              } finally {
+                sub.cancel();
+              }
+              consumerExited.set(true);
+            });
 
     await()
         .atMost(Duration.ofMillis(2000))
         .untilAsserted(
             () -> {
               assertThat(consumerExited.get()).isTrue();
-              assertThat(caught.get()).isNotNull();
+              assertThat(expiredResult.get()).isNotNull();
+              assertThat(expiredResult.get()).isInstanceOf(NextResult.Expired.class);
             });
   }
 }

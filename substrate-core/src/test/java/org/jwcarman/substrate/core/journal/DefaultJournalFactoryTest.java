@@ -60,6 +60,7 @@ class DefaultJournalFactoryTest {
             spi,
             codecFactory,
             new InMemoryNotifier(),
+            1024,
             Duration.ofHours(24),
             Duration.ofDays(7),
             Duration.ofDays(30));

@@ -27,8 +27,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.codec.spi.Codec;
+import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
-import org.jwcarman.substrate.journal.JournalCursor;
+import org.jwcarman.substrate.journal.JournalEntry;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -52,7 +53,8 @@ class DefaultJournalTest {
         .thenAnswer(inv -> new String((byte[]) inv.getArgument(0), UTF_8));
     lenient().when(notifier.subscribe(any())).thenReturn(() -> {});
     journal =
-        new DefaultJournal<>(spi, KEY, codec, notifier, Duration.ofDays(7), Duration.ofDays(30));
+        new DefaultJournal<>(
+            spi, KEY, codec, notifier, 1024, Duration.ofDays(7), Duration.ofDays(30));
   }
 
   @Test
@@ -92,29 +94,34 @@ class DefaultJournalTest {
   }
 
   @Test
-  void deleteDelegatesToSpiWithBoundKey() {
+  void deleteDelegatesToSpiAndNotifiesDeleted() {
     journal.delete();
 
     verify(spi).delete(KEY);
+    verify(notifier).notify(KEY, "__DELETED__");
   }
 
   @Test
-  void readReturnsCursorFromTail() {
+  void subscribeReturnsActiveSubscription() {
     when(spi.readLast(KEY, 1)).thenReturn(List.of());
 
-    JournalCursor<String> cursor = journal.read();
-
-    assertNotNull(cursor);
-    assertTrue(cursor.isOpen());
-    cursor.close();
+    BlockingSubscription<JournalEntry<String>> sub = journal.subscribe();
+    try {
+      assertNotNull(sub);
+      assertTrue(sub.isActive());
+    } finally {
+      sub.cancel();
+    }
   }
 
   @Test
-  void readAfterReturnsCursor() {
-    JournalCursor<String> cursor = journal.readAfter("entry-1");
-
-    assertNotNull(cursor);
-    assertTrue(cursor.isOpen());
-    cursor.close();
+  void subscribeAfterReturnsActiveSubscription() {
+    BlockingSubscription<JournalEntry<String>> sub = journal.subscribeAfter("entry-1");
+    try {
+      assertNotNull(sub);
+      assertTrue(sub.isActive());
+    } finally {
+      sub.cancel();
+    }
   }
 }
