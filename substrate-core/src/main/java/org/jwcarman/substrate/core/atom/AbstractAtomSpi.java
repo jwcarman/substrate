@@ -15,6 +15,13 @@
  */
 package org.jwcarman.substrate.core.atom;
 
+/**
+ * Skeletal implementation of {@link AtomSpi} providing key-prefix management and a no-op {@link
+ * org.jwcarman.substrate.core.sweep.Sweepable#sweep sweep} default. Backend implementations extend
+ * this and provide the storage-specific {@link AtomSpi#create create}, {@link AtomSpi#read read},
+ * {@link AtomSpi#set set}, {@link AtomSpi#touch touch}, and {@link AtomSpi#delete delete}
+ * operations.
+ */
 public abstract class AbstractAtomSpi implements AtomSpi {
 
   private final String prefix;

@@ -22,6 +22,13 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.jwcarman.substrate.NextResult;
 
+/**
+ * Single-slot latest-wins handoff strategy. The producer never blocks — each {@link #push push}
+ * overwrites the previous unconsumed value. Used by {@link org.jwcarman.substrate.atom.Atom Atom}
+ * subscriptions, where only the most recent state matters.
+ *
+ * @param <T> the type of values transferred through the handoff
+ */
 public class CoalescingHandoff<T> implements NextHandoff<T> {
 
   private final Lock lock = new ReentrantLock();

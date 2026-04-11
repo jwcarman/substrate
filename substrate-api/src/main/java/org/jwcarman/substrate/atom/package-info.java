@@ -13,20 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.substrate.journal;
 
 /**
- * Thrown when {@link Journal#append(Object, java.time.Duration) append} is called on a journal that
- * has already been {@linkplain Journal#complete(java.time.Duration) completed}.
+ * The Atom primitive — a distributed, leased, keyed reference with change notification. Contains
+ * the {@link org.jwcarman.substrate.atom.Atom} interface, {@link
+ * org.jwcarman.substrate.atom.AtomFactory} for construction, {@link
+ * org.jwcarman.substrate.atom.Snapshot} for point-in-time views, and atom-specific exceptions.
  *
- * <p>Once a journal is completed no further entries may be appended, though existing entries remain
- * readable until the retention TTL elapses.
- *
- * @see Journal#complete(java.time.Duration)
+ * <p>Use Atom when you need a shared variable that multiple processes can read and write, with
+ * notification when it changes. See {@link org.jwcarman.substrate.atom.Atom} for the full contract
+ * and usage examples.
  */
-public class JournalCompletedException extends RuntimeException {
-
-  public JournalCompletedException(String key) {
-    super("Journal has been completed: " + key);
-  }
-}
+package org.jwcarman.substrate.atom;

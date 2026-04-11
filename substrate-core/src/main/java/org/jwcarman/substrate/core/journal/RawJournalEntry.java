@@ -19,6 +19,17 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Objects;
 
+/**
+ * Raw byte-level representation of a journal entry as stored by the backend.
+ *
+ * <p>Contains the entry {@code id}, journal {@code key}, serialized {@code data} payload, and
+ * append {@code timestamp}.
+ *
+ * @param id the unique entry identifier (UUID v7)
+ * @param key the backend storage key of the owning journal
+ * @param data the serialized entry payload
+ * @param timestamp the instant at which the entry was appended
+ */
 public record RawJournalEntry(String id, String key, byte[] data, Instant timestamp) {
 
   @Override

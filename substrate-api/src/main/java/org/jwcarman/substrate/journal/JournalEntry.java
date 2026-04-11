@@ -17,4 +17,18 @@ package org.jwcarman.substrate.journal;
 
 import java.time.Instant;
 
+/**
+ * A single entry in a {@link Journal}, containing the deserialized payload, the entry's unique
+ * monotonic ID, the journal key, and the append timestamp.
+ *
+ * <p>Entry IDs are monotonically ordered within a journal and are suitable as resume checkpoints
+ * for {@link Journal#subscribeAfter(String)}.
+ *
+ * @param id the unique, monotonically increasing entry identifier
+ * @param key the key of the journal this entry belongs to
+ * @param data the deserialized entry payload
+ * @param timestamp the instant at which the entry was appended
+ * @param <T> the payload type
+ * @see Journal
+ */
 public record JournalEntry<T>(String id, String key, T data, Instant timestamp) {}

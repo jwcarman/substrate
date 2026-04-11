@@ -19,19 +19,61 @@ import java.time.Duration;
 import java.util.List;
 import org.jwcarman.substrate.NextResult;
 
+/**
+ * Contract for the producer-consumer handoff between a primitive's feeder thread and a
+ * subscription's consumer. The feeder pushes values and terminal signals; the consumer pulls
+ * results. Implementations define the buffering, backpressure, and coalescing strategy.
+ *
+ * @param <T> the type of values transferred through the handoff
+ */
 public interface NextHandoff<T> {
 
+  /**
+   * Delivers a single value from the feeder to the consumer.
+   *
+   * @param item the value to deliver
+   */
   void push(T item);
 
+  /**
+   * Delivers multiple values from the feeder to the consumer. The exact semantics (ordered enqueue,
+   * coalesce to latest, etc.) depend on the implementation strategy.
+   *
+   * @param items the values to deliver
+   */
   void pushAll(List<T> items);
 
+  /**
+   * Blocks up to the given timeout for the next result. Returns {@link NextResult.Timeout Timeout}
+   * if nothing arrives within the deadline.
+   *
+   * @param timeout the maximum time to wait
+   * @return the next result, or {@link NextResult.Timeout Timeout} if the deadline elapses
+   */
   NextResult<T> pull(Duration timeout);
 
+  /**
+   * Signals an unrecoverable backend error to the consumer.
+   *
+   * @param cause the error that occurred
+   */
   void error(Throwable cause);
 
+  /**
+   * Signals that the underlying primitive has been completed. Terminal — no further values will be
+   * delivered after this signal is consumed.
+   */
   void markCompleted();
 
+  /**
+   * Signals that the underlying primitive has expired. Terminal — no further values will be
+   * delivered after this signal is consumed.
+   */
   void markExpired();
 
+  /**
+   * Signals that the underlying primitive has been deleted. Terminal — no further values will be
+   * delivered after this signal is consumed.
+   */
   void markDeleted();
 }

@@ -15,8 +15,15 @@
  */
 package org.jwcarman.substrate.core.notifier;
 
+/**
+ * Handle for an active notification subscription, returned by {@link NotifierSpi#subscribe
+ * NotifierSpi.subscribe}. Call {@link #cancel()} to stop receiving notifications.
+ */
 @FunctionalInterface
 public interface NotifierSubscription {
 
+  /**
+   * Cancels this subscription so that the associated handler will no longer receive notifications.
+   */
   void cancel();
 }

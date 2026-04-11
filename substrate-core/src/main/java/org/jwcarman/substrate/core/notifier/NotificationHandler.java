@@ -15,8 +15,15 @@
  */
 package org.jwcarman.substrate.core.notifier;
 
+/** Callback for receiving notifications from a {@link NotifierSpi}. */
 @FunctionalInterface
 public interface NotificationHandler {
 
+  /**
+   * Invoked when a notification is received.
+   *
+   * @param key the notification key (typically a primitive's backend key)
+   * @param payload the signal payload
+   */
   void onNotification(String key, String payload);
 }

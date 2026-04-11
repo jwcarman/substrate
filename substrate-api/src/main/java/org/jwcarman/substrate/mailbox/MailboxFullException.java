@@ -15,8 +15,20 @@
  */
 package org.jwcarman.substrate.mailbox;
 
+/**
+ * Thrown when {@link Mailbox#deliver(Object)} is called on a mailbox that has already received its
+ * single delivery. A mailbox accepts exactly one value; any subsequent delivery attempt results in
+ * this exception.
+ *
+ * @see Mailbox#deliver(Object)
+ */
 public class MailboxFullException extends RuntimeException {
 
+  /**
+   * Construct a new instance for the given mailbox key.
+   *
+   * @param key the key of the mailbox that already contains a delivered value
+   */
   public MailboxFullException(String key) {
     super("Mailbox already has a delivered value: " + key);
   }

@@ -15,8 +15,23 @@
  */
 package org.jwcarman.substrate.atom;
 
+/**
+ * Thrown when an operation is attempted on an {@link Atom} whose TTL has elapsed or that has been
+ * explicitly {@linkplain Atom#delete() deleted}.
+ *
+ * <p>Operations that raise this exception include {@link Atom#set Atom.set} and {@link Atom#get
+ * Atom.get}. Use {@link Atom#touch Atom.touch} to probe liveness without risking this exception.
+ *
+ * @see Atom#set(Object, java.time.Duration)
+ * @see Atom#get()
+ */
 public class AtomExpiredException extends RuntimeException {
 
+  /**
+   * Constructs a new {@code AtomExpiredException} for the given atom key.
+   *
+   * @param key the backend key of the expired or deleted atom
+   */
   public AtomExpiredException(String key) {
     super("Atom has expired or been deleted: " + key);
   }

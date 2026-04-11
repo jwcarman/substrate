@@ -15,6 +15,13 @@
  */
 package org.jwcarman.substrate.journal;
 
+/**
+ * Thrown when an operation targets a {@link Journal} that has expired due to inactivity or
+ * post-completion retention TTL elapsing, or that has been explicitly {@linkplain Journal#delete()
+ * deleted}.
+ *
+ * @see Journal
+ */
 public class JournalExpiredException extends RuntimeException {
 
   public JournalExpiredException(String key) {

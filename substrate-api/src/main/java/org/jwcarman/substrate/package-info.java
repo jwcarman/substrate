@@ -13,20 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.substrate.journal;
 
 /**
- * Thrown when {@link Journal#append(Object, java.time.Duration) append} is called on a journal that
- * has already been {@linkplain Journal#complete(java.time.Duration) completed}.
- *
- * <p>Once a journal is completed no further entries may be appended, though existing entries remain
- * readable until the retention TTL elapses.
- *
- * @see Journal#complete(java.time.Duration)
+ * Substrate subscription model — the consumer-side types shared across all primitives. Contains
+ * {@link org.jwcarman.substrate.Subscription} and its two concrete forms ({@link
+ * org.jwcarman.substrate.BlockingSubscription} and {@link
+ * org.jwcarman.substrate.CallbackSubscription}), the sealed {@link
+ * org.jwcarman.substrate.NextResult} outcome type, and {@link
+ * org.jwcarman.substrate.CallbackSubscriberBuilder} for configuring callback-style subscriptions.
  */
-public class JournalCompletedException extends RuntimeException {
-
-  public JournalCompletedException(String key) {
-    super("Journal has been completed: " + key);
-  }
-}
+package org.jwcarman.substrate;

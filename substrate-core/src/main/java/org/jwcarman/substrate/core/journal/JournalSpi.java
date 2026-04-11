@@ -22,6 +22,18 @@ import org.jwcarman.substrate.journal.JournalAlreadyExistsException;
 import org.jwcarman.substrate.journal.JournalCompletedException;
 import org.jwcarman.substrate.journal.JournalExpiredException;
 
+/**
+ * Backend SPI for Journal storage operations.
+ *
+ * <p>Implementations must provide ordered append, cursor-based reads, completion lifecycle
+ * management, and expiry semantics. The {@link #append append} and {@link #readAfter readAfter}
+ * methods may be called concurrently from multiple threads. {@link
+ * org.jwcarman.substrate.core.sweep.Sweepable#sweep sweep} may run concurrently with {@link #append
+ * append}.
+ *
+ * @see AbstractJournalSpi
+ * @see RawJournalEntry
+ */
 public interface JournalSpi extends Sweepable {
 
   /**
@@ -61,9 +73,27 @@ public interface JournalSpi extends Sweepable {
    */
   void complete(String key, Duration retentionTtl);
 
+  /**
+   * Removes the journal and all of its entries. This operation is idempotent — deleting a
+   * non-existent journal is a no-op.
+   *
+   * @param key the backend storage key for the journal
+   */
   void delete(String key);
 
+  /**
+   * Returns whether the journal has been marked as completed.
+   *
+   * @param key the backend storage key for the journal
+   * @return {@code true} if the journal has been completed; {@code false} otherwise
+   */
   boolean isComplete(String key);
 
+  /**
+   * Builds a backend storage key from a logical journal name.
+   *
+   * @param name the logical journal name
+   * @return the fully-qualified backend key
+   */
   String journalKey(String name);
 }

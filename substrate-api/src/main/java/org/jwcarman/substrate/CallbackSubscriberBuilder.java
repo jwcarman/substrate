@@ -17,13 +17,65 @@ package org.jwcarman.substrate;
 
 import java.util.function.Consumer;
 
+/**
+ * Builder for configuring lifecycle handlers on a {@link CallbackSubscription}. An instance of this
+ * builder is passed as a customizer lambda to the subscribe methods on substrate primitives.
+ *
+ * <p>The {@code onNext} handler is <em>not</em> part of this builder — it is a required positional
+ * argument to the subscribe method itself. This builder configures the optional lifecycle handlers
+ * that fire on terminal or exceptional events.
+ *
+ * <p>Example usage:
+ *
+ * <pre>{@code
+ * CallbackSubscription sub = atom.subscribe(
+ *     current,
+ *     snap -> process(snap),        // onNext (required, positional)
+ *     b -> b
+ *         .onExpiration(() -> reconnect())
+ *         .onDelete(() -> cleanup())
+ *         .onError(err -> log.error("subscription error", err)));
+ * }</pre>
+ *
+ * @param <T> the type of values delivered by the subscription
+ * @see CallbackSubscription
+ */
 public interface CallbackSubscriberBuilder<T> {
 
+  /**
+   * Registers a handler that is invoked when an unexpected error occurs during value delivery. The
+   * subscription becomes inactive after the handler returns.
+   *
+   * @param consumer the error handler
+   * @return this builder, for chaining
+   */
   CallbackSubscriberBuilder<T> onError(Consumer<Throwable> consumer);
 
+  /**
+   * Registers a handler that is invoked when the underlying primitive's TTL elapses without
+   * renewal. The subscription becomes inactive after the handler returns.
+   *
+   * @param runnable the expiration handler
+   * @return this builder, for chaining
+   */
   CallbackSubscriberBuilder<T> onExpiration(Runnable runnable);
 
+  /**
+   * Registers a handler that is invoked when the underlying primitive is explicitly deleted. The
+   * subscription becomes inactive after the handler returns.
+   *
+   * @param runnable the deletion handler
+   * @return this builder, for chaining
+   */
   CallbackSubscriberBuilder<T> onDelete(Runnable runnable);
 
+  /**
+   * Registers a handler that is invoked when the underlying primitive completes naturally (e.g., a
+   * Journal after {@code complete()} and drain, or a Mailbox after its single delivery is
+   * consumed). The subscription becomes inactive after the handler returns.
+   *
+   * @param runnable the completion handler
+   * @return this builder, for chaining
+   */
   CallbackSubscriberBuilder<T> onComplete(Runnable runnable);
 }

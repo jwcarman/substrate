@@ -15,4 +15,17 @@
  */
 package org.jwcarman.substrate;
 
+/**
+ * A push-based {@link Subscription} where values are delivered to a registered handler on a
+ * background feeder thread. This is a marker interface with no additional methods beyond those
+ * inherited from {@link Subscription} — all interaction with the subscription (receiving values,
+ * handling errors, etc.) happens through the handlers registered via {@link
+ * CallbackSubscriberBuilder} at subscription time.
+ *
+ * <p>Calling {@link #cancel()} stops the background feeder thread and releases associated
+ * resources.
+ *
+ * @see CallbackSubscriberBuilder
+ * @see BlockingSubscription
+ */
 public interface CallbackSubscription extends Subscription {}

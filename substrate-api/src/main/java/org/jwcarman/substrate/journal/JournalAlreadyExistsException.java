@@ -15,6 +15,12 @@
  */
 package org.jwcarman.substrate.journal;
 
+/**
+ * Thrown by {@link JournalFactory#create(String, Class, java.time.Duration) JournalFactory.create}
+ * when a journal with the requested name already exists in the backend.
+ *
+ * @see JournalFactory
+ */
 public class JournalAlreadyExistsException extends RuntimeException {
 
   public JournalAlreadyExistsException(String key) {

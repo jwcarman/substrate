@@ -15,8 +15,19 @@
  */
 package org.jwcarman.substrate.mailbox;
 
+/**
+ * Thrown when an operation such as {@link Mailbox#deliver(Object)} is attempted on a mailbox whose
+ * TTL has elapsed or that has been explicitly {@linkplain Mailbox#delete() deleted}.
+ *
+ * @see Mailbox#deliver(Object)
+ */
 public class MailboxExpiredException extends RuntimeException {
 
+  /**
+   * Construct a new instance for the given mailbox key.
+   *
+   * @param key the key of the expired or deleted mailbox
+   */
   public MailboxExpiredException(String key) {
     super("Mailbox has expired or been deleted: " + key);
   }

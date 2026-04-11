@@ -17,6 +17,42 @@ package org.jwcarman.substrate;
 
 import java.time.Duration;
 
+/**
+ * A pull-based {@link Subscription} where the caller explicitly polls for values by calling {@link
+ * #next(Duration)}. Each call blocks until a value is available, the timeout elapses, or a terminal
+ * condition is reached.
+ *
+ * <p>After {@link #next(Duration)} returns a {@linkplain NextResult#isTerminal() terminal} result
+ * ({@link NextResult.Completed}, {@link NextResult.Expired}, {@link NextResult.Deleted}, or {@link
+ * NextResult.Errored}), {@link #isActive()} will return {@code false} and all subsequent calls to
+ * {@code next()} will return the same terminal result.
+ *
+ * <p>If the calling thread is interrupted while blocked in {@code next()}, the subscription becomes
+ * inactive and the thread's interrupt flag is restored.
+ *
+ * @param <T> the type of values delivered by this subscription
+ * @see CallbackSubscription
+ * @see NextResult
+ */
 public interface BlockingSubscription<T> extends Subscription {
+
+  /**
+   * Blocks until the next result is available or the given timeout elapses.
+   *
+   * <p>Possible outcomes:
+   *
+   * <ul>
+   *   <li>{@link NextResult.Value} — a new value was delivered.
+   *   <li>{@link NextResult.Timeout} — the timeout elapsed with no value available; the
+   *       subscription is still active.
+   *   <li>{@link NextResult.Completed} — the underlying primitive completed naturally.
+   *   <li>{@link NextResult.Expired} — the underlying primitive's TTL elapsed.
+   *   <li>{@link NextResult.Deleted} — the underlying primitive was explicitly deleted.
+   *   <li>{@link NextResult.Errored} — an unexpected error occurred.
+   * </ul>
+   *
+   * @param timeout the maximum time to wait for a result
+   * @return a {@link NextResult} describing the outcome
+   */
   NextResult<T> next(Duration timeout);
 }

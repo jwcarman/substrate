@@ -15,8 +15,20 @@
  */
 package org.jwcarman.substrate.atom;
 
+/**
+ * Thrown by {@link AtomFactory#create AtomFactory.create} when an atom with the given name already
+ * exists in the backend.
+ *
+ * @see AtomFactory#create(String, Class, Object, java.time.Duration)
+ * @see AtomFactory#create(String, org.jwcarman.codec.spi.TypeRef, Object, java.time.Duration)
+ */
 public class AtomAlreadyExistsException extends RuntimeException {
 
+  /**
+   * Constructs a new {@code AtomAlreadyExistsException} for the given atom key.
+   *
+   * @param key the backend key of the atom that already exists
+   */
   public AtomAlreadyExistsException(String key) {
     super("Atom already exists: " + key);
   }

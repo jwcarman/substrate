@@ -15,4 +15,13 @@
  */
 package org.jwcarman.substrate.core.atom;
 
+/**
+ * Raw byte-level representation of an Atom's state as stored by the backend.
+ *
+ * <p>The {@code value} field holds the serialized payload and {@code token} is the opaque staleness
+ * marker used for change detection.
+ *
+ * @param value the serialized atom payload
+ * @param token the opaque staleness marker
+ */
 public record RawAtom(byte[] value, String token) {}

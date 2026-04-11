@@ -23,6 +23,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.jwcarman.substrate.NextResult;
 
+/**
+ * FIFO bounded-queue handoff strategy. The producer blocks on {@link #push push} when the queue is
+ * full, providing backpressure. Used by {@link org.jwcarman.substrate.journal.Journal Journal}
+ * subscriptions, which need ordered delivery of every entry.
+ *
+ * @param <T> the type of values transferred through the handoff
+ */
 public class BlockingBoundedHandoff<T> implements NextHandoff<T> {
 
   private final BlockingQueue<NextResult<T>> queue;

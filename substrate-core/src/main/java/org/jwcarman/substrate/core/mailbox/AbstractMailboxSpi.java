@@ -15,6 +15,12 @@
  */
 package org.jwcarman.substrate.core.mailbox;
 
+/**
+ * Skeletal implementation of {@link MailboxSpi} providing key-prefix management and a no-op {@link
+ * org.jwcarman.substrate.core.sweep.Sweepable#sweep sweep} default. Backend implementations extend
+ * this and provide storage-specific {@link MailboxSpi#create create}, {@link MailboxSpi#deliver
+ * deliver}, {@link MailboxSpi#get get}, and {@link MailboxSpi#delete delete} operations.
+ */
 public abstract class AbstractMailboxSpi implements MailboxSpi {
 
   private final String prefix;

@@ -19,6 +19,14 @@ import com.fasterxml.uuid.Generators;
 import com.fasterxml.uuid.impl.TimeBasedEpochGenerator;
 import java.time.Duration;
 
+/**
+ * Skeletal implementation of {@link JournalSpi} providing key-prefix management, UUID v7 entry-ID
+ * generation, a no-op {@link #create create} default, and a no-op {@link
+ * org.jwcarman.substrate.core.sweep.Sweepable#sweep sweep} default. Backend implementations extend
+ * this and provide storage-specific {@link JournalSpi#append append}, {@link JournalSpi#readAfter
+ * readAfter}, {@link JournalSpi#readLast readLast}, {@link JournalSpi#complete complete}, {@link
+ * JournalSpi#delete delete}, and {@link JournalSpi#isComplete isComplete} operations.
+ */
 public abstract class AbstractJournalSpi implements JournalSpi {
 
   private static final TimeBasedEpochGenerator UUID_GENERATOR =

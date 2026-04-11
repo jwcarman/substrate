@@ -22,6 +22,13 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.jwcarman.substrate.NextResult;
 
+/**
+ * Single-push sealed handoff strategy. Accepts exactly one value via {@link #push push}, then
+ * auto-transitions to {@link org.jwcarman.substrate.NextResult.Completed Completed} after that
+ * value is consumed. Used by {@link org.jwcarman.substrate.mailbox.Mailbox Mailbox} subscriptions.
+ *
+ * @param <T> the type of values transferred through the handoff
+ */
 public class SingleShotHandoff<T> implements NextHandoff<T> {
 
   private final Lock lock = new ReentrantLock();

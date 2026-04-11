@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T02:40:00Z
-ITERATION: 39
-SPEC_COMPLETED: 038-reduce-feeder-cognitive-complexity.md
-WHAT_WAS_DONE: Refactored startFeeder methods in DefaultAtom, DefaultJournal, and DefaultMailbox by extracting helper methods (handleNotification, runFeederLoop, readAndPushIfChanged/readBatchAndPush/tryPushDelivery, waitForNudge, plus Journal-specific pushPreload and drainIfCompleted) to reduce cognitive complexity well below 15. Consolidated duplicated semaphore.release() calls in handleNotification. Added DELETED_PAYLOAD constants to DefaultJournal and DefaultMailbox, replacing all string literals.
-VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — BUILD SUCCESS (all 13 modules, zero test failures); grep for "__DELETED__" string literals — only in constant declarations; no @SuppressWarnings introduced; no test files modified
+LAST_RUN: 2026-04-11T02:51:00Z
+ITERATION: 40
+SPEC_COMPLETED: 039-public-api-documentation.md
+WHAT_WAS_DONE: Added comprehensive Javadoc to all public API types in substrate-api (20 files) and all SPI/handoff types in substrate-core (15 files). Created 4 package-info.java files for substrate-api packages. Documentation covers class-level purpose, method-level @param/@return/@throws, usage examples for Atom/Journal/Mailbox, cross-references via @link, thread-safety notes, and lifecycle documentation for NextResult variants and subscription types.
+VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — BUILD SUCCESS (all 13 modules, zero test failures); ./mvnw javadoc:javadoc -pl substrate-api — PASS (zero warnings); no @SuppressWarnings introduced; no code logic changes
 STATUS: DONE
 NEXT_SPEC: none
-NOTES: Preserved the running.get() early-exit checks in Journal's pushPreload, readBatchAndPush, and drainIfCompleted helpers to maintain exact behavioral parity with the monolithic version. waitForNudge is kept as a private static copy in each class per spec recommendation (three-line method doesn't warrant a utility class).
+NOTES: substrate-core javadoc:javadoc has pre-existing cross-module resolution errors on Default* internal classes (DefaultCallbackSubscriberBuilder can't resolve CallbackSubscriberBuilder from substrate-api) — these predate this spec and are unrelated to the documentation added. Usage examples avoid try-with-resources since BlockingSubscription does not extend AutoCloseable.
