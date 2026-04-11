@@ -16,18 +16,20 @@
 package org.jwcarman.substrate.rabbitmq;
 
 import org.testcontainers.images.builder.Transferable;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
 
-@Testcontainers
-public abstract class AbstractRabbitMqIT {
+public final class RabbitMqTestContainer {
 
-  @Container
-  protected static RabbitMQContainer rabbitMQContainer =
+  public static final RabbitMQContainer INSTANCE =
       new RabbitMQContainer("rabbitmq:4-management")
           .withExposedPorts(5552, 5672, 15672)
           .withCopyToContainer(
               Transferable.of("[rabbitmq_management,rabbitmq_stream]."),
               "/etc/rabbitmq/enabled_plugins");
+
+  static {
+    INSTANCE.start();
+  }
+
+  private RabbitMqTestContainer() {}
 }

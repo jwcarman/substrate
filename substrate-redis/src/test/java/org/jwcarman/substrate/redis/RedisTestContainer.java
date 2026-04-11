@@ -13,16 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.substrate.mongodb;
+package org.jwcarman.substrate.redis;
 
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoClients;
-import org.springframework.data.mongodb.core.MongoTemplate;
+import org.testcontainers.containers.GenericContainer;
 
-public abstract class AbstractMongoDbIT {
+public final class RedisTestContainer {
 
-  protected MongoTemplate createMongoTemplate() {
-    MongoClient client = MongoClients.create(MongoDbTestContainer.INSTANCE.getConnectionString());
-    return new MongoTemplate(client, "substrate_test");
+  public static final GenericContainer<?> INSTANCE =
+      new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
+
+  static {
+    INSTANCE.start();
   }
+
+  private RedisTestContainer() {}
 }

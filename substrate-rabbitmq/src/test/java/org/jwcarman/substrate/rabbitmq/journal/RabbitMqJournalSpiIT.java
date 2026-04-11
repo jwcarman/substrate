@@ -25,9 +25,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.core.journal.RawJournalEntry;
-import org.jwcarman.substrate.rabbitmq.AbstractRabbitMqIT;
+import org.jwcarman.substrate.rabbitmq.RabbitMqTestContainer;
 
-class RabbitMqJournalSpiIT extends AbstractRabbitMqIT {
+class RabbitMqJournalSpiIT {
 
   private Environment environment;
   private RabbitMqJournalSpi journal;
@@ -36,8 +36,8 @@ class RabbitMqJournalSpiIT extends AbstractRabbitMqIT {
   void setUp() {
     environment =
         Environment.builder()
-            .host(rabbitMQContainer.getHost())
-            .port(rabbitMQContainer.getMappedPort(5552))
+            .host(RabbitMqTestContainer.INSTANCE.getHost())
+            .port(RabbitMqTestContainer.INSTANCE.getMappedPort(5552))
             .build();
 
     journal =

@@ -13,16 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.substrate.mongodb;
+package org.jwcarman.substrate.postgresql;
 
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoClients;
-import org.springframework.data.mongodb.core.MongoTemplate;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
-public abstract class AbstractMongoDbIT {
+public final class PostgresTestContainer {
 
-  protected MongoTemplate createMongoTemplate() {
-    MongoClient client = MongoClients.create(MongoDbTestContainer.INSTANCE.getConnectionString());
-    return new MongoTemplate(client, "substrate_test");
+  public static final PostgreSQLContainer INSTANCE = new PostgreSQLContainer("postgres:16-alpine");
+
+  static {
+    INSTANCE.start();
   }
+
+  private PostgresTestContainer() {}
 }

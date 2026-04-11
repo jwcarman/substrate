@@ -15,30 +15,22 @@
  */
 package org.jwcarman.substrate.dynamodb;
 
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.localstack.LocalStackContainer;
-import org.testcontainers.utility.DockerImageName;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
-@Testcontainers
 public abstract class AbstractDynamoDbIT {
-
-  @Container
-  static LocalStackContainer localstack =
-      new LocalStackContainer(DockerImageName.parse("localstack/localstack:3.8"))
-          .withServices("dynamodb");
 
   protected static DynamoDbClient createClient() {
     return DynamoDbClient.builder()
-        .endpointOverride(localstack.getEndpoint())
+        .endpointOverride(DynamoDbTestContainer.INSTANCE.getEndpoint())
         .credentialsProvider(
             StaticCredentialsProvider.create(
-                AwsBasicCredentials.create(localstack.getAccessKey(), localstack.getSecretKey())))
-        .region(Region.of(localstack.getRegion()))
+                AwsBasicCredentials.create(
+                    DynamoDbTestContainer.INSTANCE.getAccessKey(),
+                    DynamoDbTestContainer.INSTANCE.getSecretKey())))
+        .region(Region.of(DynamoDbTestContainer.INSTANCE.getRegion()))
         .build();
   }
 }

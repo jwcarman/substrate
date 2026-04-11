@@ -15,14 +15,17 @@
  */
 package org.jwcarman.substrate.mongodb;
 
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoClients;
-import org.springframework.data.mongodb.core.MongoTemplate;
+import org.testcontainers.mongodb.MongoDBContainer;
+import org.testcontainers.utility.DockerImageName;
 
-public abstract class AbstractMongoDbIT {
+public final class MongoDbTestContainer {
 
-  protected MongoTemplate createMongoTemplate() {
-    MongoClient client = MongoClients.create(MongoDbTestContainer.INSTANCE.getConnectionString());
-    return new MongoTemplate(client, "substrate_test");
+  public static final MongoDBContainer INSTANCE =
+      new MongoDBContainer(DockerImageName.parse("mongo:7"));
+
+  static {
+    INSTANCE.start();
   }
+
+  private MongoDbTestContainer() {}
 }

@@ -13,16 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.substrate.mongodb;
+package org.jwcarman.substrate.cassandra;
 
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoClients;
-import org.springframework.data.mongodb.core.MongoTemplate;
+import org.testcontainers.cassandra.CassandraContainer;
 
-public abstract class AbstractMongoDbIT {
+public final class CassandraTestContainer {
 
-  protected MongoTemplate createMongoTemplate() {
-    MongoClient client = MongoClients.create(MongoDbTestContainer.INSTANCE.getConnectionString());
-    return new MongoTemplate(client, "substrate_test");
+  public static final CassandraContainer INSTANCE =
+      new CassandraContainer("cassandra:4.1").withInitScript("cassandra-init.cql");
+
+  static {
+    INSTANCE.start();
   }
+
+  private CassandraTestContainer() {}
 }

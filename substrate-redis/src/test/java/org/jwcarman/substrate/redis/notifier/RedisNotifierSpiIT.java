@@ -28,9 +28,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.redis.AbstractRedisIT;
+import org.jwcarman.substrate.redis.RedisTestContainer;
 
-class RedisNotifierSpiIT extends AbstractRedisIT {
+class RedisNotifierSpiIT {
 
   private RedisClient client;
   private RedisNotifierSpi notifier;
@@ -40,8 +40,8 @@ class RedisNotifierSpiIT extends AbstractRedisIT {
     client =
         RedisClient.create(
             RedisURI.builder()
-                .withHost(REDIS.getHost())
-                .withPort(REDIS.getFirstMappedPort())
+                .withHost(RedisTestContainer.INSTANCE.getHost())
+                .withPort(RedisTestContainer.INSTANCE.getFirstMappedPort())
                 .build());
 
     StatefulRedisPubSubConnection<String, String> pubSubConnection =

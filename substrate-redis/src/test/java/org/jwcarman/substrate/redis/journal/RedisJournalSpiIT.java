@@ -29,9 +29,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.core.journal.RawJournalEntry;
-import org.jwcarman.substrate.redis.AbstractRedisIT;
+import org.jwcarman.substrate.redis.RedisTestContainer;
 
-class RedisJournalSpiIT extends AbstractRedisIT {
+class RedisJournalSpiIT {
 
   private RedisClient client;
   private RedisJournalSpi journal;
@@ -42,11 +42,12 @@ class RedisJournalSpiIT extends AbstractRedisIT {
     client =
         RedisClient.create(
             RedisURI.builder()
-                .withHost(REDIS.getHost())
-                .withPort(REDIS.getFirstMappedPort())
+                .withHost(RedisTestContainer.INSTANCE.getHost())
+                .withPort(RedisTestContainer.INSTANCE.getFirstMappedPort())
                 .build());
     StatefulRedisConnection<String, String> connection = client.connect(StringCodec.UTF8);
     commands = connection.sync();
+    commands.flushall();
     journal = new RedisJournalSpi(commands, "substrate:journal:", 100_000, Duration.ofHours(1));
   }
 

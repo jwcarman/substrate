@@ -13,16 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.substrate.postgresql;
+package org.jwcarman.substrate.dynamodb;
 
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.localstack.LocalStackContainer;
+import org.testcontainers.utility.DockerImageName;
 
-@Testcontainers
-public abstract class AbstractPostgresIT {
+public final class DynamoDbTestContainer {
 
-  @Container
-  protected static final PostgreSQLContainer POSTGRES =
-      new PostgreSQLContainer("postgres:16-alpine");
+  public static final LocalStackContainer INSTANCE =
+      new LocalStackContainer(DockerImageName.parse("localstack/localstack:3.8"))
+          .withServices("dynamodb");
+
+  static {
+    INSTANCE.start();
+  }
+
+  private DynamoDbTestContainer() {}
 }

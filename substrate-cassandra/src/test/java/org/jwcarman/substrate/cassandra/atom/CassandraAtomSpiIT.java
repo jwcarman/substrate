@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
+import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -27,42 +28,42 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
-import org.testcontainers.cassandra.CassandraContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import org.jwcarman.substrate.cassandra.CassandraTestContainer;
 
-@Testcontainers
 class CassandraAtomSpiIT {
 
-  @Container static CassandraContainer cassandra = new CassandraContainer("cassandra:4.1");
+  private static CqlSession session;
+  private static CassandraAtomSpi atom;
 
-  private CassandraAtomSpi atom;
-  private CqlSession session;
-
-  @BeforeEach
-  void setUp() {
+  @BeforeAll
+  static void openSession() {
     session =
         CqlSession.builder()
             .addContactPoint(
-                new InetSocketAddress(cassandra.getHost(), cassandra.getMappedPort(9042)))
+                new InetSocketAddress(
+                    CassandraTestContainer.INSTANCE.getHost(),
+                    CassandraTestContainer.INSTANCE.getMappedPort(9042)))
             .withLocalDatacenter("datacenter1")
+            .withKeyspace(CqlIdentifier.fromCql("substrate_test"))
             .build();
-
-    session.execute(
-        "CREATE KEYSPACE IF NOT EXISTS substrate_test"
-            + " WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}");
-    session.execute("USE substrate_test");
-    session.execute(
-        "CREATE TABLE IF NOT EXISTS substrate_atoms ("
-            + "key text PRIMARY KEY, "
-            + "value blob, "
-            + "\"token\" text)");
-    session.execute("TRUNCATE substrate_atoms");
-
     atom = new CassandraAtomSpi(session, "substrate:atom:", "substrate_atoms");
+  }
+
+  @AfterAll
+  static void closeSession() {
+    if (session != null) {
+      session.close();
+    }
+  }
+
+  @BeforeEach
+  void truncate() {
+    session.execute("TRUNCATE substrate_atoms");
   }
 
   @Test

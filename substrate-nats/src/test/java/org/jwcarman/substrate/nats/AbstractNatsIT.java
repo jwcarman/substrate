@@ -20,22 +20,18 @@ import io.nats.client.Nats;
 import io.nats.client.Options;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-@Testcontainers
 public abstract class AbstractNatsIT {
-
-  @Container
-  private static final GenericContainer<?> NATS =
-      new GenericContainer<>("nats:latest").withCommand("--jetstream").withExposedPorts(4222);
 
   protected static Connection connection;
 
   @BeforeAll
   static void connect() throws Exception {
-    String url = "nats://" + NATS.getHost() + ":" + NATS.getMappedPort(4222);
+    String url =
+        "nats://"
+            + NatsTestContainer.INSTANCE.getHost()
+            + ":"
+            + NatsTestContainer.INSTANCE.getMappedPort(4222);
     connection = Nats.connect(new Options.Builder().server(url).build());
   }
 

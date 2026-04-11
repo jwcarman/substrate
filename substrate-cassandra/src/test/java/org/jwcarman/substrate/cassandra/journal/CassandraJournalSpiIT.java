@@ -18,52 +18,50 @@ package org.jwcarman.substrate.cassandra.journal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 
+import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.substrate.cassandra.CassandraTestContainer;
 import org.jwcarman.substrate.core.journal.RawJournalEntry;
-import org.testcontainers.cassandra.CassandraContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-@Testcontainers
 class CassandraJournalSpiIT {
 
-  @Container static CassandraContainer cassandra = new CassandraContainer("cassandra:4.1");
+  private static CqlSession session;
+  private static CassandraJournalSpi journal;
 
-  private CassandraJournalSpi journal;
-  private CqlSession session;
-
-  @BeforeEach
-  void setUp() {
+  @BeforeAll
+  static void openSession() {
     session =
         CqlSession.builder()
             .addContactPoint(
-                new InetSocketAddress(cassandra.getHost(), cassandra.getMappedPort(9042)))
+                new InetSocketAddress(
+                    CassandraTestContainer.INSTANCE.getHost(),
+                    CassandraTestContainer.INSTANCE.getMappedPort(9042)))
             .withLocalDatacenter("datacenter1")
+            .withKeyspace(CqlIdentifier.fromCql("substrate_test"))
             .build();
-
-    session.execute(
-        "CREATE KEYSPACE IF NOT EXISTS substrate_test"
-            + " WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}");
-    session.execute("USE substrate_test");
-    session.execute(
-        "CREATE TABLE IF NOT EXISTS substrate_journal ("
-            + "key TEXT, "
-            + "entry_id TIMEUUID, "
-            + "data BLOB, "
-            + "timestamp TIMESTAMP, "
-            + "PRIMARY KEY (key, entry_id)"
-            + ") WITH CLUSTERING ORDER BY (entry_id ASC)");
-    session.execute("TRUNCATE substrate_journal");
-
     journal =
         new CassandraJournalSpi(session, "substrate:journal:", "substrate_journal", Duration.ZERO);
+  }
+
+  @AfterAll
+  static void closeSession() {
+    if (session != null) {
+      session.close();
+    }
+  }
+
+  @BeforeEach
+  void truncate() {
+    session.execute("TRUNCATE substrate_journal");
   }
 
   @Test

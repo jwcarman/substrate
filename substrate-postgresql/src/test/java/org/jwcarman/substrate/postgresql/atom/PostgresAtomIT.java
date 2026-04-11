@@ -29,13 +29,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
 import org.jwcarman.substrate.core.atom.RawAtom;
-import org.jwcarman.substrate.postgresql.AbstractPostgresIT;
+import org.jwcarman.substrate.postgresql.PostgresTestContainer;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 
-class PostgresAtomIT extends AbstractPostgresIT {
+class PostgresAtomIT {
 
   private DataSource dataSource;
   private PostgresAtomSpi atom;
@@ -370,9 +370,9 @@ class PostgresAtomIT extends AbstractPostgresIT {
 
   private DataSource createDataSource() {
     DriverManagerDataSource ds = new DriverManagerDataSource();
-    ds.setUrl(POSTGRES.getJdbcUrl());
-    ds.setUsername(POSTGRES.getUsername());
-    ds.setPassword(POSTGRES.getPassword());
+    ds.setUrl(PostgresTestContainer.INSTANCE.getJdbcUrl());
+    ds.setUsername(PostgresTestContainer.INSTANCE.getUsername());
+    ds.setPassword(PostgresTestContainer.INSTANCE.getPassword());
     return ds;
   }
 }

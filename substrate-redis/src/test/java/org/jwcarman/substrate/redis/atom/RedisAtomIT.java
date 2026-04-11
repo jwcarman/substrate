@@ -33,9 +33,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
 import org.jwcarman.substrate.core.atom.RawAtom;
-import org.jwcarman.substrate.redis.AbstractRedisIT;
+import org.jwcarman.substrate.redis.RedisTestContainer;
 
-class RedisAtomIT extends AbstractRedisIT {
+class RedisAtomIT {
 
   private RedisClient client;
   private RedisAtomSpi atom;
@@ -45,10 +45,11 @@ class RedisAtomIT extends AbstractRedisIT {
     client =
         RedisClient.create(
             RedisURI.builder()
-                .withHost(REDIS.getHost())
-                .withPort(REDIS.getFirstMappedPort())
+                .withHost(RedisTestContainer.INSTANCE.getHost())
+                .withPort(RedisTestContainer.INSTANCE.getFirstMappedPort())
                 .build());
     RedisCommands<String, String> commands = client.connect(StringCodec.UTF8).sync();
+    commands.flushall();
     atom = new RedisAtomSpi(commands, "substrate:atom:");
   }
 

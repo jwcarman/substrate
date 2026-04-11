@@ -27,11 +27,11 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.rabbitmq.AbstractRabbitMqIT;
+import org.jwcarman.substrate.rabbitmq.RabbitMqTestContainer;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
-class RabbitMqNotifierSpiIT extends AbstractRabbitMqIT {
+class RabbitMqNotifierSpiIT {
 
   private CachingConnectionFactory connectionFactory;
   private RabbitMqNotifierSpi notifier;
@@ -39,10 +39,10 @@ class RabbitMqNotifierSpiIT extends AbstractRabbitMqIT {
   @BeforeEach
   void setUp() {
     connectionFactory = new CachingConnectionFactory();
-    connectionFactory.setHost(rabbitMQContainer.getHost());
-    connectionFactory.setPort(rabbitMQContainer.getAmqpPort());
-    connectionFactory.setUsername(rabbitMQContainer.getAdminUsername());
-    connectionFactory.setPassword(rabbitMQContainer.getAdminPassword());
+    connectionFactory.setHost(RabbitMqTestContainer.INSTANCE.getHost());
+    connectionFactory.setPort(RabbitMqTestContainer.INSTANCE.getAmqpPort());
+    connectionFactory.setUsername(RabbitMqTestContainer.INSTANCE.getAdminUsername());
+    connectionFactory.setPassword(RabbitMqTestContainer.INSTANCE.getAdminPassword());
 
     RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
     notifier = new RabbitMqNotifierSpi(rabbitTemplate, connectionFactory, "substrate-notify");

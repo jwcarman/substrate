@@ -13,16 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.substrate.redis;
+package org.jwcarman.substrate.nats;
 
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-@Testcontainers
-public abstract class AbstractRedisIT {
+public final class NatsTestContainer {
 
-  @Container
-  protected static final GenericContainer<?> REDIS =
-      new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
+  public static final GenericContainer<?> INSTANCE =
+      new GenericContainer<>("nats:latest").withCommand("--jetstream").withExposedPorts(4222);
+
+  static {
+    INSTANCE.start();
+  }
+
+  private NatsTestContainer() {}
 }

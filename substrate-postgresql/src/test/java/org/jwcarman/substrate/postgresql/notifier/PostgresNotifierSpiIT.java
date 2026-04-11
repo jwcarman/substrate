@@ -26,11 +26,11 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.substrate.postgresql.AbstractPostgresIT;
+import org.jwcarman.substrate.postgresql.PostgresTestContainer;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
-class PostgresNotifierSpiIT extends AbstractPostgresIT {
+class PostgresNotifierSpiIT {
 
   private DataSource dataSource;
   private PostgresNotifierSpi notifier;
@@ -142,9 +142,9 @@ class PostgresNotifierSpiIT extends AbstractPostgresIT {
 
   private DataSource createDataSource() {
     DriverManagerDataSource ds = new DriverManagerDataSource();
-    ds.setUrl(POSTGRES.getJdbcUrl());
-    ds.setUsername(POSTGRES.getUsername());
-    ds.setPassword(POSTGRES.getPassword());
+    ds.setUrl(PostgresTestContainer.INSTANCE.getJdbcUrl());
+    ds.setUsername(PostgresTestContainer.INSTANCE.getUsername());
+    ds.setPassword(PostgresTestContainer.INSTANCE.getPassword());
     return ds;
   }
 }
