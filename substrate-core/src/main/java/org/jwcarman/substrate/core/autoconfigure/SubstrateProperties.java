@@ -24,7 +24,7 @@ public record SubstrateProperties(
 
   public SubstrateProperties {
     if (atom == null) atom = new AtomProperties(null, null);
-    if (journal == null) journal = new JournalProperties(null, null, null, null);
+    if (journal == null) journal = new JournalProperties(null, null, null, null, null);
     if (mailbox == null) mailbox = new MailboxProperties(null, null);
   }
 
@@ -39,12 +39,22 @@ public record SubstrateProperties(
       Duration maxInactivityTtl,
       Duration maxRetentionTtl,
       Duration maxEntryTtl,
-      SweepProperties sweep) {
+      SweepProperties sweep,
+      SubscriptionProperties subscription) {
     public JournalProperties {
       if (maxInactivityTtl == null) maxInactivityTtl = Duration.ofHours(24);
       if (maxRetentionTtl == null) maxRetentionTtl = Duration.ofDays(30);
       if (maxEntryTtl == null) maxEntryTtl = Duration.ofDays(7);
       if (sweep == null) sweep = SweepProperties.defaults();
+      if (subscription == null) subscription = new SubscriptionProperties(1024);
+    }
+  }
+
+  public record SubscriptionProperties(int queueCapacity) {
+    public SubscriptionProperties {
+      if (queueCapacity <= 0) {
+        throw new IllegalArgumentException("queueCapacity must be positive: " + queueCapacity);
+      }
     }
   }
 

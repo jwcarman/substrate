@@ -17,6 +17,7 @@ package org.jwcarman.substrate.core.autoconfigure;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
@@ -87,5 +88,34 @@ class SubstratePropertiesTest {
           SubstrateProperties props = context.getBean(SubstrateProperties.class);
           assertEquals(Duration.ofMinutes(30), props.mailbox().maxTtl());
         });
+  }
+
+  @Test
+  void defaultJournalSubscriptionQueueCapacityIs1024() {
+    contextRunner.run(
+        context -> {
+          SubstrateProperties props = context.getBean(SubstrateProperties.class);
+          assertEquals(1024, props.journal().subscription().queueCapacity());
+        });
+  }
+
+  @Test
+  void journalSubscriptionQueueCapacityCanBeOverridden() {
+    new ApplicationContextRunner()
+        .withUserConfiguration(PropertiesConfiguration.class)
+        .withPropertyValues("substrate.journal.subscription.queue-capacity=4096")
+        .run(
+            context -> {
+              SubstrateProperties props = context.getBean(SubstrateProperties.class);
+              assertEquals(4096, props.journal().subscription().queueCapacity());
+            });
+  }
+
+  @Test
+  void subscriptionPropertiesRejectsNonPositiveQueueCapacity() {
+    assertThrows(
+        IllegalArgumentException.class, () -> new SubstrateProperties.SubscriptionProperties(0));
+    assertThrows(
+        IllegalArgumentException.class, () -> new SubstrateProperties.SubscriptionProperties(-1));
   }
 }
