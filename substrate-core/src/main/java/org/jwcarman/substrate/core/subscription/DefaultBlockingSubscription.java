@@ -58,7 +58,8 @@ public class DefaultBlockingSubscription<T> implements BlockingSubscription<T> {
 
   @Override
   public void cancel() {
-    done.set(true);
-    canceller.run();
+    if (done.compareAndSet(false, true)) {
+      canceller.run();
+    }
   }
 }

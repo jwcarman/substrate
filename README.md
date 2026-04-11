@@ -88,7 +88,8 @@ nulls and exceptions.
 ```java
 @Autowired AtomFactory atomFactory;
 
-// Create a new atom with an initial value and lease duration
+// Create a new atom with an initial value and lease duration. The lease
+// duration is the TTL — the atom expires unless touch()/set() renews it.
 Atom<Session> session = atomFactory.create(
     "session:abc", Session.class, new Session("user-42"), Duration.ofHours(1));
 
@@ -102,45 +103,49 @@ session.set(new Session("user-42", "updated"), Duration.ofHours(1));
 Snapshot<Session> snap = session.get();
 Session current = snap.value();
 
-// Renew the lease without changing the value
+// Extend the lease without changing the value
 session.touch(Duration.ofHours(1));
 
-// Subscribe to changes via blocking poll (good for virtual threads)
+// Subscribe to changes via blocking poll (good for virtual threads).
+// BlockingSubscription extends AutoCloseable, so try-with-resources cancels
+// the subscription on scope exit.
 try (BlockingSubscription<Snapshot<Session>> sub = session.subscribe()) {
-    while (true) {
+    while (sub.isActive()) {
         switch (sub.next(Duration.ofSeconds(30))) {
             case NextResult.Value<Snapshot<Session>>(var s) -> handleChange(s);
-            case NextResult.Timeout<Snapshot<Session>> t -> sendKeepAlive();
-            case NextResult.Expired<Snapshot<Session>> e -> { handleExpired(); return; }
-            case NextResult.Deleted<Snapshot<Session>> d -> { handleDeleted(); return; }
-            default -> { return; }
+            case NextResult.Timeout<Snapshot<Session>> ignored -> sendKeepAlive();
+            case NextResult.Expired<Snapshot<Session>> ignored -> log.info("lease expired");
+            case NextResult.Deleted<Snapshot<Session>> ignored -> log.info("atom deleted");
+            case NextResult.Errored<Snapshot<Session>>(var cause) -> log.error("error", cause);
+            case NextResult.Completed<Snapshot<Session>> ignored -> {}
         }
     }
 }
 
-// ... or via callback, with optional lifecycle handlers
-CallbackSubscription sub = session.subscribe(
-    snap -> handleChange(snap),
-    builder -> builder
-        .onExpiration(() -> log.info("session lease expired"))
-        .onDelete(() -> log.info("session deleted by another node"))
-        .onError(err -> log.error("subscription failed", err)));
+// ... or push values to a callback handler
+CallbackSubscription sub = session.subscribe(this::handleChange);
 
-// ... later, when you're done observing
+// ... or push values plus register lifecycle handlers via the customizer
+CallbackSubscription sub = session.subscribe(
+    this::handleChange,
+    builder -> builder
+        .onError(err -> log.error("subscription failed", err))
+        .onExpiration(() -> log.info("session lease expired"))
+        .onDelete(() -> log.info("session deleted by another node")));
+
+// Cancel the callback subscription when you're done
 sub.cancel();
 
-// Resume from a known snapshot — only deliver values that differ from lastSeen.
-// Each Snapshot carries a SHA-256 staleness token; the SPI compares incoming
-// values against it and skips deliveries that haven't actually changed.
-// Useful for reconnect-after-blip or for skipping the initial state when you
-// already have it locally.
+// Resume from a known snapshot — only deliver values whose token differs
+// from lastSeen. Useful for reconnect-after-blip or for skipping the
+// initial state when the caller already has it locally.
 Snapshot<Session> lastSeen = session.get();
 processInitialState(lastSeen);
 try (BlockingSubscription<Snapshot<Session>> resumed = session.subscribe(lastSeen)) {
     // resumed only delivers Snapshots whose token differs from lastSeen
 }
 
-// Lazy connect to an existing atom (no backend I/O until first call)
+// Lazy connect to an existing atom (no backend I/O until the first operation)
 Atom<Session> existing = atomFactory.connect("session:abc", Session.class);
 ```
 
@@ -149,31 +154,47 @@ Atom<Session> existing = atomFactory.connect("session:abc", Session.class);
 ```java
 @Autowired JournalFactory journalFactory;
 
-// Create a typed journal bound to a key
-Journal<OrderEvent> orders = journalFactory.create("orders:123", OrderEvent.class);
+// Create a typed journal. The inactivity TTL is how long the journal lives
+// without an append before it expires.
+Journal<OrderEvent> orders = journalFactory.create(
+    "orders:123", OrderEvent.class, Duration.ofDays(7));
 
-// Append entries
-orders.append(new OrderEvent("created", 42));
-orders.append(new OrderEvent("shipped", 42));
+// Append entries — each append takes its own per-entry TTL and resets the
+// journal's inactivity timer. Returns the generated entry id.
+String createdId = orders.append(new OrderEvent("created", 42), Duration.ofDays(30));
+String shippedId = orders.append(new OrderEvent("shipped", 42), Duration.ofDays(30));
 
-// Subscribe to entries with a blocking subscription (perfect for virtual threads)
+// Subscribe from the current tail. New entries are delivered as they arrive;
+// historical entries already in the journal are NOT replayed.
 try (BlockingSubscription<JournalEntry<OrderEvent>> sub = orders.subscribe()) {
-    while (true) {
+    while (sub.isActive()) {
         switch (sub.next(Duration.ofSeconds(30))) {
-            case NextResult.Value<JournalEntry<OrderEvent>>(var entry) -> processEvent(entry.value());
-            case NextResult.Timeout<JournalEntry<OrderEvent>> t -> sendKeepAlive();
-            case NextResult.Completed<JournalEntry<OrderEvent>> c -> { return; }
-            case NextResult.Expired<JournalEntry<OrderEvent>> e -> { return; }
-            default -> { return; }
+            case NextResult.Value<JournalEntry<OrderEvent>>(var entry) -> processEvent(entry.data());
+            case NextResult.Timeout<JournalEntry<OrderEvent>> ignored -> sendKeepAlive();
+            case NextResult.Completed<JournalEntry<OrderEvent>> ignored -> log.info("journal completed");
+            case NextResult.Expired<JournalEntry<OrderEvent>> ignored -> log.info("journal expired");
+            case NextResult.Deleted<JournalEntry<OrderEvent>> ignored -> log.info("journal deleted");
+            case NextResult.Errored<JournalEntry<OrderEvent>>(var cause) -> log.error("error", cause);
         }
     }
 }
 
-// Resume from a known entry (e.g., SSE reconnect with Last-Event-ID)
-orders.subscribe(lastSeenEntry);
+// Resume from a known checkpoint id (e.g., SSE reconnect with Last-Event-ID).
+// Replays all entries strictly after afterId, then continues live.
+try (var resumed = orders.subscribeAfter(lastSeenId)) {
+    // ...
+}
 
-// Mark the journal as complete (no more appends; subscribers receive Completed)
-orders.complete();
+// Replay the last N retained entries, then continue live.
+try (var tail = orders.subscribeLast(50)) {
+    // ...
+}
+
+// Mark the journal as complete with a retention TTL. After complete(), no
+// further appends are accepted; subscribers receive NextResult.Completed
+// once the journal is fully drained, and the journal stays readable until
+// the retention TTL elapses.
+orders.complete(Duration.ofDays(7));
 ```
 
 ### Mailbox -- single-shot distributed delivery
@@ -182,21 +203,33 @@ orders.complete();
 @Autowired MailboxFactory mailboxFactory;
 
 // Create a typed mailbox with a TTL
-Mailbox<ElicitationResponse> mailbox =
-    mailboxFactory.create("elicit:abc", ElicitationResponse.class, Duration.ofMinutes(5));
+Mailbox<ElicitationResponse> mailbox = mailboxFactory.create(
+    "elicit:abc", ElicitationResponse.class, Duration.ofMinutes(5));
 
-// Deliver a value (from any node) -- a second deliver throws MailboxFullException
+// Deliver a value (from any node) — a second deliver throws MailboxFullException
 mailbox.deliver(new ElicitationResponse("user picked option A"));
 
-// Wait for delivery (blocks until delivered, expired, or deleted)
+// Wait for delivery via blocking subscribe. The first next() returns the
+// delivered value if it's already there, otherwise blocks until delivery.
+// After the value is consumed, subsequent next() calls return Completed.
 try (BlockingSubscription<ElicitationResponse> sub = mailbox.subscribe()) {
     switch (sub.next(Duration.ofMinutes(5))) {
         case NextResult.Value<ElicitationResponse>(var response) -> processResponse(response);
-        case NextResult.Expired<ElicitationResponse> e -> handleExpired();
-        case NextResult.Deleted<ElicitationResponse> d -> handleDeleted();
-        default -> handleTimeout();
+        case NextResult.Timeout<ElicitationResponse> ignored -> handleTimeout();
+        case NextResult.Expired<ElicitationResponse> ignored -> handleExpired();
+        case NextResult.Deleted<ElicitationResponse> ignored -> handleDeleted();
+        case NextResult.Completed<ElicitationResponse> ignored -> {}
+        case NextResult.Errored<ElicitationResponse>(var cause) -> log.error("error", cause);
     }
 }
+
+// ... or via callback. The handler fires exactly once per subscription;
+// onComplete fires after the handler returns.
+mailbox.subscribe(
+    this::processResponse,
+    builder -> builder
+        .onExpiration(() -> log.info("mailbox expired before delivery"))
+        .onDelete(() -> log.info("mailbox deleted before delivery")));
 ```
 
 

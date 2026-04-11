@@ -25,11 +25,42 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.NextResult;
 
 class DefaultBlockingSubscriptionTest {
 
   private static final Duration SHORT_TIMEOUT = Duration.ofMillis(100);
+
+  @Test
+  void canBeUsedInTryWithResourcesAndCancelsOnExit() {
+    var handoff = new BlockingBoundedHandoff<String>(10);
+    var cancellerInvocations = new AtomicInteger(0);
+
+    try (BlockingSubscription<String> sub =
+        new DefaultBlockingSubscription<>(handoff, cancellerInvocations::incrementAndGet)) {
+      assertThat(sub.isActive()).isTrue();
+      assertThat(cancellerInvocations.get()).isZero();
+    }
+
+    // Exiting the try-with-resources block must invoke close(), which delegates
+    // to cancel(), which invokes the canceller closure exactly once.
+    assertThat(cancellerInvocations.get()).isEqualTo(1);
+  }
+
+  @Test
+  void closeIsIdempotentAndEquivalentToCancel() {
+    var handoff = new BlockingBoundedHandoff<String>(10);
+    var cancellerInvocations = new AtomicInteger(0);
+    var sub = new DefaultBlockingSubscription<>(handoff, cancellerInvocations::incrementAndGet);
+
+    sub.close();
+    sub.close();
+    sub.cancel();
+
+    assertThat(cancellerInvocations.get()).isEqualTo(1);
+    assertThat(sub.isActive()).isFalse();
+  }
 
   @Test
   void nextReturnsValueAndRemainsActive() {
@@ -112,7 +143,12 @@ class DefaultBlockingSubscriptionTest {
 
     sub.cancel();
     sub.cancel();
-    assertThat(canceller.get()).isEqualTo(2);
+    sub.cancel();
+    // Per the Subscription contract, cancel() on an already-inactive subscription
+    // is a no-op. The canceller closure must run exactly once across any number
+    // of cancel() invocations.
+    assertThat(canceller.get()).isEqualTo(1);
+    assertThat(sub.isActive()).isFalse();
   }
 
   // --- isTerminal tests ---

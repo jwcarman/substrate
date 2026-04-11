@@ -30,11 +30,15 @@ import java.time.Duration;
  * <p>If the calling thread is interrupted while blocked in {@code next()}, the subscription becomes
  * inactive and the thread's interrupt flag is restored.
  *
+ * <p>{@code BlockingSubscription} extends {@link AutoCloseable} so it can be used with
+ * try-with-resources. The {@link #close()} default implementation simply delegates to {@link
+ * #cancel()}.
+ *
  * @param <T> the type of values delivered by this subscription
  * @see CallbackSubscription
  * @see NextResult
  */
-public interface BlockingSubscription<T> extends Subscription {
+public interface BlockingSubscription<T> extends Subscription, AutoCloseable {
 
   /**
    * Blocks until the next result is available or the given timeout elapses.
@@ -55,4 +59,15 @@ public interface BlockingSubscription<T> extends Subscription {
    * @return a {@link NextResult} describing the outcome
    */
   NextResult<T> next(Duration timeout);
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Equivalent to calling {@link #cancel()}. Provided so that {@code BlockingSubscription}
+   * instances can be used with try-with-resources blocks. Does not throw.
+   */
+  @Override
+  default void close() {
+    cancel();
+  }
 }

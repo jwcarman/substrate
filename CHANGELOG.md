@@ -8,6 +8,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 While substrate is in 0.x, the API is considered beta and breaking changes may
 occur between minor versions. The 1.0.0 release will mark API stability.
 
+## [0.2.1] - 2026-04-11
+
+### Added
+
+- **`BlockingSubscription` now extends `AutoCloseable`** with a default
+  `close()` that delegates to `cancel()`. This makes try-with-resources
+  the natural cancellation pattern for blocking subscriptions:
+
+  ```java
+  try (BlockingSubscription<Snapshot<Session>> sub = atom.subscribe()) {
+      while (sub.isActive()) {
+          // ... pull values via sub.next(timeout)
+      }
+  }
+  ```
+
+  No source-level breakage for existing callers — `cancel()` still works
+  the same way, and the new `close()` is a default method.
+
+### Documentation
+
+- Substantial README rewrite to fix incorrect API examples that slipped
+  into 0.2.0. The Atom, Journal, and Mailbox sections now use verified
+  signatures: `Journal.append(data, ttl)`, `Journal.complete(retentionTtl)`,
+  `Journal.subscribeAfter(id)` instead of a non-existent
+  `subscribe(lastSeen)`, `JournalEntry.data()` instead of `.value()`,
+  `JournalFactory.create(name, type, inactivityTtl)`, and the actual
+  callback subscribe overloads with the `CallbackSubscriberBuilder`
+  customizer for lifecycle handlers.
+
 ## [0.2.0] - 2026-04-11
 
 ### Breaking changes
