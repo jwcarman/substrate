@@ -192,4 +192,66 @@ class HazelcastJournalSpiTest {
     List<RawJournalEntry> entries = journal.readAfter("test-key", "-1");
     assertThat(entries).isEmpty();
   }
+
+  @Test
+  void completeWithNullRetentionTtlStoresMarkerWithoutTtl() {
+    when(hazelcastInstance.<String, Boolean>getMap("substrate-journal-completed"))
+        .thenReturn(completedMap);
+
+    journal.complete("test-key", null);
+
+    verify(completedMap).put("test-key", Boolean.TRUE);
+  }
+
+  @Test
+  void completeWithZeroRetentionTtlStoresMarkerWithoutTtl() {
+    when(hazelcastInstance.<String, Boolean>getMap("substrate-journal-completed"))
+        .thenReturn(completedMap);
+
+    journal.complete("test-key", Duration.ZERO);
+
+    verify(completedMap).put("test-key", Boolean.TRUE);
+  }
+
+  @Test
+  void readAfterReturnsEmptyWhenTailSequenceIsNegativeOne() {
+    when(hazelcastInstance.<String>getRingbuffer("test-key")).thenReturn(ringbuffer);
+    when(ringbuffer.tailSequence()).thenReturn(-1L);
+
+    List<RawJournalEntry> entries = journal.readAfter("test-key", "0");
+
+    assertThat(entries).isEmpty();
+  }
+
+  @Test
+  void readAfterReturnsEmptyWhenStartSequenceExceedsTailSequence() {
+    when(hazelcastInstance.<String>getRingbuffer("test-key")).thenReturn(ringbuffer);
+    when(ringbuffer.tailSequence()).thenReturn(5L);
+
+    List<RawJournalEntry> entries = journal.readAfter("test-key", "10");
+
+    assertThat(entries).isEmpty();
+  }
+
+  @Test
+  void readLastReturnsEmptyWhenTailSequenceIsNegativeOne() {
+    when(hazelcastInstance.<String>getRingbuffer("test-key")).thenReturn(ringbuffer);
+    when(ringbuffer.tailSequence()).thenReturn(-1L);
+
+    List<RawJournalEntry> entries = journal.readLast("test-key", 5);
+
+    assertThat(entries).isEmpty();
+  }
+
+  @Test
+  void readLastReturnsEmptyWhenReadCountIsZero() {
+    when(hazelcastInstance.<String>getRingbuffer("test-key")).thenReturn(ringbuffer);
+    when(ringbuffer.tailSequence()).thenReturn(5L);
+    when(ringbuffer.headSequence()).thenReturn(0L);
+
+    // count=0 -> startSequence = max(0, 5-0+1) = 6 -> readCount = 5-6+1 = 0
+    List<RawJournalEntry> entries = journal.readLast("test-key", 0);
+
+    assertThat(entries).isEmpty();
+  }
 }

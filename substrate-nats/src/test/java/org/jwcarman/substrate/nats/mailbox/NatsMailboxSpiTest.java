@@ -224,6 +224,106 @@ class NatsMailboxSpiTest {
         .hasMessageContaining("Failed to delete from NATS KV");
   }
 
+  @Test
+  void createPutsCreatedMarkerInKv() throws Exception {
+    wireConnectionForConstruction();
+    var kv = mock(io.nats.client.KeyValue.class);
+    when(connection.keyValue("substrate-mailbox")).thenReturn(kv);
+
+    NatsMailboxSpi mailbox = createMailbox();
+    mailbox.create("substrate:mailbox:test", Duration.ofMinutes(5));
+
+    verify(kv).put(anyString(), any(byte[].class));
+  }
+
+  @Test
+  void createThrowsUncheckedIOExceptionOnIOError() throws Exception {
+    wireConnectionForConstruction();
+    var kv = mock(io.nats.client.KeyValue.class);
+    when(connection.keyValue("substrate-mailbox")).thenReturn(kv);
+    when(kv.put(anyString(), any(byte[].class))).thenThrow(new IOException("kv failed"));
+
+    NatsMailboxSpi mailbox = createMailbox();
+    assertThatThrownBy(() -> mailbox.create("substrate:mailbox:test", Duration.ofMinutes(5)))
+        .isInstanceOf(UncheckedIOException.class)
+        .hasMessageContaining("Failed to create mailbox in NATS KV");
+  }
+
+  @Test
+  void createThrowsIllegalStateOnJetStreamApiError() throws Exception {
+    wireConnectionForConstruction();
+    JetStreamApiException apiException = mockApiException();
+    var kv = mock(io.nats.client.KeyValue.class);
+    when(connection.keyValue("substrate-mailbox")).thenReturn(kv);
+    when(kv.put(anyString(), any(byte[].class))).thenThrow(apiException);
+
+    NatsMailboxSpi mailbox = createMailbox();
+    assertThatThrownBy(() -> mailbox.create("substrate:mailbox:test", Duration.ofMinutes(5)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Failed to create mailbox in NATS KV");
+  }
+
+  @Test
+  void deliverThrowsMailboxExpiredWhenEntryIsNull() throws Exception {
+    wireConnectionForConstruction();
+    var kv = mock(io.nats.client.KeyValue.class);
+    when(connection.keyValue("substrate-mailbox")).thenReturn(kv);
+    when(kv.get(anyString())).thenReturn(null);
+
+    NatsMailboxSpi mailbox = createMailbox();
+    byte[] data = "hello".getBytes(StandardCharsets.UTF_8);
+    assertThatThrownBy(() -> mailbox.deliver("substrate:mailbox:test", data))
+        .isInstanceOf(MailboxExpiredException.class);
+  }
+
+  @Test
+  void getThrowsMailboxExpiredWhenEntryHasNullValue() throws Exception {
+    wireConnectionForConstruction();
+    var kv = mock(io.nats.client.KeyValue.class);
+    when(connection.keyValue("substrate-mailbox")).thenReturn(kv);
+    KeyValueEntry entry = mock(KeyValueEntry.class);
+    when(entry.getValue()).thenReturn(null);
+    when(kv.get(anyString())).thenReturn(entry);
+
+    NatsMailboxSpi mailbox = createMailbox();
+    assertThatThrownBy(() -> mailbox.get("substrate:mailbox:test"))
+        .isInstanceOf(MailboxExpiredException.class);
+  }
+
+  @Test
+  void constructorCreatesBucketWhenNotFound() throws Exception {
+    JetStreamApiException notFound = mockApiException();
+    when(connection.keyValueManagement()).thenReturn(kvm);
+    when(kvm.getStatus("substrate-mailbox")).thenThrow(notFound);
+    when(kvm.create(any())).thenReturn(mock(KeyValueStatus.class));
+
+    NatsMailboxSpi mailbox = createMailbox();
+    assertThat(mailbox).isNotNull();
+    verify(kvm).create(any());
+  }
+
+  @Test
+  void constructorThrowsUncheckedIOExceptionWhenBucketCreationFails() throws Exception {
+    when(connection.keyValueManagement()).thenThrow(new IOException("connection failed"));
+
+    assertThatThrownBy(this::createMailbox)
+        .isInstanceOf(UncheckedIOException.class)
+        .hasMessageContaining("Failed to create NATS KV bucket");
+  }
+
+  @Test
+  void constructorThrowsIllegalStateWhenBucketCreationFailsWithApiError() throws Exception {
+    JetStreamApiException notFound = mockApiException();
+    when(connection.keyValueManagement()).thenReturn(kvm);
+    when(kvm.getStatus("substrate-mailbox")).thenThrow(notFound);
+    JetStreamApiException createFailed = mockApiException();
+    when(kvm.create(any())).thenThrow(createFailed);
+
+    assertThatThrownBy(this::createMailbox)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Failed to create NATS KV bucket");
+  }
+
   private void wireConnectionForConstruction() throws Exception {
     when(connection.keyValueManagement()).thenReturn(kvm);
     when(kvm.getStatus("substrate-mailbox")).thenReturn(mock(KeyValueStatus.class));

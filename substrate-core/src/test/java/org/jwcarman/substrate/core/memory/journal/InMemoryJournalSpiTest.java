@@ -428,6 +428,80 @@ class InMemoryJournalSpiTest {
     assertThat(journal.sweep(1000)).isZero();
   }
 
+  @Test
+  void defaultConstructorCreatesUsableInstance() {
+    InMemoryJournalSpi defaultJournal = new InMemoryJournalSpi();
+    defaultJournal.create(KEY, Duration.ofHours(1));
+
+    String id = defaultJournal.append(KEY, "data".getBytes(UTF_8), Duration.ofHours(1));
+
+    assertNotNull(id);
+    List<RawJournalEntry> entries = defaultJournal.readAfter(KEY, "0-0");
+    assertEquals(1, entries.size());
+  }
+
+  @Test
+  void readLastOnExpiredActiveJournalThrowsJournalExpiredException() {
+    journal.create(KEY, Duration.ofMillis(50));
+    journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(
+            () ->
+                assertThatThrownBy(() -> journal.readLast(KEY, 5))
+                    .isInstanceOf(JournalExpiredException.class));
+  }
+
+  @Test
+  void readAfterOnExpiredActiveJournalThrowsJournalExpiredException() {
+    journal.create(KEY, Duration.ofMillis(50));
+    journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(
+            () ->
+                assertThatThrownBy(() -> journal.readAfter(KEY, "0-0"))
+                    .isInstanceOf(JournalExpiredException.class));
+  }
+
+  @Test
+  void boundedEntryListRemoveExpiredRemovesExpiredEntries() {
+    InMemoryJournalSpi.BoundedEntryList list = new InMemoryJournalSpi.BoundedEntryList(100);
+
+    java.time.Instant now = java.time.Instant.now();
+    java.time.Instant soonExpiry = now.plusSeconds(5);
+    java.time.Instant farExpiry = now.plusSeconds(3600);
+
+    list.add(new RawJournalEntry("1-0", KEY, "data".getBytes(UTF_8), now), soonExpiry);
+    list.add(new RawJournalEntry("2-0", KEY, "live".getBytes(UTF_8), now), farExpiry);
+
+    int removed = list.removeExpired(soonExpiry.plusSeconds(1), 10);
+
+    assertEquals(1, removed);
+    assertEquals(1, list.snapshot().size());
+    assertArrayEquals("live".getBytes(UTF_8), list.snapshot().getFirst().entry().data());
+  }
+
+  @Test
+  void boundedEntryListRemoveExpiredRespectsMaxLimit() {
+    InMemoryJournalSpi.BoundedEntryList list = new InMemoryJournalSpi.BoundedEntryList(100);
+
+    java.time.Instant now = java.time.Instant.now();
+    java.time.Instant soonExpiry = now.plusSeconds(5);
+    java.time.Instant farExpiry = now.plusSeconds(3600);
+
+    list.add(new RawJournalEntry("1-0", KEY, "a".getBytes(UTF_8), now), soonExpiry);
+    list.add(new RawJournalEntry("2-0", KEY, "b".getBytes(UTF_8), now), soonExpiry);
+    list.add(new RawJournalEntry("3-0", KEY, "c".getBytes(UTF_8), now), farExpiry);
+
+    int removed = list.removeExpired(soonExpiry.plusSeconds(1), 1);
+
+    assertEquals(1, removed);
+    assertEquals(2, list.snapshot().size());
+  }
+
   private static long parseId(String id) {
     int dash = id.indexOf('-');
     return Long.parseLong(dash >= 0 ? id.substring(0, dash) : id);

@@ -349,4 +349,143 @@ class RabbitMqJournalSpiTest {
     assertThat(entries).hasSize(1);
     assertThat(entries.getFirst().data()).isEmpty();
   }
+
+  @Test
+  void completePublishesCompletedMarker() {
+    wireStreamAndProducer();
+    wireMessageBuilder();
+    wireSuccessfulPublish();
+
+    journal.complete("substrate:journal:test", Duration.ofHours(1));
+
+    verify(producer).send(any(Message.class), any(ConfirmationHandler.class));
+  }
+
+  @Test
+  void readAfterFiltersEntriesByComparingIds() {
+    StreamStats stats = mock(StreamStats.class);
+    when(environment.queryStreamStats("substrate-journal-test")).thenReturn(stats);
+
+    ConsumerBuilder consumerBuilder = mock(ConsumerBuilder.class);
+    when(environment.consumerBuilder()).thenReturn(consumerBuilder);
+    when(consumerBuilder.stream(any())).thenReturn(consumerBuilder);
+    when(consumerBuilder.offset(any(OffsetSpecification.class))).thenReturn(consumerBuilder);
+
+    Consumer consumer = mock(Consumer.class);
+    doAnswer(
+            invocation -> {
+              com.rabbitmq.stream.MessageHandler handler = invocation.getArgument(0);
+
+              Message msg1 = mock(Message.class);
+              Map<String, Object> props1 =
+                  Map.of(
+                      "entryId", "aaa",
+                      "journalKey", "substrate:journal:test",
+                      "timestamp", Instant.now().toString());
+              when(msg1.getApplicationProperties()).thenReturn(props1);
+              when(msg1.getBodyAsBinary()).thenReturn("d1".getBytes(StandardCharsets.UTF_8));
+              handler.handle(mock(com.rabbitmq.stream.MessageHandler.Context.class), msg1);
+
+              Message msg2 = mock(Message.class);
+              Map<String, Object> props2 =
+                  Map.of(
+                      "entryId", "bbb",
+                      "journalKey", "substrate:journal:test",
+                      "timestamp", Instant.now().toString());
+              when(msg2.getApplicationProperties()).thenReturn(props2);
+              when(msg2.getBodyAsBinary()).thenReturn("d2".getBytes(StandardCharsets.UTF_8));
+              handler.handle(mock(com.rabbitmq.stream.MessageHandler.Context.class), msg2);
+
+              Message msg3 = mock(Message.class);
+              Map<String, Object> props3 =
+                  Map.of(
+                      "entryId", "ccc",
+                      "journalKey", "substrate:journal:test",
+                      "timestamp", Instant.now().toString());
+              when(msg3.getApplicationProperties()).thenReturn(props3);
+              when(msg3.getBodyAsBinary()).thenReturn("d3".getBytes(StandardCharsets.UTF_8));
+              handler.handle(mock(com.rabbitmq.stream.MessageHandler.Context.class), msg3);
+
+              return consumerBuilder;
+            })
+        .when(consumerBuilder)
+        .messageHandler(any());
+    when(consumerBuilder.build()).thenReturn(consumer);
+
+    List<RawJournalEntry> entries = journal.readAfter("substrate:journal:test", "bbb");
+
+    assertThat(entries).hasSize(1);
+    assertThat(entries.getFirst().id()).isEqualTo("ccc");
+  }
+
+  @Test
+  void readLastReturnsLastNEntries() {
+    StreamStats stats = mock(StreamStats.class);
+    when(environment.queryStreamStats("substrate-journal-test")).thenReturn(stats);
+
+    ConsumerBuilder consumerBuilder = mock(ConsumerBuilder.class);
+    when(environment.consumerBuilder()).thenReturn(consumerBuilder);
+    when(consumerBuilder.stream(any())).thenReturn(consumerBuilder);
+    when(consumerBuilder.offset(any(OffsetSpecification.class))).thenReturn(consumerBuilder);
+
+    Consumer consumer = mock(Consumer.class);
+    doAnswer(
+            invocation -> {
+              com.rabbitmq.stream.MessageHandler handler = invocation.getArgument(0);
+              for (int i = 1; i <= 5; i++) {
+                Message msg = mock(Message.class);
+                Map<String, Object> props =
+                    Map.of(
+                        "entryId",
+                        "entry-" + i,
+                        "journalKey",
+                        "substrate:journal:test",
+                        "timestamp",
+                        Instant.now().toString());
+                when(msg.getApplicationProperties()).thenReturn(props);
+                when(msg.getBodyAsBinary())
+                    .thenReturn(("data-" + i).getBytes(StandardCharsets.UTF_8));
+                handler.handle(mock(com.rabbitmq.stream.MessageHandler.Context.class), msg);
+              }
+              return consumerBuilder;
+            })
+        .when(consumerBuilder)
+        .messageHandler(any());
+    when(consumerBuilder.build()).thenReturn(consumer);
+
+    List<RawJournalEntry> entries = journal.readLast("substrate:journal:test", 2);
+
+    assertThat(entries).hasSize(2);
+    assertThat(entries.get(0).id()).isEqualTo("entry-4");
+    assertThat(entries.get(1).id()).isEqualTo("entry-5");
+  }
+
+  @Test
+  void readAfterReturnsEmptyForNonExistentStream() {
+    doThrow(new StreamException("stream does not exist"))
+        .when(environment)
+        .queryStreamStats("substrate-journal-test");
+
+    List<RawJournalEntry> entries = journal.readAfter("substrate:journal:test", "some-id");
+
+    assertThat(entries).isEmpty();
+  }
+
+  @Test
+  void readLastReturnsEmptyForNonExistentStream() {
+    doThrow(new StreamException("stream does not exist"))
+        .when(environment)
+        .queryStreamStats("substrate-journal-test");
+
+    List<RawJournalEntry> entries = journal.readLast("substrate:journal:test", 5);
+
+    assertThat(entries).isEmpty();
+  }
+
+  @Test
+  void deleteWithNoCachedProducerOnlyDeletesStream() {
+    journal.delete("substrate:journal:test");
+
+    verify(environment).deleteStream("substrate-journal-test");
+  }
 }

@@ -240,6 +240,95 @@ class NatsJournalSpiTest {
     assertThat(result).isEmpty();
   }
 
+  @Test
+  void constructorThrowsIllegalStateOnNon10058ApiError() throws Exception {
+    when(connection.jetStream()).thenReturn(jetStream);
+    when(connection.jetStreamManagement()).thenReturn(jsm);
+    JetStreamApiException apiException = mockApiException(500);
+    when(jsm.addStream(any(StreamConfiguration.class))).thenThrow(apiException);
+
+    assertThatThrownBy(this::createJournal)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Failed to create NATS JetStream stream");
+  }
+
+  @Test
+  void constructorThrowsUncheckedIOExceptionWhenUpdateStreamFailsWithIOException()
+      throws Exception {
+    when(connection.jetStream()).thenReturn(jetStream);
+    when(connection.jetStreamManagement()).thenReturn(jsm);
+    JetStreamApiException existsException = mockApiException(10058);
+    when(jsm.addStream(any(StreamConfiguration.class))).thenThrow(existsException);
+    when(jsm.updateStream(any(StreamConfiguration.class)))
+        .thenThrow(new IOException("update failed"));
+
+    assertThatThrownBy(this::createJournal)
+        .isInstanceOf(UncheckedIOException.class)
+        .hasMessageContaining("Failed to update NATS JetStream stream");
+  }
+
+  @Test
+  void constructorThrowsIllegalStateWhenUpdateStreamFailsWithApiException() throws Exception {
+    when(connection.jetStream()).thenReturn(jetStream);
+    when(connection.jetStreamManagement()).thenReturn(jsm);
+    JetStreamApiException existsException = mockApiException(10058);
+    when(jsm.addStream(any(StreamConfiguration.class))).thenThrow(existsException);
+    JetStreamApiException updateException = mockApiException(999);
+    when(jsm.updateStream(any(StreamConfiguration.class))).thenThrow(updateException);
+
+    assertThatThrownBy(this::createJournal)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Failed to update NATS JetStream stream");
+  }
+
+  @Test
+  void isCompleteReturnsTrueWhenEntryExists() throws Exception {
+    wireConnectionForConstruction();
+    var kvm = mock(KeyValueManagement.class);
+    when(connection.keyValueManagement()).thenReturn(kvm);
+    when(kvm.getStatus(anyString())).thenReturn(mock(KeyValueStatus.class));
+    var kv = mock(io.nats.client.KeyValue.class);
+    when(connection.keyValue(anyString())).thenReturn(kv);
+    var entry = mock(io.nats.client.api.KeyValueEntry.class);
+    when(kv.get(anyString())).thenReturn(entry);
+
+    NatsJournalSpi journal = createJournal();
+    assertThat(journal.isComplete("substrate:journal:test")).isTrue();
+  }
+
+  @Test
+  void completeSucceedsOnHappyPath() throws Exception {
+    wireConnectionForConstruction();
+    var kvm = mock(KeyValueManagement.class);
+    when(connection.keyValueManagement()).thenReturn(kvm);
+    when(kvm.getStatus(anyString())).thenReturn(mock(KeyValueStatus.class));
+    var kv = mock(io.nats.client.KeyValue.class);
+    when(connection.keyValue(anyString())).thenReturn(kv);
+
+    NatsJournalSpi journal = createJournal();
+    assertThatNoException()
+        .isThrownBy(() -> journal.complete("substrate:journal:test", Duration.ofHours(1)));
+    verify(kv).put(anyString(), any(byte[].class));
+  }
+
+  @Test
+  void ensureCompletedBucketCreatesWhenNotFound() throws Exception {
+    wireConnectionForConstruction();
+    var kvm = mock(KeyValueManagement.class);
+    when(connection.keyValueManagement()).thenReturn(kvm);
+    JetStreamApiException notFound = mockApiException(404);
+    when(kvm.getStatus(anyString())).thenThrow(notFound);
+    when(kvm.create(any())).thenReturn(mock(KeyValueStatus.class));
+    var kv = mock(io.nats.client.KeyValue.class);
+    when(connection.keyValue(anyString())).thenReturn(kv);
+    var entry = mock(io.nats.client.api.KeyValueEntry.class);
+    when(kv.get(anyString())).thenReturn(entry);
+
+    NatsJournalSpi journal = createJournal();
+    assertThat(journal.isComplete("substrate:journal:test")).isTrue();
+    verify(kvm).create(any());
+  }
+
   private void wireConnectionForConstruction() throws Exception {
     when(connection.jetStream()).thenReturn(jetStream);
     when(connection.jetStreamManagement()).thenReturn(jsm);

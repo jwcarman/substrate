@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T05:53:00Z
-ITERATION: 59
-SPEC_COMPLETED: 057-abstract-spi-and-factory-coverage.md
-WHAT_WAS_DONE: Added coverage tests for all 7 listed classes: new AbstractAtomSpiTest (4 tests) and DefaultCallbackSubscriberBuilderTest (5 tests); added sweep/create no-op tests to AbstractJournalSpiTest and AbstractMailboxSpiTest; added TypeRef overload and TTL validation tests to DefaultMailboxFactoryTest and DefaultJournalFactoryTest; added disabled-property test to SnsNotifierAutoConfigurationTest.
-VERIFICATION: ./mvnw spotless:check -pl substrate-core,substrate-sns — PASS; ./mvnw -pl substrate-core verify -DskipITs — 330 tests, 0 failures, BUILD SUCCESS; ./mvnw -pl substrate-sns verify -DskipITs — 22 tests, 0 failures, BUILD SUCCESS
-STATUS: MORE_WORK
-NEXT_SPEC: 058-backend-spi-coverage-gaps.md
-NOTES: No new @SuppressWarnings annotations introduced. No new dependencies added. All abstract SPI methods (atomKey, prefix, sweep, create no-op, generateEntryId) now covered. Factory TypeRef overloads and TTL validation branches now covered. Builder default-null getters and fluent setters now covered. SNS conditional-on-property disabled branch now covered.
+LAST_RUN: 2026-04-11T06:12:00Z
+ITERATION: 60
+SPEC_COMPLETED: 058-backend-spi-coverage-gaps.md
+WHAT_WAS_DONE: Added ~50 new unit tests across 9 files in 6 modules to close coverage gaps on BlockingBoundedHandoff (interrupt paths), DefaultCallbackSubscription (handler-throws-exception branches), InMemoryJournalSpi (removeExpired, default constructor, readLast on dead journal), DefaultJournal (subscribeLast, callback variants, feeder preload/expiration/completion paths), NatsJournalSpi (constructor error paths, isComplete/complete happy paths, bucket creation), NatsMailboxSpi (create method, deliver-null-entry, bucket creation error paths), CassandraJournalSpi (isComplete, readAfter/readLast filtering, TTL fallback, mapRow null buffer), RabbitMqJournalSpi (complete, readAfter/readLast filtering/slicing, delete without producer), HazelcastJournalSpi (complete without TTL, readAfter/readLast empty-ringbuffer edge cases), and PostgresNotifierSpi (dispatchNotification malformed payload, subscribe/cancel, stop-before-start).
+VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — all modules BUILD SUCCESS; substrate-core 354 tests (was 330), substrate-nats 86 tests (was 72), substrate-cassandra 35 tests (was 25), substrate-rabbitmq 29 tests (was 23), substrate-hazelcast 58 tests, substrate-postgresql 23 tests (was 15). No failures.
+STATUS: DONE
+NEXT_SPEC: none
+NOTES: No new @SuppressWarnings annotations introduced. No new dependencies added. No production code changes. Some InterruptedException paths in BlockingBoundedHandoff.mark() are genuinely hard to reach in tests without changing production code — they require interrupting a thread during a BlockingQueue.put on a queue that has capacity (put never blocks, so InterruptedException cannot fire). These are defensive guards. The sleepBeforeReconnect and closeListenConnection error paths in PostgresNotifierSpi are exercised by the existing IT tests against a real Postgres container.

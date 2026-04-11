@@ -154,4 +154,36 @@ class BlockingBoundedHandoffTest {
 
     assertThat(handoff.pull(SHORT_TIMEOUT)).isInstanceOf(NextResult.Expired.class);
   }
+
+  @Test
+  void pullReturnsTimeoutWhenInterrupted() {
+    var handoff = new BlockingBoundedHandoff<String>(10);
+
+    Thread.currentThread().interrupt();
+    NextResult<String> result = handoff.pull(Duration.ofSeconds(10));
+
+    assertThat(result).isInstanceOf(NextResult.Timeout.class);
+    assertThat(Thread.interrupted()).isTrue();
+  }
+
+  @Test
+  void pushSilentlyHandlesInterrupt() throws Exception {
+    var handoff = new BlockingBoundedHandoff<String>(1);
+    handoff.push("fill");
+
+    var started = new CountDownLatch(1);
+    var finished = new CountDownLatch(1);
+    var thread =
+        Thread.ofVirtual()
+            .start(
+                () -> {
+                  started.countDown();
+                  handoff.push("blocked");
+                  finished.countDown();
+                });
+
+    assertThat(started.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+    thread.interrupt();
+    assertThat(finished.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+  }
 }

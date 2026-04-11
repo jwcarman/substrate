@@ -27,8 +27,11 @@ import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Row;
+import com.datastax.oss.driver.api.core.uuid.Uuids;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -148,5 +151,161 @@ class CassandraJournalSpiTest {
   void preparesStatementsDuringConstruction() {
     // 5 prepared statements: insert, insertWithTtl, readAfter, readLast, delete
     verify(session, atLeast(5)).prepare(anyString());
+  }
+
+  @Test
+  void isCompleteReturnsTrueWhenCompletedDataExists() {
+    ByteBuffer completedData = ByteBuffer.wrap("__COMPLETED__".getBytes(StandardCharsets.UTF_8));
+    Row row = org.mockito.Mockito.mock(Row.class);
+    when(row.getByteBuffer("data")).thenReturn(completedData);
+
+    ResultSet isCompleteResultSet = org.mockito.Mockito.mock(ResultSet.class);
+    when(isCompleteResultSet.iterator()).thenReturn(List.of(row).iterator());
+    when(session.execute(anyString(), any(Object.class))).thenReturn(isCompleteResultSet);
+
+    assertThat(journal.isComplete("substrate:journal:test")).isTrue();
+  }
+
+  @Test
+  void isCompleteReturnsFalseWhenNoCompletedData() {
+    ByteBuffer regularData = ByteBuffer.wrap("regular".getBytes(StandardCharsets.UTF_8));
+    Row row = org.mockito.Mockito.mock(Row.class);
+    when(row.getByteBuffer("data")).thenReturn(regularData);
+
+    ResultSet isCompleteResultSet = org.mockito.Mockito.mock(ResultSet.class);
+    when(isCompleteResultSet.iterator()).thenReturn(List.of(row).iterator());
+    when(session.execute(anyString(), any(Object.class))).thenReturn(isCompleteResultSet);
+
+    assertThat(journal.isComplete("substrate:journal:test")).isFalse();
+  }
+
+  @Test
+  void isCompleteReturnsFalseWhenEmpty() {
+    ResultSet isCompleteResultSet = org.mockito.Mockito.mock(ResultSet.class);
+    when(isCompleteResultSet.iterator()).thenReturn(List.<Row>of().iterator());
+    when(session.execute(anyString(), any(Object.class))).thenReturn(isCompleteResultSet);
+
+    assertThat(journal.isComplete("substrate:journal:test")).isFalse();
+  }
+
+  @Test
+  void readAfterFiltersOutCompletedDataRows() {
+    ByteBuffer completedData = ByteBuffer.wrap("__COMPLETED__".getBytes(StandardCharsets.UTF_8));
+    ByteBuffer regularData = ByteBuffer.wrap("hello".getBytes(StandardCharsets.UTF_8));
+    UUID regularId = Uuids.timeBased();
+    Instant now = Instant.now();
+
+    Row regularRow = org.mockito.Mockito.mock(Row.class);
+    when(regularRow.getByteBuffer("data")).thenReturn(regularData);
+    when(regularRow.getUuid("entry_id")).thenReturn(regularId);
+    when(regularRow.getInstant("timestamp")).thenReturn(now);
+
+    Row completedRow = org.mockito.Mockito.mock(Row.class);
+    when(completedRow.getByteBuffer("data")).thenReturn(completedData);
+
+    when(resultSet.iterator()).thenReturn(List.of(regularRow, completedRow).iterator());
+
+    List<org.jwcarman.substrate.core.journal.RawJournalEntry> entries =
+        journal.readAfter("substrate:journal:test", "e5e3e100-1c9c-11b2-808b-8b3a28b5a162");
+
+    assertThat(entries).hasSize(1);
+    assertThat(entries.get(0).id()).isEqualTo(regularId.toString());
+  }
+
+  @Test
+  void readLastFiltersOutCompletedDataAndReversesOrder() {
+    ByteBuffer data1 = ByteBuffer.wrap("first".getBytes(StandardCharsets.UTF_8));
+    ByteBuffer data2 = ByteBuffer.wrap("second".getBytes(StandardCharsets.UTF_8));
+    UUID id1 = Uuids.timeBased();
+    UUID id2 = Uuids.timeBased();
+    Instant now = Instant.now();
+
+    // DESC order: id2 first, then id1
+    Row row2 = org.mockito.Mockito.mock(Row.class);
+    when(row2.getByteBuffer("data")).thenReturn(data2);
+    when(row2.getUuid("entry_id")).thenReturn(id2);
+    when(row2.getInstant("timestamp")).thenReturn(now);
+
+    Row row1 = org.mockito.Mockito.mock(Row.class);
+    when(row1.getByteBuffer("data")).thenReturn(data1);
+    when(row1.getUuid("entry_id")).thenReturn(id1);
+    when(row1.getInstant("timestamp")).thenReturn(now);
+
+    when(resultSet.iterator()).thenReturn(List.of(row2, row1).iterator());
+
+    List<org.jwcarman.substrate.core.journal.RawJournalEntry> entries =
+        journal.readLast("substrate:journal:test", 5);
+
+    // Should be reversed to ASC order: id1 first, then id2
+    assertThat(entries).hasSize(2);
+    assertThat(entries.get(0).id()).isEqualTo(id1.toString());
+    assertThat(entries.get(1).id()).isEqualTo(id2.toString());
+  }
+
+  @Test
+  void readLastTruncatesWhenMoreThanCount() {
+    Instant now = Instant.now();
+    List<Row> rows = new java.util.ArrayList<>();
+    List<UUID> ids = new java.util.ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      UUID id = Uuids.timeBased();
+      ids.add(id);
+      Row row = org.mockito.Mockito.mock(Row.class);
+      ByteBuffer data = ByteBuffer.wrap(("data-" + i).getBytes(StandardCharsets.UTF_8));
+      when(row.getByteBuffer("data")).thenReturn(data);
+      when(row.getUuid("entry_id")).thenReturn(id);
+      when(row.getInstant("timestamp")).thenReturn(now);
+      rows.add(row);
+    }
+
+    when(resultSet.iterator()).thenReturn(rows.iterator());
+
+    List<org.jwcarman.substrate.core.journal.RawJournalEntry> entries =
+        journal.readLast("substrate:journal:test", 2);
+
+    assertThat(entries).hasSize(2);
+  }
+
+  @Test
+  void completeWithZeroTtlUsesInsertWithoutTtl() {
+    CassandraJournalSpi noTtlJournal =
+        new CassandraJournalSpi(session, "substrate:journal:", "substrate_journal", Duration.ZERO);
+
+    noTtlJournal.complete("substrate:journal:test", Duration.ZERO);
+
+    verify(session, atLeast(1)).execute(any(BoundStatement.class));
+  }
+
+  @Test
+  void completeWithNullTtlUsesDefaultTtl() {
+    journal.complete("substrate:journal:test", null);
+
+    verify(session, atLeast(1)).execute(any(BoundStatement.class));
+  }
+
+  @Test
+  void appendWithNullTtlUsesDefaultTtl() {
+    journal.append("substrate:journal:test", "data".getBytes(StandardCharsets.UTF_8), null);
+
+    verify(session, atLeast(1)).execute(any(BoundStatement.class));
+  }
+
+  @Test
+  void mapRowWithNullByteBufferReturnsEmptyArray() {
+    UUID entryId = Uuids.timeBased();
+    Instant now = Instant.now();
+
+    Row row = org.mockito.Mockito.mock(Row.class);
+    when(row.getByteBuffer("data")).thenReturn(null);
+    when(row.getUuid("entry_id")).thenReturn(entryId);
+    when(row.getInstant("timestamp")).thenReturn(now);
+
+    when(resultSet.iterator()).thenReturn(List.of(row).iterator());
+
+    List<org.jwcarman.substrate.core.journal.RawJournalEntry> entries =
+        journal.readAfter("substrate:journal:test", "e5e3e100-1c9c-11b2-808b-8b3a28b5a162");
+
+    assertThat(entries).hasSize(1);
+    assertThat(entries.get(0).data()).isEmpty();
   }
 }

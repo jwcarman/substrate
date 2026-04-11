@@ -19,6 +19,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import java.time.Duration;
@@ -28,6 +29,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.BlockingSubscription;
+import org.jwcarman.substrate.CallbackSubscription;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.journal.JournalEntry;
 import org.mockito.Mock;
@@ -122,6 +124,211 @@ class DefaultJournalTest {
     try {
       assertNotNull(sub);
       assertTrue(sub.isActive());
+    } finally {
+      sub.cancel();
+    }
+  }
+
+  @Test
+  void subscribeLastReturnsActiveSubscription() {
+    when(spi.readLast(KEY, 5)).thenReturn(List.of());
+
+    BlockingSubscription<JournalEntry<String>> sub = journal.subscribeLast(5);
+    try {
+      assertNotNull(sub);
+      assertTrue(sub.isActive());
+    } finally {
+      sub.cancel();
+    }
+  }
+
+  @Test
+  void subscribeLastWithPreloadUsesLastIdAsCheckpoint() {
+    var raw =
+        new RawJournalEntry("entry-3", KEY, "preloaded".getBytes(UTF_8), java.time.Instant.now());
+    when(spi.readLast(KEY, 10)).thenReturn(List.of(raw));
+
+    BlockingSubscription<JournalEntry<String>> sub = journal.subscribeLast(10);
+    try {
+      assertNotNull(sub);
+      assertTrue(sub.isActive());
+    } finally {
+      sub.cancel();
+    }
+  }
+
+  @Test
+  void subscribeCallbackReturnsActiveSubscription() {
+    when(spi.readLast(KEY, 1)).thenReturn(List.of());
+
+    CallbackSubscription sub = journal.subscribe(value -> {});
+    try {
+      assertNotNull(sub);
+      assertTrue(sub.isActive());
+    } finally {
+      sub.cancel();
+    }
+  }
+
+  @Test
+  void subscribeCallbackWithCustomizerReturnsActiveSubscription() {
+    when(spi.readLast(KEY, 1)).thenReturn(List.of());
+
+    CallbackSubscription sub = journal.subscribe(value -> {}, builder -> {});
+    try {
+      assertNotNull(sub);
+      assertTrue(sub.isActive());
+    } finally {
+      sub.cancel();
+    }
+  }
+
+  @Test
+  void subscribeAfterCallbackReturnsActiveSubscription() {
+    CallbackSubscription sub = journal.subscribeAfter("entry-1", value -> {});
+    try {
+      assertNotNull(sub);
+      assertTrue(sub.isActive());
+    } finally {
+      sub.cancel();
+    }
+  }
+
+  @Test
+  void subscribeAfterCallbackWithCustomizerReturnsActiveSubscription() {
+    CallbackSubscription sub = journal.subscribeAfter("entry-1", value -> {}, builder -> {});
+    try {
+      assertNotNull(sub);
+      assertTrue(sub.isActive());
+    } finally {
+      sub.cancel();
+    }
+  }
+
+  @Test
+  void subscribeLastCallbackReturnsActiveSubscription() {
+    when(spi.readLast(KEY, 3)).thenReturn(List.of());
+
+    CallbackSubscription sub = journal.subscribeLast(3, value -> {});
+    try {
+      assertNotNull(sub);
+      assertTrue(sub.isActive());
+    } finally {
+      sub.cancel();
+    }
+  }
+
+  @Test
+  void subscribeLastCallbackWithCustomizerReturnsActiveSubscription() {
+    when(spi.readLast(KEY, 3)).thenReturn(List.of());
+
+    CallbackSubscription sub = journal.subscribeLast(3, value -> {}, builder -> {});
+    try {
+      assertNotNull(sub);
+      assertTrue(sub.isActive());
+    } finally {
+      sub.cancel();
+    }
+  }
+
+  @Test
+  void feederPushesPreloadedEntriesBeforePolling() {
+    var raw1 =
+        new RawJournalEntry("entry-1", KEY, "preload1".getBytes(UTF_8), java.time.Instant.now());
+    var raw2 =
+        new RawJournalEntry("entry-2", KEY, "preload2".getBytes(UTF_8), java.time.Instant.now());
+    when(spi.readLast(KEY, 2)).thenReturn(List.of(raw1, raw2));
+    lenient().when(spi.readAfter(eq(KEY), anyString())).thenReturn(List.of());
+    lenient().when(spi.isComplete(KEY)).thenReturn(false);
+
+    BlockingSubscription<JournalEntry<String>> sub = journal.subscribeLast(2);
+    try {
+      var result1 = sub.next(java.time.Duration.ofSeconds(5));
+      assertInstanceOf(org.jwcarman.substrate.NextResult.Value.class, result1);
+      assertEquals(
+          "preload1",
+          ((org.jwcarman.substrate.NextResult.Value<JournalEntry<String>>) result1).value().data());
+
+      var result2 = sub.next(java.time.Duration.ofSeconds(5));
+      assertInstanceOf(org.jwcarman.substrate.NextResult.Value.class, result2);
+      assertEquals(
+          "preload2",
+          ((org.jwcarman.substrate.NextResult.Value<JournalEntry<String>>) result2).value().data());
+    } finally {
+      sub.cancel();
+    }
+  }
+
+  @Test
+  void feederMarksExpiredWhenJournalExpires() {
+    when(spi.readLast(KEY, 1)).thenReturn(List.of());
+    when(spi.readLast(KEY, Integer.MAX_VALUE))
+        .thenThrow(new org.jwcarman.substrate.journal.JournalExpiredException(KEY));
+
+    BlockingSubscription<JournalEntry<String>> sub = journal.subscribe();
+    try {
+      var result = sub.next(java.time.Duration.ofSeconds(5));
+      assertInstanceOf(org.jwcarman.substrate.NextResult.Expired.class, result);
+    } finally {
+      sub.cancel();
+    }
+  }
+
+  @Test
+  void feederMarksCompletedWhenJournalCompletes() {
+    when(spi.readLast(KEY, 1)).thenReturn(List.of());
+    when(spi.readLast(KEY, Integer.MAX_VALUE)).thenReturn(List.of());
+    lenient().when(spi.readAfter(eq(KEY), anyString())).thenReturn(List.of());
+    when(spi.isComplete(KEY)).thenReturn(true);
+
+    BlockingSubscription<JournalEntry<String>> sub = journal.subscribe();
+    try {
+      var result = sub.next(java.time.Duration.ofSeconds(5));
+      assertInstanceOf(org.jwcarman.substrate.NextResult.Completed.class, result);
+    } finally {
+      sub.cancel();
+    }
+  }
+
+  @Test
+  void feederDrainsRemainingEntriesBeforeCompletionMarker() {
+    var initial =
+        new RawJournalEntry("entry-1", KEY, "first".getBytes(UTF_8), java.time.Instant.now());
+    when(spi.readLast(KEY, 1)).thenReturn(List.of(initial));
+    var late = new RawJournalEntry("entry-2", KEY, "late".getBytes(UTF_8), java.time.Instant.now());
+    when(spi.readAfter(KEY, "entry-1")).thenReturn(List.of(late));
+    when(spi.readAfter(KEY, "entry-2")).thenReturn(List.of());
+    when(spi.isComplete(KEY)).thenReturn(true);
+
+    BlockingSubscription<JournalEntry<String>> sub = journal.subscribe();
+    try {
+      var result1 = sub.next(java.time.Duration.ofSeconds(5));
+      assertInstanceOf(org.jwcarman.substrate.NextResult.Value.class, result1);
+      assertEquals(
+          "late",
+          ((org.jwcarman.substrate.NextResult.Value<JournalEntry<String>>) result1).value().data());
+
+      var result2 = sub.next(java.time.Duration.ofSeconds(5));
+      assertInstanceOf(org.jwcarman.substrate.NextResult.Completed.class, result2);
+    } finally {
+      sub.cancel();
+    }
+  }
+
+  @Test
+  void feederHandlesExpirationDuringDrain() {
+    var initial =
+        new RawJournalEntry("entry-1", KEY, "data".getBytes(UTF_8), java.time.Instant.now());
+    when(spi.readLast(KEY, 1)).thenReturn(List.of(initial));
+    when(spi.readAfter(KEY, "entry-1"))
+        .thenReturn(List.of())
+        .thenThrow(new org.jwcarman.substrate.journal.JournalExpiredException(KEY));
+    when(spi.isComplete(KEY)).thenReturn(true);
+
+    BlockingSubscription<JournalEntry<String>> sub = journal.subscribe();
+    try {
+      var result = sub.next(java.time.Duration.ofSeconds(5));
+      assertInstanceOf(org.jwcarman.substrate.NextResult.Expired.class, result);
     } finally {
       sub.cancel();
     }

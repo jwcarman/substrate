@@ -387,6 +387,90 @@ class DefaultCallbackSubscriptionTest {
   // --- Value pushed while parked wakes handler immediately ---
 
   @Test
+  void onCompleteHandlerExceptionIsSwallowed() {
+    var handoff = new CoalescingHandoff<String>();
+
+    var sub =
+        new DefaultCallbackSubscription<>(
+            handoff,
+            () -> {},
+            value -> {},
+            null,
+            null,
+            null,
+            () -> {
+              throw new RuntimeException("onComplete blew up");
+            });
+
+    handoff.markCompleted();
+
+    await().atMost(AWAIT_TIMEOUT).until(() -> !sub.isActive());
+  }
+
+  @Test
+  void onExpirationHandlerExceptionIsSwallowed() {
+    var handoff = new CoalescingHandoff<String>();
+
+    var sub =
+        new DefaultCallbackSubscription<>(
+            handoff,
+            () -> {},
+            value -> {},
+            null,
+            () -> {
+              throw new RuntimeException("onExpiration blew up");
+            },
+            null,
+            null);
+
+    handoff.markExpired();
+
+    await().atMost(AWAIT_TIMEOUT).until(() -> !sub.isActive());
+  }
+
+  @Test
+  void onDeleteHandlerExceptionIsSwallowed() {
+    var handoff = new CoalescingHandoff<String>();
+
+    var sub =
+        new DefaultCallbackSubscription<>(
+            handoff,
+            () -> {},
+            value -> {},
+            null,
+            null,
+            () -> {
+              throw new RuntimeException("onDelete blew up");
+            },
+            null);
+
+    handoff.markDeleted();
+
+    await().atMost(AWAIT_TIMEOUT).until(() -> !sub.isActive());
+  }
+
+  @Test
+  void onErrorHandlerExceptionIsSwallowed() {
+    var handoff = new CoalescingHandoff<String>();
+
+    var sub =
+        new DefaultCallbackSubscription<>(
+            handoff,
+            () -> {},
+            value -> {},
+            cause -> {
+              throw new RuntimeException("onError blew up");
+            },
+            null,
+            null,
+            null);
+
+    handoff.error(new RuntimeException("original"));
+
+    await().atMost(AWAIT_TIMEOUT).until(() -> !sub.isActive());
+  }
+
+  @Test
   void valuePushedWhileParkedWakesHandlerImmediately() {
     var handoff = new CoalescingHandoff<String>();
     var received = new CopyOnWriteArrayList<String>();
