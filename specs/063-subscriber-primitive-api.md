@@ -56,13 +56,13 @@ The `BlockingSubscription<T> subscribe(...)` pull-style overloads
 stay exactly as they are.
 
 The customizer-flavor impl is a one-liner on each primitive,
-delegating to the `Subscriber.fromConfig(Consumer<SubscriberConfig<T>>)`
+delegating to the `DefaultSubscriberConfig.from(Consumer<SubscriberConfig<T>>)`
 static helper introduced in spec 062:
 
 ```java
 @Override
 public Subscription subscribe(Consumer<SubscriberConfig<Snapshot<T>>> customizer) {
-  return subscribe(Subscriber.fromConfig(customizer));
+  return subscribe(DefaultSubscriberConfig.from(customizer));
 }
 ```
 
@@ -97,7 +97,7 @@ where a test lambda is ambiguous, add an explicit parameter type
 
 **Update `DefaultAtom`, `DefaultJournal`, `DefaultMailbox`:**
 - Implement the new `subscribe(Subscriber<T>)` overloads. The `buildCallbackSubscription` helper becomes trivial: create feeder/handoff, build `DefaultBlockingSubscription`, wrap in `DefaultCallbackSubscription(source, subscriber)`.
-- Implement the new `subscribe(Consumer<SubscriberConfig<T>>)` overloads as one-line adapters that delegate to `Subscriber.fromConfig(customizer)` and then call the `Subscriber<T>` flavor.
+- Implement the new `subscribe(Consumer<SubscriberConfig<T>>)` overloads as one-line adapters that delegate to `DefaultSubscriberConfig.from(customizer)` and then call the `Subscriber<T>` flavor.
 - Remove the old `Consumer<T>` / `Consumer<CallbackSubscriberBuilder<T>>` overloads entirely.
 - Remove `DefaultCallbackSubscriberBuilder` and `LifecycleCallbacks` imports.
 
@@ -140,7 +140,7 @@ AND handler-exception isolation for every variant including `onCancelled`.
 
 ## Implementation notes
 
-- Spec 062 landed `Subscriber<T>`, `SubscriberConfig<T>`, `DefaultSubscriberConfig<T>`, and the `Subscriber.fromConfig(Consumer<SubscriberConfig<T>>)` static helper as pure additions. Start by verifying those exist and have green tests before touching anything else. Substrate-core code MUST use `Subscriber.fromConfig(...)` to materialize a `Subscriber<T>` from a customizer — it cannot instantiate `DefaultSubscriberConfig` directly (package-private in substrate-api).
+- Spec 062 landed `Subscriber<T>` and `SubscriberConfig<T>` in `substrate-api` and `ConfiguredSubscriber<T>` + `DefaultSubscriberConfig<T>` in `substrate-core` as pure additions. Start by verifying those exist and have green tests before touching anything else. Substrate-core code SHOULD use `DefaultSubscriberConfig.from(customizer)` to materialize a `Subscriber<T>` from a `Consumer<SubscriberConfig<T>>`; constructing `DefaultSubscriberConfig` by hand and calling `toSubscriber()` also works and is fine for tests.
 - The `ShutdownCoordinator` plumbing (including `NextResult.Cancelled`, `markCancelled()`, and the layered `DefaultBlockingSubscription` + `DefaultCallbackSubscription` design) is already in place. This spec only changes the **callback side** of that design — the blocking subscription and its cancellation semantics stay exactly as they are.
 - `DefaultCallbackSubscription`'s handler loop already calls `source.next(MAX_POLL_DURATION)` and switches on the `NextResult` variant. The dispatch switch just needs to call `subscriber.onXxx` instead of looking up a handler from a `LifecycleCallbacks` record.
 - Wrap each `subscriber.onXxx(...)` call in a try/catch(RuntimeException) that logs via commons-logging and keeps looping. Follow the existing `safeRun` / `safeAccept` shape in the current `DefaultCallbackSubscription`.
