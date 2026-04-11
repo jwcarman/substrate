@@ -41,8 +41,8 @@ public abstract class AbstractSingleSlotHandoff<T> extends AbstractHandoff<T> {
     lock.lock();
     try {
       long deadlineNanos = System.nanoTime() + timeout.toNanos();
+      long remaining = deadlineNanos - System.nanoTime();
       while (slot == null) {
-        long remaining = deadlineNanos - System.nanoTime();
         if (remaining <= 0) return new NextResult.Timeout<>();
         try {
           remaining = notEmpty.awaitNanos(remaining);
