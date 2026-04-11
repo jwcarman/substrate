@@ -196,12 +196,11 @@ class DynamoDbAtomIT extends AbstractDynamoDbIT {
     String key = atom.atomKey("ttlset-" + System.nanoTime());
     atom.create(key, "data".getBytes(StandardCharsets.UTF_8), "tok1", Duration.ofSeconds(1));
 
-    await()
-        .atMost(Duration.ofSeconds(5))
-        .until(
-            () ->
-                !atom.set(
-                    key, "new".getBytes(StandardCharsets.UTF_8), "tok2", Duration.ofMinutes(5)));
+    // Poll read() (idempotent) to detect expiry, then verify set() returns false in one call.
+    // Polling set() directly would refresh the TTL on each successful write.
+    await().atMost(Duration.ofSeconds(5)).until(() -> atom.read(key).isEmpty());
+    assertThat(atom.set(key, "new".getBytes(StandardCharsets.UTF_8), "tok2", Duration.ofMinutes(5)))
+        .isFalse();
   }
 
   @Test
@@ -209,7 +208,8 @@ class DynamoDbAtomIT extends AbstractDynamoDbIT {
     String key = atom.atomKey("ttltouch-" + System.nanoTime());
     atom.create(key, "data".getBytes(StandardCharsets.UTF_8), "tok1", Duration.ofSeconds(1));
 
-    await().atMost(Duration.ofSeconds(5)).until(() -> !atom.touch(key, Duration.ofMinutes(5)));
+    await().atMost(Duration.ofSeconds(5)).until(() -> atom.read(key).isEmpty());
+    assertThat(atom.touch(key, Duration.ofMinutes(5))).isFalse();
   }
 
   @Test
