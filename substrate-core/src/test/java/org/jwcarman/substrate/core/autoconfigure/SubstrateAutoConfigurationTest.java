@@ -130,7 +130,7 @@ class SubstrateAutoConfigurationTest {
     assertThat(output)
         .contains("No Journal implementation found; using in-memory fallback")
         .contains("No Mailbox implementation found; using in-memory fallback")
-        .contains("No NotifierSpi implementation found; using in-memory fallback");
+        .contains("No Notifier implementation found; using in-memory fallback");
   }
 
   @Test
@@ -149,7 +149,7 @@ class SubstrateAutoConfigurationTest {
     assertThat(output)
         .doesNotContain("No Journal implementation found; using in-memory fallback")
         .doesNotContain("No Mailbox implementation found; using in-memory fallback")
-        .doesNotContain("No NotifierSpi implementation found; using in-memory fallback");
+        .doesNotContain("No Notifier implementation found; using in-memory fallback");
   }
 
   @Test
