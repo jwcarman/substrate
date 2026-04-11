@@ -63,6 +63,14 @@ Properties moved from `substrate.{primitive}.{backend}.*` to
 Each primitive can now be disabled individually via
 `substrate.{backend}.{primitive}.enabled=false` (all enabled by default).
 
+### Notifier reframed as an internal SPI
+
+`NotifierSpi` is no longer a user-facing primitive. It exists as a pluggable
+cross-node wake-up transport that the three primitives (Atom, Journal,
+Mailbox) use internally to notify subscribers when state changes. Each
+backend module supplies its own `NotifierSpi` implementation
+automatically; you don't need to interact with it directly.
+
 ### Added
 
 #### Atom — distributed AtomicReference

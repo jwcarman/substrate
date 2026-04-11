@@ -51,39 +51,39 @@ public class SubstrateAutoConfiguration {
 
   private static final Log log = LogFactory.getLog(SubstrateAutoConfiguration.class);
 
+  private static final String FALLBACK_WARNING_SUFFIX =
+      " implementation found; using in-memory fallback (single-node only). "
+          + "For clustered deployments, add a backend module (e.g. substrate-redis).";
+
+  private static String fallbackWarning(String primitive) {
+    return "No " + primitive + FALLBACK_WARNING_SUFFIX;
+  }
+
   @Bean
   @ConditionalOnMissingBean(JournalSpi.class)
   public InMemoryJournalSpi journalSpi() {
-    log.warn(
-        "No Journal implementation found; using in-memory fallback (single-node only). "
-            + "For clustered deployments, add a backend module (e.g. substrate-redis).");
+    log.warn(fallbackWarning("Journal"));
     return new InMemoryJournalSpi();
   }
 
   @Bean
   @ConditionalOnMissingBean(MailboxSpi.class)
   public InMemoryMailboxSpi mailboxSpi() {
-    log.warn(
-        "No Mailbox implementation found; using in-memory fallback (single-node only). "
-            + "For clustered deployments, add a backend module (e.g. substrate-redis).");
+    log.warn(fallbackWarning("Mailbox"));
     return new InMemoryMailboxSpi();
   }
 
   @Bean
   @ConditionalOnMissingBean(NotifierSpi.class)
   public InMemoryNotifier notifier() {
-    log.warn(
-        "No Notifier implementation found; using in-memory fallback (single-node only). "
-            + "For clustered deployments, add a backend module (e.g. substrate-redis).");
+    log.warn(fallbackWarning("Notifier"));
     return new InMemoryNotifier();
   }
 
   @Bean
   @ConditionalOnMissingBean(AtomSpi.class)
   public InMemoryAtomSpi atomSpi() {
-    log.warn(
-        "No Atom implementation found; using in-memory fallback (single-node only). "
-            + "For clustered deployments, add a backend module (e.g. substrate-redis).");
+    log.warn(fallbackWarning("Atom"));
     return new InMemoryAtomSpi();
   }
 

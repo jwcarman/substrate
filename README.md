@@ -13,10 +13,10 @@
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=jwcarman_substrate&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=jwcarman_substrate)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=jwcarman_substrate&metric=coverage)](https://sonarcloud.io/summary/new_code?id=jwcarman_substrate)
 
-Distributed data structures for Spring Boot. Substrate provides four SPIs --
-Atom, Journal, Mailbox, and Notifier -- that abstract away the underlying
+Distributed data structures for Spring Boot. Substrate provides three
+primitives -- Atom, Journal, and Mailbox -- that abstract away the underlying
 infrastructure, letting applications work with distributed leased values,
-streams, futures, and notifications without coupling to any specific technology.
+streams, and futures without coupling to any specific technology.
 
 ## Requirements
 
@@ -70,7 +70,7 @@ Notifier and `substrate-postgresql` for Journal in the same application.
 
 ## Usage
 
-All four primitives share a unified subscription model. A subscription's
+All three primitives share a unified subscription model. A subscription's
 `next(Duration)` returns a `NextResult<T>` sealed type that exhaustively
 describes every possible outcome — `Value`, `Timeout`, `Completed`, `Expired`,
 `Deleted`, or `Errored` — so consumers can pattern-match instead of juggling
@@ -169,11 +169,6 @@ try (BlockingSubscription<ElicitationResponse> sub = mailbox.subscribe()) {
 }
 ```
 
-### Notifier -- fire-and-forget signal
-
-The Notifier is used internally by Atom, Journal, and Mailbox to wake up
-subscribers when new data arrives. You don't typically use it directly, but
-it's an SPI you can swap independently of the storage backend.
 
 ## Architecture
 
@@ -183,8 +178,6 @@ Consumer Code
      v
 Atom<T> / Journal<T> / Mailbox<T>      <-- Typed, key-bound, blocking API
      |        |        |
-   Codec   Notifier  Subscription      <-- Serialization, signaling, NextResult
-     |        |        |
      v        v        v
 AtomSpi / JournalSpi / MailboxSpi      <-- Pure storage (byte[]-based)
      |
@@ -192,28 +185,37 @@ AtomSpi / JournalSpi / MailboxSpi      <-- Pure storage (byte[]-based)
  Backend Module                         <-- Redis, PostgreSQL, NATS, etc.
 ```
 
-- **SPIs** are pure storage — read/write bytes, no threading, no notifications.
-- **Core** handles orchestration — Notifier wake-ups, subscriptions,
-  serialization via Codec, TTL sweeping.
-- **Backends** are independently deployable — mix and match per SPI.
+- **Primitives** are typed, key-bound, blocking APIs designed for virtual
+  threads. They handle serialization (via Codec), subscription orchestration,
+  and TTL management.
+- **SPIs** are pure storage — read/write bytes, no threading, no callbacks.
+- **Backends** are independently deployable. Internally, each backend module
+  also supplies a `NotifierSpi` that the primitives use to wake subscribers
+  across nodes; this is an implementation detail you don't need to use
+  directly.
 
 ## Available Backends
 
-Each backend module provides whichever SPIs that backend supports. One module
-per backend, not per SPI.
+Each backend module provides whichever primitives that backend supports. One
+module per backend, not per primitive.
 
-| Backend    | Module | Atom | Journal | Mailbox | Notifier |
-|------------|--------|:---:|:---:|:---:|:---:|
-| In-Memory  | `substrate-core` (built-in fallback) | ✓ | ✓ | ✓ | ✓ |
-| Redis      | `substrate-redis` | ✓ | ✓ | ✓ | ✓ |
-| PostgreSQL | `substrate-postgresql` | ✓ | ✓ | ✓ | ✓ |
-| Hazelcast  | `substrate-hazelcast` | ✓ | ✓ | ✓ | ✓ |
-| NATS       | `substrate-nats` | ✓ | ✓ | ✓ | ✓ |
-| MongoDB    | `substrate-mongodb` | ✓ | ✓ | ✓ | — |
-| DynamoDB   | `substrate-dynamodb` | ✓ | ✓ | ✓ | — |
-| Cassandra  | `substrate-cassandra` | ✓ | ✓ | — | — |
-| RabbitMQ   | `substrate-rabbitmq` | — | ✓ | — | ✓ |
-| SNS/SQS    | `substrate-sns` | — | — | — | ✓ |
+| Backend    | Module | Atom | Journal | Mailbox |
+|------------|--------|:---:|:---:|:---:|
+| In-Memory  | `substrate-core` (built-in fallback) | ✓ | ✓ | ✓ |
+| Redis      | `substrate-redis` | ✓ | ✓ | ✓ |
+| PostgreSQL | `substrate-postgresql` | ✓ | ✓ | ✓ |
+| Hazelcast  | `substrate-hazelcast` | ✓ | ✓ | ✓ |
+| NATS       | `substrate-nats` | ✓ | ✓ | ✓ |
+| MongoDB    | `substrate-mongodb` | ✓ | ✓ | ✓ |
+| DynamoDB   | `substrate-dynamodb` | ✓ | ✓ | ✓ |
+| Cassandra  | `substrate-cassandra` | ✓ | ✓ | — |
+| RabbitMQ   | `substrate-rabbitmq` | — | ✓ | — |
+| SNS/SQS    | `substrate-sns` | — | — | — |
+
+> **Note:** RabbitMQ and SNS/SQS modules don't add any user-facing primitives
+> on their own — they exist as pluggable cross-node notification transports
+> that the other primitives can use under the hood. If your application only
+> needs Atom/Journal/Mailbox, you don't need them.
 
 ## Configuration
 
@@ -237,9 +239,6 @@ substrate:
       enabled: true
       prefix: "substrate:mailbox:"
       default-ttl: 5m
-    notifier:
-      enabled: true
-      channel-prefix: "substrate:notify:"
 ```
 
 ## Design Principles
@@ -251,8 +250,8 @@ substrate:
   the SPI layer
 - **Unified subscription model** — all primitives share `BlockingSubscription`,
   `CallbackSubscription`, and `NextResult<T>` so consumers learn one pattern
-- **Mix and match** — use Redis for Atom, PostgreSQL for Journal, NATS for
-  Notifier in the same application
+- **Mix and match** — use Redis for Atom, PostgreSQL for Journal, and NATS
+  for Mailbox in the same application
 - **Spring Boot auto-configuration** — drop a backend module on the classpath
   and it registers; in-memory fallbacks for unconfigured primitives
 
