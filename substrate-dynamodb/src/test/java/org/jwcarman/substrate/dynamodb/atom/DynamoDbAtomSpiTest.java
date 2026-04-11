@@ -81,13 +81,9 @@ class DynamoDbAtomSpiTest {
     when(client.putItem(any(PutItemRequest.class)))
         .thenThrow(ConditionalCheckFailedException.builder().build());
 
-    assertThatThrownBy(
-            () ->
-                atom.create(
-                    "key1",
-                    "value".getBytes(StandardCharsets.UTF_8),
-                    "tok1",
-                    Duration.ofMinutes(5)))
+    byte[] value = "value".getBytes(StandardCharsets.UTF_8);
+    Duration ttl = Duration.ofMinutes(5);
+    assertThatThrownBy(() -> atom.create("key1", value, "tok1", ttl))
         .isInstanceOf(AtomAlreadyExistsException.class);
   }
 

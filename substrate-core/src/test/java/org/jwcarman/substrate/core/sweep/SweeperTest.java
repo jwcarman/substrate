@@ -38,27 +38,31 @@ class SweeperTest {
   @Test
   void constructorRejectsNullPrimitiveType() {
     Sweepable target = mock(Sweepable.class);
-    assertThatThrownBy(() -> new Sweeper(null, target, Duration.ofMinutes(1), 100))
+    Duration oneMinute = Duration.ofMinutes(1);
+    assertThatThrownBy(() -> new Sweeper(null, target, oneMinute, 100))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   void constructorRejectsNullTarget() {
-    assertThatThrownBy(() -> new Sweeper(Atom.class, null, Duration.ofMinutes(1), 100))
+    Duration oneMinute = Duration.ofMinutes(1);
+    assertThatThrownBy(() -> new Sweeper(Atom.class, null, oneMinute, 100))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   void constructorRejectsBatchSizeZero() {
     Sweepable target = mock(Sweepable.class);
-    assertThatThrownBy(() -> new Sweeper(Atom.class, target, Duration.ofMinutes(1), 0))
+    Duration oneMinute = Duration.ofMinutes(1);
+    assertThatThrownBy(() -> new Sweeper(Atom.class, target, oneMinute, 0))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   void constructorRejectsNegativeBatchSize() {
     Sweepable target = mock(Sweepable.class);
-    assertThatThrownBy(() -> new Sweeper(Atom.class, target, Duration.ofMinutes(1), -1))
+    Duration oneMinute = Duration.ofMinutes(1);
+    assertThatThrownBy(() -> new Sweeper(Atom.class, target, oneMinute, -1))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -72,7 +76,8 @@ class SweeperTest {
   @Test
   void constructorRejectsNegativeInterval() {
     Sweepable target = mock(Sweepable.class);
-    assertThatThrownBy(() -> new Sweeper(Atom.class, target, Duration.ofMinutes(-1), 100))
+    Duration negativeMinute = Duration.ofMinutes(-1);
+    assertThatThrownBy(() -> new Sweeper(Atom.class, target, negativeMinute, 100))
         .isInstanceOf(IllegalArgumentException.class);
   }
 

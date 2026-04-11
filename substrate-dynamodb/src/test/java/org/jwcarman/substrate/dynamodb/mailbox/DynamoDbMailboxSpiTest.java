@@ -77,9 +77,9 @@ class DynamoDbMailboxSpiTest {
         .thenThrow(ConditionalCheckFailedException.builder().build());
     when(client.getItem(any(GetItemRequest.class))).thenReturn(GetItemResponse.builder().build());
 
+    byte[] data = "hello".getBytes(StandardCharsets.UTF_8);
     assertThrows(
-        MailboxExpiredException.class,
-        () -> mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8)));
+        MailboxExpiredException.class, () -> mailbox.deliver("substrate:mailbox:test", data));
   }
 
   @Test
@@ -92,9 +92,8 @@ class DynamoDbMailboxSpiTest {
                 .item(Map.of("key", AttributeValue.builder().s("substrate:mailbox:test").build()))
                 .build());
 
-    assertThrows(
-        MailboxFullException.class,
-        () -> mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8)));
+    byte[] data = "hello".getBytes(StandardCharsets.UTF_8);
+    assertThrows(MailboxFullException.class, () -> mailbox.deliver("substrate:mailbox:test", data));
   }
 
   @Test

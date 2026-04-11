@@ -71,9 +71,9 @@ class RedisMailboxTest {
     when(commands.eval(any(String.class), eq(ScriptOutputType.INTEGER), any(String[].class), any()))
         .thenReturn(0L);
 
+    byte[] data = "hello".getBytes(StandardCharsets.UTF_8);
     assertThrows(
-        MailboxExpiredException.class,
-        () -> mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8)));
+        MailboxExpiredException.class, () -> mailbox.deliver("substrate:mailbox:test", data));
   }
 
   @Test
@@ -81,9 +81,8 @@ class RedisMailboxTest {
     when(commands.eval(any(String.class), eq(ScriptOutputType.INTEGER), any(String[].class), any()))
         .thenReturn(-1L);
 
-    assertThrows(
-        MailboxFullException.class,
-        () -> mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8)));
+    byte[] data = "hello".getBytes(StandardCharsets.UTF_8);
+    assertThrows(MailboxFullException.class, () -> mailbox.deliver("substrate:mailbox:test", data));
   }
 
   @Test

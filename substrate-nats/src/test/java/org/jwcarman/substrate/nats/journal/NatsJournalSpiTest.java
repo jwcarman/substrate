@@ -77,7 +77,8 @@ class NatsJournalSpiTest {
 
     NatsJournalSpi journal = createJournal();
     byte[] data = "data".getBytes(StandardCharsets.UTF_8);
-    assertThatThrownBy(() -> journal.append("substrate:journal:test", data, Duration.ofHours(1)))
+    Duration ttl = Duration.ofHours(1);
+    assertThatThrownBy(() -> journal.append("substrate:journal:test", data, ttl))
         .isInstanceOf(UncheckedIOException.class);
   }
 
@@ -117,7 +118,8 @@ class NatsJournalSpiTest {
 
     NatsJournalSpi journal = createJournal();
     byte[] data = "data".getBytes(StandardCharsets.UTF_8);
-    assertThatThrownBy(() -> journal.append("substrate:journal:test", data, Duration.ofHours(1)))
+    Duration ttl = Duration.ofHours(1);
+    assertThatThrownBy(() -> journal.append("substrate:journal:test", data, ttl))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("Failed to publish to NATS JetStream");
   }
@@ -128,7 +130,8 @@ class NatsJournalSpiTest {
     when(connection.keyValueManagement()).thenThrow(new IOException("kv failed"));
 
     NatsJournalSpi journal = createJournal();
-    assertThatThrownBy(() -> journal.complete("substrate:journal:test", Duration.ofHours(1)))
+    Duration ttl = Duration.ofHours(1);
+    assertThatThrownBy(() -> journal.complete("substrate:journal:test", ttl))
         .isInstanceOf(UncheckedIOException.class)
         .hasMessageContaining("Failed to mark journal as complete");
   }
@@ -145,7 +148,8 @@ class NatsJournalSpiTest {
     when(kv.put(anyString(), any(byte[].class))).thenThrow(apiException);
 
     NatsJournalSpi journal = createJournal();
-    assertThatThrownBy(() -> journal.complete("substrate:journal:test", Duration.ofHours(1)))
+    Duration ttl = Duration.ofHours(1);
+    assertThatThrownBy(() -> journal.complete("substrate:journal:test", ttl))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("Failed to mark journal as complete");
   }

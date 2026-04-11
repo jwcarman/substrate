@@ -76,7 +76,8 @@ class DefaultJournalTest {
 
   @Test
   void appendThrowsWhenEntryTtlExceedsMax() {
-    assertThrows(IllegalArgumentException.class, () -> journal.append("data", Duration.ofDays(30)));
+    Duration excessiveEntryTtl = Duration.ofDays(30);
+    assertThrows(IllegalArgumentException.class, () -> journal.append("data", excessiveEntryTtl));
   }
 
   @Test
@@ -90,7 +91,8 @@ class DefaultJournalTest {
 
   @Test
   void completeThrowsWhenRetentionTtlExceedsMax() {
-    assertThrows(IllegalArgumentException.class, () -> journal.complete(Duration.ofDays(60)));
+    Duration excessiveRetentionTtl = Duration.ofDays(60);
+    assertThrows(IllegalArgumentException.class, () -> journal.complete(excessiveRetentionTtl));
   }
 
   @Test

@@ -74,11 +74,9 @@ class PostgresAtomIT {
     byte[] value = "first".getBytes(StandardCharsets.UTF_8);
     atom.create(key, value, "token-1", Duration.ofMinutes(5));
 
-    assertThrows(
-        AtomAlreadyExistsException.class,
-        () ->
-            atom.create(
-                key, "second".getBytes(StandardCharsets.UTF_8), "token-2", Duration.ofMinutes(5)));
+    byte[] second = "second".getBytes(StandardCharsets.UTF_8);
+    Duration ttl = Duration.ofMinutes(5);
+    assertThrows(AtomAlreadyExistsException.class, () -> atom.create(key, second, "token-2", ttl));
   }
 
   @Test

@@ -81,13 +81,9 @@ class NatsAtomSpiTest {
     when(kv.create(anyString(), any(byte[].class))).thenThrow(apiException);
 
     NatsAtomSpi atom = createAtom();
-    assertThatThrownBy(
-            () ->
-                atom.create(
-                    "substrate:atom:test",
-                    "hello".getBytes(StandardCharsets.UTF_8),
-                    "tok1",
-                    Duration.ofMinutes(5)))
+    byte[] value = "hello".getBytes(StandardCharsets.UTF_8);
+    Duration ttl = Duration.ofMinutes(5);
+    assertThatThrownBy(() -> atom.create("substrate:atom:test", value, "tok1", ttl))
         .isInstanceOf(AtomAlreadyExistsException.class);
   }
 
@@ -99,13 +95,9 @@ class NatsAtomSpiTest {
     when(kv.create(anyString(), any(byte[].class))).thenThrow(apiException);
 
     NatsAtomSpi atom = createAtom();
-    assertThatThrownBy(
-            () ->
-                atom.create(
-                    "substrate:atom:test",
-                    "hello".getBytes(StandardCharsets.UTF_8),
-                    "tok1",
-                    Duration.ofMinutes(5)))
+    byte[] value = "hello".getBytes(StandardCharsets.UTF_8);
+    Duration ttl = Duration.ofMinutes(5);
+    assertThatThrownBy(() -> atom.create("substrate:atom:test", value, "tok1", ttl))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("Failed to create atom in NATS KV");
   }
@@ -117,13 +109,9 @@ class NatsAtomSpiTest {
     when(kv.create(anyString(), any(byte[].class))).thenThrow(new IOException("write failed"));
 
     NatsAtomSpi atom = createAtom();
-    assertThatThrownBy(
-            () ->
-                atom.create(
-                    "substrate:atom:test",
-                    "hello".getBytes(StandardCharsets.UTF_8),
-                    "tok1",
-                    Duration.ofMinutes(5)))
+    byte[] value = "hello".getBytes(StandardCharsets.UTF_8);
+    Duration ttl = Duration.ofMinutes(5);
+    assertThatThrownBy(() -> atom.create("substrate:atom:test", value, "tok1", ttl))
         .isInstanceOf(UncheckedIOException.class)
         .hasMessageContaining("Failed to create atom in NATS KV");
   }
@@ -257,13 +245,9 @@ class NatsAtomSpiTest {
         .thenThrow(new IOException("write failed"));
 
     NatsAtomSpi atom = createAtom();
-    assertThatThrownBy(
-            () ->
-                atom.set(
-                    "substrate:atom:test",
-                    "new".getBytes(StandardCharsets.UTF_8),
-                    "tok2",
-                    Duration.ofMinutes(5)))
+    byte[] value = "new".getBytes(StandardCharsets.UTF_8);
+    Duration ttl = Duration.ofMinutes(5);
+    assertThatThrownBy(() -> atom.set("substrate:atom:test", value, "tok2", ttl))
         .isInstanceOf(UncheckedIOException.class)
         .hasMessageContaining("Failed to set atom in NATS KV");
   }
@@ -316,7 +300,8 @@ class NatsAtomSpiTest {
         .thenThrow(new IOException("write failed"));
 
     NatsAtomSpi atom = createAtom();
-    assertThatThrownBy(() -> atom.touch("substrate:atom:test", Duration.ofMinutes(10)))
+    Duration ttl = Duration.ofMinutes(10);
+    assertThatThrownBy(() -> atom.touch("substrate:atom:test", ttl))
         .isInstanceOf(UncheckedIOException.class)
         .hasMessageContaining("Failed to touch atom in NATS KV");
   }

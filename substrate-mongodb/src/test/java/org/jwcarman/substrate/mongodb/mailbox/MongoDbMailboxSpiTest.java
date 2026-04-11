@@ -74,9 +74,9 @@ class MongoDbMailboxSpiTest {
         .thenReturn(noMatch);
     when(mongoTemplate.exists(any(Query.class), eq("substrate_mailbox"))).thenReturn(false);
 
+    byte[] data = "hello".getBytes(StandardCharsets.UTF_8);
     assertThrows(
-        MailboxExpiredException.class,
-        () -> mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8)));
+        MailboxExpiredException.class, () -> mailbox.deliver("substrate:mailbox:test", data));
   }
 
   @Test
@@ -87,9 +87,8 @@ class MongoDbMailboxSpiTest {
         .thenReturn(noMatch);
     when(mongoTemplate.exists(any(Query.class), eq("substrate_mailbox"))).thenReturn(true);
 
-    assertThrows(
-        MailboxFullException.class,
-        () -> mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8)));
+    byte[] data = "hello".getBytes(StandardCharsets.UTF_8);
+    assertThrows(MailboxFullException.class, () -> mailbox.deliver("substrate:mailbox:test", data));
   }
 
   @Test

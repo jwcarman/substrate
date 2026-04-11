@@ -74,7 +74,8 @@ class DefaultJournalFactoryTest {
 
   @Test
   void createThrowsWhenInactivityTtlExceedsMax() {
-    assertThatThrownBy(() -> factory.create("test", String.class, Duration.ofHours(48)))
+    Duration excessiveInactivityTtl = Duration.ofHours(48);
+    assertThatThrownBy(() -> factory.create("test", String.class, excessiveInactivityTtl))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -82,7 +83,8 @@ class DefaultJournalFactoryTest {
   void createThrowsOnDuplicateJournal() {
     factory.create("test", String.class, Duration.ofHours(1));
 
-    assertThatThrownBy(() -> factory.create("test", String.class, Duration.ofHours(1)))
+    Duration oneHour = Duration.ofHours(1);
+    assertThatThrownBy(() -> factory.create("test", String.class, oneHour))
         .isInstanceOf(JournalAlreadyExistsException.class);
   }
 
@@ -96,7 +98,8 @@ class DefaultJournalFactoryTest {
   void connectedHandleThrowsOnFirstOperationIfNoLiveJournal() {
     Journal<String> journal = factory.connect("nonexistent", String.class);
 
-    assertThatThrownBy(() -> journal.append("data", Duration.ofHours(1)))
+    Duration oneHour = Duration.ofHours(1);
+    assertThatThrownBy(() -> journal.append("data", oneHour))
         .isInstanceOf(JournalExpiredException.class);
   }
 

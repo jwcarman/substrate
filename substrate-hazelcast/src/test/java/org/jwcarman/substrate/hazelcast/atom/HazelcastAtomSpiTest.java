@@ -70,7 +70,8 @@ class HazelcastAtomSpiTest {
     when(map.putIfAbsent(anyString(), any(AtomEntry.class), anyLong(), any(TimeUnit.class)))
         .thenReturn(new AtomEntry("old".getBytes(StandardCharsets.UTF_8), "old-token"));
 
-    assertThatThrownBy(() -> spi.create("test-key", value, "token-1", Duration.ofMinutes(5)))
+    Duration ttl = Duration.ofMinutes(5);
+    assertThatThrownBy(() -> spi.create("test-key", value, "token-1", ttl))
         .isInstanceOf(AtomAlreadyExistsException.class);
   }
 

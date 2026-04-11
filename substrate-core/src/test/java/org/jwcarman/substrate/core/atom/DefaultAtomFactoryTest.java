@@ -98,7 +98,8 @@ class DefaultAtomFactoryTest {
   void createThrowsOnNameCollision() {
     factory.create("test", String.class, "first", Duration.ofSeconds(10));
 
-    assertThatThrownBy(() -> factory.create("test", String.class, "second", Duration.ofSeconds(10)))
+    Duration tenSeconds = Duration.ofSeconds(10);
+    assertThatThrownBy(() -> factory.create("test", String.class, "second", tenSeconds))
         .isInstanceOf(AtomAlreadyExistsException.class);
   }
 
@@ -200,7 +201,8 @@ class DefaultAtomFactoryTest {
   void connectedHandleThrowsOnSetWhenNoLiveAtom() {
     Atom<String> atom = factory.connect("nonexistent", String.class);
 
-    assertThatThrownBy(() -> atom.set("value", Duration.ofSeconds(10)))
+    Duration tenSeconds = Duration.ofSeconds(10);
+    assertThatThrownBy(() -> atom.set("value", tenSeconds))
         .isInstanceOf(AtomExpiredException.class);
   }
 
@@ -213,8 +215,8 @@ class DefaultAtomFactoryTest {
 
   @Test
   void createThrowsWhenTtlExceedsMaxTtl() {
-    assertThatThrownBy(
-            () -> factory.create("excessive", String.class, "value", Duration.ofHours(25)))
+    Duration excessiveTtl = Duration.ofHours(25);
+    assertThatThrownBy(() -> factory.create("excessive", String.class, "value", excessiveTtl))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("exceeds configured maximum");
   }

@@ -109,7 +109,8 @@ class RabbitMqJournalSpiTest {
         .send(any(Message.class), any(ConfirmationHandler.class));
 
     byte[] data = "data".getBytes(StandardCharsets.UTF_8);
-    assertThatThrownBy(() -> journal.append("substrate:journal:test", data, Duration.ofHours(1)))
+    Duration ttl = Duration.ofHours(1);
+    assertThatThrownBy(() -> journal.append("substrate:journal:test", data, ttl))
         .isInstanceOf(StreamException.class);
   }
 

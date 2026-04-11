@@ -69,10 +69,9 @@ class DynamoDbAtomIT extends AbstractDynamoDbIT {
     String key = atom.atomKey("dup-" + System.nanoTime());
     atom.create(key, "first".getBytes(StandardCharsets.UTF_8), "tok1", Duration.ofMinutes(5));
 
-    assertThatThrownBy(
-            () ->
-                atom.create(
-                    key, "second".getBytes(StandardCharsets.UTF_8), "tok2", Duration.ofMinutes(5)))
+    byte[] value = "second".getBytes(StandardCharsets.UTF_8);
+    Duration ttl = Duration.ofMinutes(5);
+    assertThatThrownBy(() -> atom.create(key, value, "tok2", ttl))
         .isInstanceOf(AtomAlreadyExistsException.class);
   }
 

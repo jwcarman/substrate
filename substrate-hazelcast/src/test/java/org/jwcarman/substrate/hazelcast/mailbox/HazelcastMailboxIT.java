@@ -91,9 +91,8 @@ class HazelcastMailboxIT extends AbstractHazelcastIT {
     mailbox.create(key, Duration.ofMinutes(5));
     mailbox.deliver(key, "first".getBytes(StandardCharsets.UTF_8));
 
-    assertThrows(
-        MailboxFullException.class,
-        () -> mailbox.deliver(key, "second".getBytes(StandardCharsets.UTF_8)));
+    byte[] second = "second".getBytes(StandardCharsets.UTF_8);
+    assertThrows(MailboxFullException.class, () -> mailbox.deliver(key, second));
   }
 
   @Test
@@ -102,9 +101,8 @@ class HazelcastMailboxIT extends AbstractHazelcastIT {
     mailbox.create(key, Duration.ofMinutes(5));
     mailbox.deliver(key, "original".getBytes(StandardCharsets.UTF_8));
 
-    assertThrows(
-        MailboxFullException.class,
-        () -> mailbox.deliver(key, "replacement".getBytes(StandardCharsets.UTF_8)));
+    byte[] replacement = "replacement".getBytes(StandardCharsets.UTF_8);
+    assertThrows(MailboxFullException.class, () -> mailbox.deliver(key, replacement));
 
     assertThat(mailbox.get(key)).isPresent();
     assertThat(new String(mailbox.get(key).get(), StandardCharsets.UTF_8)).isEqualTo("original");

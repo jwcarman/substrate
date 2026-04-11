@@ -64,11 +64,9 @@ class MongoDbAtomSpiIT extends AbstractMongoDbIT {
 
     spi.create(key, value, "token-1", Duration.ofMinutes(5));
 
-    assertThrows(
-        AtomAlreadyExistsException.class,
-        () ->
-            spi.create(
-                key, "other".getBytes(StandardCharsets.UTF_8), "token-2", Duration.ofMinutes(5)));
+    byte[] other = "other".getBytes(StandardCharsets.UTF_8);
+    Duration ttl = Duration.ofMinutes(5);
+    assertThrows(AtomAlreadyExistsException.class, () -> spi.create(key, other, "token-2", ttl));
   }
 
   @Test

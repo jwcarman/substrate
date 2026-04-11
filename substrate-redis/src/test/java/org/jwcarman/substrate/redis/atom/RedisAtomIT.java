@@ -82,10 +82,9 @@ class RedisAtomIT {
 
     atom.create(key, value, "tok-1", Duration.ofMinutes(5));
 
-    assertThatThrownBy(
-            () ->
-                atom.create(
-                    key, "second".getBytes(StandardCharsets.UTF_8), "tok-2", Duration.ofMinutes(5)))
+    byte[] second = "second".getBytes(StandardCharsets.UTF_8);
+    Duration ttl = Duration.ofMinutes(5);
+    assertThatThrownBy(() -> atom.create(key, second, "tok-2", ttl))
         .isInstanceOf(AtomAlreadyExistsException.class);
   }
 

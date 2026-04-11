@@ -85,9 +85,8 @@ class NatsMailboxSpiTest {
     when(kv.get(anyString())).thenReturn(entry);
 
     NatsMailboxSpi mailbox = createMailbox();
-    assertThrows(
-        MailboxFullException.class,
-        () -> mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8)));
+    byte[] data = "hello".getBytes(StandardCharsets.UTF_8);
+    assertThrows(MailboxFullException.class, () -> mailbox.deliver("substrate:mailbox:test", data));
   }
 
   @Test

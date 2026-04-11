@@ -71,9 +71,10 @@ class MongoDbAtomSpiTest {
     when(mongoTemplate.insert(any(Document.class), eq("substrate_atom")))
         .thenThrow(new DuplicateKeyException("dup key"));
 
+    Duration ttl = Duration.ofMinutes(5);
     assertThrows(
         AtomAlreadyExistsException.class,
-        () -> spi.create("substrate:atom:test", value, "token-1", Duration.ofMinutes(5)));
+        () -> spi.create("substrate:atom:test", value, "token-1", ttl));
   }
 
   @Test

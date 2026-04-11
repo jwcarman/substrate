@@ -107,7 +107,8 @@ class InMemoryMailboxSpiTest {
     mailbox.create(KEY, Duration.ofMinutes(5));
     mailbox.deliver(KEY, "first".getBytes(UTF_8));
 
-    assertThrows(MailboxFullException.class, () -> mailbox.deliver(KEY, "second".getBytes(UTF_8)));
+    byte[] secondPayload = "second".getBytes(UTF_8);
+    assertThrows(MailboxFullException.class, () -> mailbox.deliver(KEY, secondPayload));
   }
 
   @Test
@@ -115,8 +116,8 @@ class InMemoryMailboxSpiTest {
     mailbox.create(KEY, Duration.ofMinutes(5));
     mailbox.deliver(KEY, "original".getBytes(UTF_8));
 
-    assertThrows(
-        MailboxFullException.class, () -> mailbox.deliver(KEY, "replacement".getBytes(UTF_8)));
+    byte[] replacementPayload = "replacement".getBytes(UTF_8);
+    assertThrows(MailboxFullException.class, () -> mailbox.deliver(KEY, replacementPayload));
 
     Optional<byte[]> result = mailbox.get(KEY);
     assertTrue(result.isPresent());
@@ -125,8 +126,8 @@ class InMemoryMailboxSpiTest {
 
   @Test
   void deliverThrowsExpiredOnDeadMailboxNotFull() {
-    assertThrows(
-        MailboxExpiredException.class, () -> mailbox.deliver(KEY, "value".getBytes(UTF_8)));
+    byte[] valuePayload = "value".getBytes(UTF_8);
+    assertThrows(MailboxExpiredException.class, () -> mailbox.deliver(KEY, valuePayload));
   }
 
   @Test

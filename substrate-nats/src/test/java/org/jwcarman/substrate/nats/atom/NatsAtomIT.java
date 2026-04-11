@@ -62,9 +62,10 @@ class NatsAtomIT extends AbstractNatsIT {
     String key = atom.atomKey("dup-" + System.nanoTime());
     byte[] value = "hello".getBytes(StandardCharsets.UTF_8);
 
-    atom.create(key, value, "tok1", Duration.ofMinutes(5));
+    Duration ttl = Duration.ofMinutes(5);
+    atom.create(key, value, "tok1", ttl);
 
-    assertThatThrownBy(() -> atom.create(key, value, "tok2", Duration.ofMinutes(5)))
+    assertThatThrownBy(() -> atom.create(key, value, "tok2", ttl))
         .isInstanceOf(AtomAlreadyExistsException.class);
   }
 

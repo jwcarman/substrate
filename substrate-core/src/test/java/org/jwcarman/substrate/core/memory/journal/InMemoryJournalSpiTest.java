@@ -54,7 +54,8 @@ class InMemoryJournalSpiTest {
   void createThrowsOnDuplicateLiveJournal() {
     journal.create(KEY, Duration.ofHours(1));
 
-    assertThatThrownBy(() -> journal.create(KEY, Duration.ofHours(1)))
+    Duration oneHour = Duration.ofHours(1);
+    assertThatThrownBy(() -> journal.create(KEY, oneHour))
         .isInstanceOf(JournalAlreadyExistsException.class);
   }
 
@@ -96,18 +97,21 @@ class InMemoryJournalSpiTest {
   void appendOnExpiredJournalThrowsJournalExpiredException() {
     journal.create(KEY, Duration.ofMillis(50));
 
+    byte[] data = "data".getBytes(UTF_8);
+    Duration oneHour = Duration.ofHours(1);
     await()
         .atMost(Duration.ofSeconds(2))
         .untilAsserted(
             () ->
-                assertThatThrownBy(
-                        () -> journal.append(KEY, "data".getBytes(UTF_8), Duration.ofHours(1)))
+                assertThatThrownBy(() -> journal.append(KEY, data, oneHour))
                     .isInstanceOf(JournalExpiredException.class));
   }
 
   @Test
   void appendOnNonExistentJournalThrowsJournalExpiredException() {
-    assertThatThrownBy(() -> journal.append(KEY, "data".getBytes(UTF_8), Duration.ofHours(1)))
+    byte[] data = "data".getBytes(UTF_8);
+    Duration oneHour = Duration.ofHours(1);
+    assertThatThrownBy(() -> journal.append(KEY, data, oneHour))
         .isInstanceOf(JournalExpiredException.class);
   }
 
@@ -117,7 +121,9 @@ class InMemoryJournalSpiTest {
     journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
     journal.complete(KEY, Duration.ofHours(1));
 
-    assertThatThrownBy(() -> journal.append(KEY, "data2".getBytes(UTF_8), Duration.ofHours(1)))
+    byte[] data2 = "data2".getBytes(UTF_8);
+    Duration oneHour = Duration.ofHours(1);
+    assertThatThrownBy(() -> journal.append(KEY, data2, oneHour))
         .isInstanceOf(JournalCompletedException.class);
   }
 
@@ -267,8 +273,8 @@ class InMemoryJournalSpiTest {
     journal.complete(KEY, Duration.ofHours(1));
 
     byte[] data2 = "data2".getBytes(UTF_8);
-    assertThrows(
-        JournalCompletedException.class, () -> journal.append(KEY, data2, Duration.ofHours(1)));
+    Duration oneHour = Duration.ofHours(1);
+    assertThrows(JournalCompletedException.class, () -> journal.append(KEY, data2, oneHour));
   }
 
   @Test
@@ -313,12 +319,13 @@ class InMemoryJournalSpiTest {
     journal.create(KEY, Duration.ofMillis(50));
     journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
 
+    byte[] data2 = "data2".getBytes(UTF_8);
+    Duration oneHour = Duration.ofHours(1);
     await()
         .atMost(Duration.ofSeconds(2))
         .untilAsserted(
             () ->
-                assertThatThrownBy(
-                        () -> journal.append(KEY, "data2".getBytes(UTF_8), Duration.ofHours(1)))
+                assertThatThrownBy(() -> journal.append(KEY, data2, oneHour))
                     .isInstanceOf(JournalExpiredException.class));
   }
 
@@ -326,11 +333,12 @@ class InMemoryJournalSpiTest {
   void completeOnExpiredJournalThrowsJournalExpiredException() {
     journal.create(KEY, Duration.ofMillis(50));
 
+    Duration oneHour = Duration.ofHours(1);
     await()
         .atMost(Duration.ofSeconds(2))
         .untilAsserted(
             () ->
-                assertThatThrownBy(() -> journal.complete(KEY, Duration.ofHours(1)))
+                assertThatThrownBy(() -> journal.complete(KEY, oneHour))
                     .isInstanceOf(JournalExpiredException.class));
   }
 

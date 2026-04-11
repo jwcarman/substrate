@@ -62,9 +62,8 @@ class HazelcastMailboxTest {
         .thenReturn(false);
     when(map.containsKey("test-key")).thenReturn(false);
 
-    assertThrows(
-        MailboxExpiredException.class,
-        () -> mailbox.deliver("test-key", "v".getBytes(StandardCharsets.UTF_8)));
+    byte[] data = "v".getBytes(StandardCharsets.UTF_8);
+    assertThrows(MailboxExpiredException.class, () -> mailbox.deliver("test-key", data));
   }
 
   @Test
@@ -73,9 +72,8 @@ class HazelcastMailboxTest {
         .thenReturn(false);
     when(map.containsKey("test-key")).thenReturn(true);
 
-    assertThrows(
-        MailboxFullException.class,
-        () -> mailbox.deliver("test-key", "v".getBytes(StandardCharsets.UTF_8)));
+    byte[] data = "v".getBytes(StandardCharsets.UTF_8);
+    assertThrows(MailboxFullException.class, () -> mailbox.deliver("test-key", data));
   }
 
   @Test

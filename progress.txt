@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T04:06:00Z
-ITERATION: 45
-SPEC_COMPLETED: 043-sonar-record-byte-array-members.md
-WHAT_WAS_DONE: Overrode equals, hashCode, and toString on 3 records with byte[] components (RawAtom, AtomEntry, InMemoryAtomSpi.Entry) to use Arrays.equals/hashCode/toString for content-based equality instead of reference equality.
-VERIFICATION: ./mvnw spotless:check — PASS (after spotless:apply); ./mvnw verify -DskipITs — BUILD SUCCESS (all 13 modules, zero failures); no @SuppressWarnings introduced; no new dependencies added
+LAST_RUN: 2026-04-11T04:16:00Z
+ITERATION: 46
+SPEC_COMPLETED: 044-sonar-assertthrows-lambda-cleanup.md
+WHAT_WAS_DONE: Extracted nested method calls (Duration.ofMinutes(), .getBytes(), etc.) from assertThrows/assertThatThrownBy/isThrownBy lambdas into local variables across all 9 backend modules and substrate-core, so each lambda contains exactly one potentially-throwing invocation (Sonar S5778).
+VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — BUILD SUCCESS (all 13 modules, zero failures); manual audit confirmed zero remaining S5778 violations across 125+ assertion sites
 STATUS: MORE_WORK
-NEXT_SPEC: 044-sonar-assertthrows-lambda-cleanup.md
-NOTES: Used Java 21+ record deconstruction patterns in equals() (e.g., `other instanceof RawAtom(byte[] v, String t)`). InMemoryAtomSpi still uses reference equality (`previous != entry` on line 53) for CAS semantics — this is unaffected since != is identity comparison. Note: RawJournalEntry and InMemoryMailboxSpi.Entry also have byte[] fields but were not flagged in this spec.
+NEXT_SPEC: 045-sonar-unnamed-pattern-catch.md
+NOTES: Fixed ~35 sites across 28 test files. Variables named descriptively (ttl, value, data, oneMinute, etc.). assertThatNoException().isThrownBy() multi-statement lambdas were left alone — they are a different Sonar rule (if any) and not in scope for S5778.

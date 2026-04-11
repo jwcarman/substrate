@@ -82,13 +82,9 @@ class CassandraAtomSpiTest {
     when(resultSet.one()).thenReturn(row);
     when(row.getBoolean("[applied]")).thenReturn(false);
 
-    assertThatThrownBy(
-            () ->
-                atom.create(
-                    "key1",
-                    "value".getBytes(StandardCharsets.UTF_8),
-                    "token1",
-                    Duration.ofMinutes(5)))
+    byte[] value = "value".getBytes(StandardCharsets.UTF_8);
+    Duration ttl = Duration.ofMinutes(5);
+    assertThatThrownBy(() -> atom.create("key1", value, "token1", ttl))
         .isInstanceOf(AtomAlreadyExistsException.class);
   }
 
