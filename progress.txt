@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T06:30:00Z
-ITERATION: 63
-SPEC_COMPLETED: 061-autoconfig-disabled-branch-tests.md
-WHAT_WAS_DONE: Added "disabled" branch tests for all 8 backend auto-configurations — added disabled test methods to 3 existing test classes (CassandraJournal, DynamoDbJournal, DynamoDbMailbox) and created 2 new test classes (CassandraAtomAutoConfigurationTest, DynamoDbAtomAutoConfigurationTest) each with enabled, disabled, and fallback-suppression tests.
-VERIFICATION: ./mvnw verify -DskipITs=true — BUILD SUCCESS, all modules pass, spotless clean, 0 failures.
+LAST_RUN: 2026-04-11T14:30:00Z
+ITERATION: 64
+SPEC_COMPLETED: shutdown-coordinator-prep-work
+WHAT_WAS_DONE: Landed ShutdownCoordinator (Spring SmartLifecycle at phase Integer.MAX_VALUE that cancels active subscriptions at context shutdown). Added NextResult.Cancelled<T> sealed variant. Added markCancelled() on NextHandoff + all impls. Refactored DefaultCallbackSubscription to wrap a DefaultBlockingSubscription (layered design — blocking owns all lifecycle state, callback is a thin pump thread). DefaultBlockingSubscription registers/unregisters with the coordinator on construction / terminal observation / cancel. Introduced LifecycleCallbacks record as an interim bundle (will be deleted in spec 063). Updated all three primitives and their factories to accept a ShutdownCoordinator bean. This was NOT spec-driven work — it was done ad-hoc to fix a 30-second shutdown hang in Odyssey. Committed separately from this spec-queue state.
+VERIFICATION: Full build green locally. All new ShutdownCoordinatorTest cases pass. Existing tests migrated to use DefaultCallbackSubscription's legacy 7-arg convenience constructor that delegates to the new layered form.
 STATUS: MORE_WORK
-NEXT_SPEC: 062-postgres-autoconfig-line-coverage.md
-NOTES: Postgres auto-config tests already had the disabled branch tests from a prior spec. The 3 existing Cassandra/DynamoDB test classes only needed one new test method each. The 2 new test classes (CassandraAtom, DynamoDbAtom) follow the same ApplicationContextRunner + mock configuration pattern as the existing tests. No new @SuppressWarnings annotations. No new dependencies.
+NEXT_SPEC: 062-subscriber-interface.md
+NOTES: Spec 062 introduces Subscriber<T> and SubscriberBuilder<T> as pure additions (no wiring). Spec 063 then migrates the primitives to the new API, merges CallbackSubscription into plain Subscription, and deletes CallbackSubscriberBuilder / LifecycleCallbacks / DefaultCallbackSubscriberBuilder. The previous 062 (postgres autoconfig line coverage) and 063 (SPI branch coverage push) were moved to specs/backlog/ — they are still valid but deferred until after the subscriber refactor lands, since 063 will rewrite large chunks of the test files those coverage specs target.
