@@ -17,6 +17,8 @@ package org.jwcarman.substrate.core.memory.atom;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -29,6 +31,30 @@ public class InMemoryAtomSpi extends AbstractAtomSpi {
   private record Entry(byte[] value, String token, Instant expiresAt) {
     boolean isAlive(Instant now) {
       return now.isBefore(expiresAt);
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      return other instanceof Entry(byte[] v, String t, Instant e)
+          && Arrays.equals(value, v)
+          && Objects.equals(token, t)
+          && Objects.equals(expiresAt, e);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(Arrays.hashCode(value), token, expiresAt);
+    }
+
+    @Override
+    public String toString() {
+      return "Entry[value="
+          + Arrays.toString(value)
+          + ", token="
+          + token
+          + ", expiresAt="
+          + expiresAt
+          + "]";
     }
   }
 

@@ -16,7 +16,26 @@
 package org.jwcarman.substrate.hazelcast.atom;
 
 import java.io.Serializable;
+import java.util.Arrays;
+import java.util.Objects;
 
 public record AtomEntry(byte[] value, String token) implements Serializable {
   private static final long serialVersionUID = 1L;
+
+  @Override
+  public boolean equals(Object other) {
+    return other instanceof AtomEntry(byte[] v, String t)
+        && Arrays.equals(value, v)
+        && Objects.equals(token, t);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(Arrays.hashCode(value), token);
+  }
+
+  @Override
+  public String toString() {
+    return "AtomEntry[value=" + Arrays.toString(value) + ", token=" + token + "]";
+  }
 }

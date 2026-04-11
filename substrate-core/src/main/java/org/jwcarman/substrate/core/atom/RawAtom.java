@@ -15,6 +15,9 @@
  */
 package org.jwcarman.substrate.core.atom;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 /**
  * Raw byte-level representation of an Atom's state as stored by the backend.
  *
@@ -24,4 +27,22 @@ package org.jwcarman.substrate.core.atom;
  * @param value the serialized atom payload
  * @param token the opaque staleness marker
  */
-public record RawAtom(byte[] value, String token) {}
+public record RawAtom(byte[] value, String token) {
+
+  @Override
+  public boolean equals(Object other) {
+    return other instanceof RawAtom(byte[] v, String t)
+        && Arrays.equals(value, v)
+        && Objects.equals(token, t);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(Arrays.hashCode(value), token);
+  }
+
+  @Override
+  public String toString() {
+    return "RawAtom[value=" + Arrays.toString(value) + ", token=" + token + "]";
+  }
+}
