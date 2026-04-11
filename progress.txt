@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T06:26:00Z
-ITERATION: 61
-SPEC_COMPLETED: 059-final-sonar-mop-up.md
-WHAT_WAS_DONE: Fixed all 11 remaining Sonar issues: (1) added assertThatNoException assertion to AbstractJournalSpiTest.createIsNoOp, (2) extracted setup calls from assertThrows/assertThatThrownBy lambdas in NatsMailboxSpiTest (2 sites) and InMemoryMailboxSpiTest (1 site) for S5778, (3) renamed _ variables to descriptive names in InMemoryAtomSpiTest for S6213, (4) replaced verbose hashCode assertions with hasSameHashCodeAs in RawAtomTest and AtomEntryTest for S5838, (5) chained multiple assertThat calls on same subject in RawAtomTest and AtomEntryTest for S5853, (6) removed unused ids collection in CassandraJournalSpiTest for S4030.
-VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — all modules BUILD SUCCESS, 0 failures across all modules.
-STATUS: DONE
-NEXT_SPEC: none
-NOTES: No new @SuppressWarnings annotations introduced. No new dependencies added. No production code changes — all fixes are in test files only.
+LAST_RUN: 2026-04-11T06:45:00Z
+ITERATION: 62
+SPEC_COMPLETED: 060-cover-api-records.md
+WHAT_WAS_DONE: Added JournalEntryTest and SnapshotTest in substrate-api to cover the two public API records (JournalEntry with id/key/data/timestamp components, Snapshot with value/token components) — accessor verification and equals/hashCode tests using AssertJ idiomatic forms.
+VERIFICATION: ./mvnw -pl substrate-api verify — BUILD SUCCESS, 24 tests run, 0 failures, 0 errors. Spotless passed.
+STATUS: MORE_WORK
+NEXT_SPEC: 061-autoconfig-disabled-branch-tests.md
+NOTES: No new @SuppressWarnings annotations. No new dependencies. Both test files follow existing codebase conventions with Apache 2.0 license headers and Google Java Format.
