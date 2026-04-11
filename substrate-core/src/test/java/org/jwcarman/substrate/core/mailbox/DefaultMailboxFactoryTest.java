@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.codec.spi.CodecFactory;
+import org.jwcarman.codec.spi.TypeRef;
 import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.NextResult;
 import org.jwcarman.substrate.core.memory.mailbox.InMemoryMailboxSpi;
@@ -73,6 +74,45 @@ class DefaultMailboxFactoryTest {
     Mailbox<String> mailbox = factory.connect("nonexistent", String.class);
 
     assertThatThrownBy(() -> mailbox.deliver("hello")).isInstanceOf(MailboxExpiredException.class);
+  }
+
+  @Test
+  void createWithClassThrowsWhenTtlExceedsMax() {
+    DefaultMailboxFactory factory =
+        new DefaultMailboxFactory(
+            mock(MailboxSpi.class), codecFactory, new InMemoryNotifier(), Duration.ofMinutes(30));
+
+    Duration excessiveTtl = Duration.ofHours(1);
+    assertThatThrownBy(() -> factory.create("test", String.class, excessiveTtl))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void createWithTypeRefThrowsWhenTtlExceedsMax() {
+    DefaultMailboxFactory factory =
+        new DefaultMailboxFactory(
+            mock(MailboxSpi.class), codecFactory, new InMemoryNotifier(), Duration.ofMinutes(30));
+
+    TypeRef<String> typeRef = new TypeRef<>() {};
+    Duration excessiveTtl = Duration.ofHours(1);
+    assertThatThrownBy(() -> factory.create("test", typeRef, excessiveTtl))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void connectWithTypeRefReturnsBoundMailbox() {
+    MailboxSpi spi = mock(MailboxSpi.class);
+    when(spi.mailboxKey("test")).thenReturn("substrate:mailbox:test");
+    TypeRef<String> typeRef = new TypeRef<>() {};
+    when(codecFactory.create(typeRef)).thenReturn(stringCodec);
+
+    DefaultMailboxFactory factory =
+        new DefaultMailboxFactory(
+            spi, codecFactory, new InMemoryNotifier(), Duration.ofMinutes(30));
+
+    Mailbox<String> mailbox = factory.connect("test", typeRef);
+    assertThat(mailbox.key()).isEqualTo("substrate:mailbox:test");
+    verify(spi, never()).create(anyString(), any(Duration.class));
   }
 
   @Test

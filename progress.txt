@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T05:48:00Z
-ITERATION: 58
-SPEC_COMPLETED: 056-record-equality-tests.md
-WHAT_WAS_DONE: Added RawAtomTest and AtomEntryTest with 5 tests each covering content equality, byte[] inequality, token inequality, hashCode consistency, and toString readability for the custom equals/hashCode/toString overrides on both record classes.
-VERIFICATION: ./mvnw spotless:check -pl substrate-core,substrate-hazelcast — PASS; ./mvnw -pl substrate-core verify -DskipITs — RawAtomTest 5 tests, 0 failures, BUILD SUCCESS; ./mvnw -pl substrate-hazelcast verify -DskipITs — AtomEntryTest 5 tests, 0 failures, BUILD SUCCESS
+LAST_RUN: 2026-04-11T05:53:00Z
+ITERATION: 59
+SPEC_COMPLETED: 057-abstract-spi-and-factory-coverage.md
+WHAT_WAS_DONE: Added coverage tests for all 7 listed classes: new AbstractAtomSpiTest (4 tests) and DefaultCallbackSubscriberBuilderTest (5 tests); added sweep/create no-op tests to AbstractJournalSpiTest and AbstractMailboxSpiTest; added TypeRef overload and TTL validation tests to DefaultMailboxFactoryTest and DefaultJournalFactoryTest; added disabled-property test to SnsNotifierAutoConfigurationTest.
+VERIFICATION: ./mvnw spotless:check -pl substrate-core,substrate-sns — PASS; ./mvnw -pl substrate-core verify -DskipITs — 330 tests, 0 failures, BUILD SUCCESS; ./mvnw -pl substrate-sns verify -DskipITs — 22 tests, 0 failures, BUILD SUCCESS
 STATUS: MORE_WORK
-NEXT_SPEC: 057-abstract-spi-and-factory-coverage.md
-NOTES: Both records have identical structure (byte[] value, String token) so test patterns are symmetric. No new dependencies or @SuppressWarnings introduced.
+NEXT_SPEC: 058-backend-spi-coverage-gaps.md
+NOTES: No new @SuppressWarnings annotations introduced. No new dependencies added. All abstract SPI methods (atomKey, prefix, sweep, create no-op, generateEntryId) now covered. Factory TypeRef overloads and TTL validation branches now covered. Builder default-null getters and fluent setters now covered. SNS conditional-on-property disabled branch now covered.

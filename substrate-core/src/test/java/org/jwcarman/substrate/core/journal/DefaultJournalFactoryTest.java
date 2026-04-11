@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.codec.spi.CodecFactory;
+import org.jwcarman.codec.spi.TypeRef;
 import org.jwcarman.substrate.core.memory.journal.InMemoryJournalSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.journal.Journal;
@@ -101,6 +102,32 @@ class DefaultJournalFactoryTest {
     Duration oneHour = Duration.ofHours(1);
     assertThatThrownBy(() -> journal.append("data", oneHour))
         .isInstanceOf(JournalExpiredException.class);
+  }
+
+  @Test
+  void createWithTypeRefReturnsJournalWithPrefixedKey() {
+    TypeRef<String> typeRef = new TypeRef<>() {};
+    lenient().when(codecFactory.create(typeRef)).thenReturn(stringCodec);
+
+    Journal<String> journal = factory.create("my-stream", typeRef, Duration.ofHours(1));
+    assertThat(journal.key()).isEqualTo("substrate:journal:my-stream");
+  }
+
+  @Test
+  void createWithTypeRefThrowsWhenInactivityTtlExceedsMax() {
+    TypeRef<String> typeRef = new TypeRef<>() {};
+    Duration excessiveInactivityTtl = Duration.ofHours(48);
+    assertThatThrownBy(() -> factory.create("test", typeRef, excessiveInactivityTtl))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void connectWithTypeRefReturnsLazyHandle() {
+    TypeRef<String> typeRef = new TypeRef<>() {};
+    lenient().when(codecFactory.create(typeRef)).thenReturn(stringCodec);
+
+    Journal<String> journal = factory.connect("lazy-test", typeRef);
+    assertThat(journal.key()).isEqualTo("substrate:journal:lazy-test");
   }
 
   @Test

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.substrate.core.mailbox;
+package org.jwcarman.substrate.core.atom;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -21,36 +21,35 @@ import java.time.Duration;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
-class AbstractMailboxSpiTest {
+class AbstractAtomSpiTest {
 
   @Test
-  void mailboxKeyPrependsPrefix() {
-    StubMailboxSpi spi = new StubMailboxSpi("myprefix:");
-    assertThat(spi.mailboxKey("inbox")).isEqualTo("myprefix:inbox");
+  void atomKeyPrependsPrefix() {
+    StubAtomSpi spi = new StubAtomSpi("substrate:atom:");
+    assertThat(spi.atomKey("session-1")).isEqualTo("substrate:atom:session-1");
   }
 
   @Test
-  void mailboxKeyWithEmptyPrefix() {
-    StubMailboxSpi spi = new StubMailboxSpi("");
-    assertThat(spi.mailboxKey("inbox")).isEqualTo("inbox");
+  void atomKeyWithEmptyPrefix() {
+    StubAtomSpi spi = new StubAtomSpi("");
+    assertThat(spi.atomKey("session-1")).isEqualTo("session-1");
   }
 
   @Test
   void prefixReturnsConstructorValue() {
-    StubMailboxSpi spi = new StubMailboxSpi("test:");
+    StubAtomSpi spi = new StubAtomSpi("test:");
     assertThat(spi.exposedPrefix()).isEqualTo("test:");
   }
 
   @Test
   void sweepReturnsZero() {
-    StubMailboxSpi spi = new StubMailboxSpi("prefix:");
+    StubAtomSpi spi = new StubAtomSpi("prefix:");
     assertThat(spi.sweep(100)).isZero();
   }
 
-  /** Minimal concrete subclass that exposes protected methods for testing. */
-  private static class StubMailboxSpi extends AbstractMailboxSpi {
+  private static class StubAtomSpi extends AbstractAtomSpi {
 
-    StubMailboxSpi(String prefix) {
+    StubAtomSpi(String prefix) {
       super(prefix);
     }
 
@@ -59,17 +58,22 @@ class AbstractMailboxSpiTest {
     }
 
     @Override
-    public void create(String key, Duration ttl) {
+    public void create(String key, byte[] value, String token, Duration ttl) {
       throw new UnsupportedOperationException();
     }
 
     @Override
-    public void deliver(String key, byte[] value) {
+    public Optional<RawAtom> read(String key) {
       throw new UnsupportedOperationException();
     }
 
     @Override
-    public Optional<byte[]> get(String key) {
+    public boolean set(String key, byte[] value, String token, Duration ttl) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean touch(String key, Duration ttl) {
       throw new UnsupportedOperationException();
     }
 

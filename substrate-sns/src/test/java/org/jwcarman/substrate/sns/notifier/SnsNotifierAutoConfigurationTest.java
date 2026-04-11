@@ -117,6 +117,19 @@ class SnsNotifierAutoConfigurationTest {
   }
 
   @Test
+  void doesNotCreateBeansWhenDisabledViaProperty() {
+    new ApplicationContextRunner()
+        .withConfiguration(
+            AutoConfigurations.of(SnsAutoConfiguration.class, SnsNotifierAutoConfiguration.class))
+        .withUserConfiguration(MockAwsConfiguration.class)
+        .withPropertyValues("substrate.sns.notifier.enabled=false")
+        .run(
+            context -> {
+              assertThat(context).doesNotHaveBean(SnsNotifierSpi.class);
+            });
+  }
+
+  @Test
   void snsNotifierSpiSuppressesInMemoryFallback() {
     new ApplicationContextRunner()
         .withConfiguration(

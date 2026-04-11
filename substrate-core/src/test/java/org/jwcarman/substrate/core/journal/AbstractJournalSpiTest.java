@@ -49,6 +49,18 @@ class AbstractJournalSpiTest {
   }
 
   @Test
+  void sweepReturnsZero() {
+    StubJournalSpi spi = new StubJournalSpi("prefix:");
+    assertThat(spi.sweep(100)).isZero();
+  }
+
+  @Test
+  void createIsNoOp() {
+    StubJournalSpi spi = new StubJournalSpi("prefix:");
+    spi.create("key", Duration.ofHours(1));
+  }
+
+  @Test
   void generateEntryIdReturnsUniqueValues() {
     StubJournalSpi spi = new StubJournalSpi("prefix:");
     String id1 = spi.exposedGenerateEntryId();
