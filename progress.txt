@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T05:41:24Z
-ITERATION: 55
-SPEC_COMPLETED: 053-cover-exceptions-and-nextresult.md
-WHAT_WAS_DONE: Created test directory for substrate-api with 8 test classes covering 7 exception constructors and NextResult.isTerminal() for all 6 sealed variants. Added JUnit Jupiter, AssertJ, and Mockito test dependencies to substrate-api/pom.xml.
-VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw -pl substrate-api test — 20 tests, 0 failures; ./mvnw verify -DskipITs — BUILD SUCCESS (all 13 modules)
+LAST_RUN: 2026-04-11T05:43:35Z
+ITERATION: 56
+SPEC_COMPLETED: 054-nats-atom-autoconfig-test.md
+WHAT_WAS_DONE: Created NatsAtomAutoConfigurationTest with 3 tests: happy path (bean created), suppression of in-memory fallback, and disabled-via-property. Follows the same pattern as the sibling NatsJournal/Mailbox/Notifier auto-config tests.
+VERIFICATION: ./mvnw spotless:check -pl substrate-nats — PASS; ./mvnw -pl substrate-nats test -Dtest=NatsAtomAutoConfigurationTest — 3 tests, 0 failures; ./mvnw -pl substrate-nats verify -DskipITs — BUILD SUCCESS
 STATUS: MORE_WORK
-NEXT_SPEC: 054-nats-atom-autoconfig-test.md
-NOTES: substrate-api now has a working src/test/java/ directory. Mockito deps were required because the parent POM configures mockito as a javaagent in surefire argLine for all modules.
+NEXT_SPEC: 055-postgres-autoconfig-coverage.md
+NOTES: NatsAtomAutoConfiguration now has full test coverage via ApplicationContextRunner. The mock Connection stubs keyValueManagement().getStatus() to satisfy the bucket-existence check in the NatsAtomSpi constructor.
