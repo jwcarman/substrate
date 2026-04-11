@@ -3,6 +3,6 @@ ITERATION: 66
 SPEC_COMPLETED: 063-subscriber-primitive-api.md
 WHAT_WAS_DONE: Migrated Atom, Journal, and Mailbox from CallbackSubscription/CallbackSubscriberBuilder to Subscriber<T>/SubscriberConfig<T>. Deleted CallbackSubscription, CallbackSubscriberBuilder, DefaultCallbackSubscriberBuilder, LifecycleCallbacks, and their tests. Rewrote DefaultCallbackSubscription to take Subscriber<T>. Updated all primitive interfaces, implementations, and tests. Updated README and CHANGELOG.
 VERIFICATION: ./mvnw verify — BUILD SUCCESS (all tests pass). ./mvnw spotless:check — BUILD SUCCESS. No CallbackSubscription/CallbackSubscriberBuilder/LifecycleCallbacks/DefaultCallbackSubscriberBuilder references in src/main or src/test. No new @SuppressWarnings annotations.
-STATUS: DONE
-NEXT_SPEC: none
-NOTES: Lambda ambiguity between Subscriber<T> and Consumer<SubscriberConfig<T>> requires explicit parameter types in tests when using the customizer flavor (e.g., (SubscriberConfig<String> cfg) -> cfg.onNext(...)) since both are single-arg functional interfaces. The spec mentioned DefaultSubscriberConfig but the actual class from spec 062 is DefaultSubscriberBuilder — used the real class name throughout.
+STATUS: MORE_WORK
+NEXT_SPEC: 064-consolidate-callback-into-blocking-subscription.md
+NOTES: Spec 064 consolidates DefaultCallbackSubscription into DefaultBlockingSubscription via a new synchronized start(Subscriber<T>) method that spawns the pump thread outside the constructor. Motivations: (1) eliminate the this-escape from DefaultCallbackSubscription's constructor, (2) one class to reason about and test. Public API on Atom/Journal/Mailbox unchanged; this is a pure internal refactor. A targeted method-reference cleanup in DefaultCallbackSubscription.dispatch was landed ad-hoc in commit 2391646 before this spec — that file is going to be deleted by 064 but the cleanup keeps the current tree tidy.
