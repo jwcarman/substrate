@@ -44,10 +44,10 @@ class InMemoryAtomSpiTest {
   void createStoresAtom() {
     spi.create("key", new byte[] {1, 2, 3}, "token1", Duration.ofSeconds(10));
 
-    Optional<RawAtom> record = spi.read("key");
-    assertThat(record).isPresent();
-    assertThat(record.get().token()).isEqualTo("token1");
-    assertThat(record.get().value()).containsExactly(1, 2, 3);
+    Optional<RawAtom> raw = spi.read("key");
+    assertThat(raw).isPresent();
+    assertThat(raw.get().token()).isEqualTo("token1");
+    assertThat(raw.get().value()).containsExactly(1, 2, 3);
   }
 
   @Test
@@ -92,9 +92,9 @@ class InMemoryAtomSpiTest {
                   "token-" + index,
                   Duration.ofSeconds(10));
               successes.incrementAndGet();
-            } catch (AtomAlreadyExistsException expected) {
+            } catch (AtomAlreadyExistsException _) {
               failures.incrementAndGet();
-            } catch (InterruptedException interrupted) {
+            } catch (InterruptedException _) {
               Thread.currentThread().interrupt();
             }
           });
@@ -129,9 +129,9 @@ class InMemoryAtomSpiTest {
     boolean result = spi.set("key", new byte[] {2}, "t2", Duration.ofSeconds(10));
 
     assertThat(result).isTrue();
-    RawAtom record = spi.read("key").orElseThrow();
-    assertThat(record.value()).containsExactly(2);
-    assertThat(record.token()).isEqualTo("t2");
+    RawAtom raw = spi.read("key").orElseThrow();
+    assertThat(raw.value()).containsExactly(2);
+    assertThat(raw.token()).isEqualTo("t2");
   }
 
   @Test
