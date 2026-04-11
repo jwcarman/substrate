@@ -16,10 +16,10 @@
 
 /**
  * Substrate subscription model — the consumer-side types shared across all primitives. Contains
- * {@link org.jwcarman.substrate.Subscription} and its two concrete forms ({@link
- * org.jwcarman.substrate.BlockingSubscription} and {@link
- * org.jwcarman.substrate.CallbackSubscription}), the sealed {@link
- * org.jwcarman.substrate.NextResult} outcome type, and {@link
- * org.jwcarman.substrate.CallbackSubscriberBuilder} for configuring callback-style subscriptions.
+ * {@link org.jwcarman.substrate.Subscription} and its pull-based form ({@link
+ * org.jwcarman.substrate.BlockingSubscription}), the sealed {@link
+ * org.jwcarman.substrate.NextResult} outcome type, and the push-based {@link
+ * org.jwcarman.substrate.Subscriber} / {@link org.jwcarman.substrate.SubscriberConfig} pair for
+ * configuring callback-style subscriptions.
  */
 package org.jwcarman.substrate;

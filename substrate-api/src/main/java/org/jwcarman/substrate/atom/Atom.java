@@ -18,8 +18,9 @@ package org.jwcarman.substrate.atom;
 import java.time.Duration;
 import java.util.function.Consumer;
 import org.jwcarman.substrate.BlockingSubscription;
-import org.jwcarman.substrate.CallbackSubscriberBuilder;
-import org.jwcarman.substrate.CallbackSubscription;
+import org.jwcarman.substrate.Subscriber;
+import org.jwcarman.substrate.SubscriberConfig;
+import org.jwcarman.substrate.Subscription;
 
 /**
  * A distributed {@link java.util.concurrent.atomic.AtomicReference} with TTL-based leases and
@@ -62,7 +63,7 @@ import org.jwcarman.substrate.CallbackSubscription;
  * <p><strong>Callback pattern:</strong>
  *
  * <pre>{@code
- * CallbackSubscription sub = atom.subscribe(snap ->
+ * Subscription sub = atom.subscribe(snap ->
  *     System.out.println("New value: " + snap.value()));
  * // later...
  * sub.cancel();
@@ -132,52 +133,44 @@ public interface Atom<T> {
   BlockingSubscription<Snapshot<T>> subscribe(Snapshot<T> lastSeen);
 
   /**
-   * Subscribes from the current state using a callback push model with only an {@code onNext}
-   * handler.
+   * Subscribes from the current state using a callback push model with a ready-made {@link
+   * Subscriber}.
    *
-   * @param onNext the callback invoked each time the atom's value changes
-   * @return a {@link CallbackSubscription} that can be used to cancel the subscription
+   * @param subscriber the subscriber to receive snapshot deliveries and lifecycle events
+   * @return a {@link Subscription} that can be used to cancel the subscription
    */
-  CallbackSubscription subscribe(Consumer<Snapshot<T>> onNext);
+  Subscription subscribe(Subscriber<Snapshot<T>> subscriber);
 
   /**
-   * Subscribes from the current state using a callback push model with an {@code onNext} handler
-   * and additional lifecycle handlers configured via the {@code customizer}.
+   * Subscribes from the current state using a callback push model with a {@link SubscriberConfig}
+   * customizer.
    *
-   * @param onNext the callback invoked each time the atom's value changes
-   * @param customizer a consumer that configures additional lifecycle handlers on the {@link
-   *     CallbackSubscriberBuilder}
-   * @return a {@link CallbackSubscription} that can be used to cancel the subscription
+   * @param customizer a consumer that configures the subscriber's handlers
+   * @return a {@link Subscription} that can be used to cancel the subscription
    */
-  CallbackSubscription subscribe(
-      Consumer<Snapshot<T>> onNext, Consumer<CallbackSubscriberBuilder<Snapshot<T>>> customizer);
+  Subscription subscribe(Consumer<SubscriberConfig<Snapshot<T>>> customizer);
 
   /**
-   * Subscribes from a known baseline using a callback push model with only an {@code onNext}
-   * handler.
+   * Subscribes from a known baseline using a callback push model with a ready-made {@link
+   * Subscriber}.
    *
    * @param lastSeen the baseline to compare against, or {@code null} to subscribe from current
    *     state
-   * @param onNext the callback invoked each time the atom's value changes
-   * @return a {@link CallbackSubscription} that can be used to cancel the subscription
+   * @param subscriber the subscriber to receive snapshot deliveries and lifecycle events
+   * @return a {@link Subscription} that can be used to cancel the subscription
    */
-  CallbackSubscription subscribe(Snapshot<T> lastSeen, Consumer<Snapshot<T>> onNext);
+  Subscription subscribe(Snapshot<T> lastSeen, Subscriber<Snapshot<T>> subscriber);
 
   /**
-   * Subscribes from a known baseline using a callback push model with an {@code onNext} handler and
-   * additional lifecycle handlers configured via the {@code customizer}.
+   * Subscribes from a known baseline using a callback push model with a {@link SubscriberConfig}
+   * customizer.
    *
    * @param lastSeen the baseline to compare against, or {@code null} to subscribe from current
    *     state
-   * @param onNext the callback invoked each time the atom's value changes
-   * @param customizer a consumer that configures additional lifecycle handlers on the {@link
-   *     CallbackSubscriberBuilder}
-   * @return a {@link CallbackSubscription} that can be used to cancel the subscription
+   * @param customizer a consumer that configures the subscriber's handlers
+   * @return a {@link Subscription} that can be used to cancel the subscription
    */
-  CallbackSubscription subscribe(
-      Snapshot<T> lastSeen,
-      Consumer<Snapshot<T>> onNext,
-      Consumer<CallbackSubscriberBuilder<Snapshot<T>>> customizer);
+  Subscription subscribe(Snapshot<T> lastSeen, Consumer<SubscriberConfig<Snapshot<T>>> customizer);
 
   /**
    * Returns the backend key for this atom.

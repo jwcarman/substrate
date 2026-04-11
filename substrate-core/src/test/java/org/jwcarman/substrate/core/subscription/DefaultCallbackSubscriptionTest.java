@@ -25,10 +25,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.substrate.Subscriber;
 
 class DefaultCallbackSubscriptionTest {
 
   private static final Duration AWAIT_TIMEOUT = Duration.ofSeconds(5);
+
+  private DefaultCallbackSubscription<String> subscribe(
+      NextHandoff<String> handoff, Subscriber<String> subscriber) {
+    var source = new DefaultBlockingSubscription<>(handoff, () -> {});
+    return new DefaultCallbackSubscription<>(source, subscriber);
+  }
 
   @Test
   void onNextIsInvokedForEachValue() {
@@ -36,17 +43,12 @@ class DefaultCallbackSubscriptionTest {
     var received = new CopyOnWriteArrayList<String>();
     var latch = new CountDownLatch(2);
 
-    new DefaultCallbackSubscription<>(
+    subscribe(
         handoff,
-        () -> {},
         value -> {
           received.add(value);
           latch.countDown();
-        },
-        null,
-        null,
-        null,
-        null);
+        });
 
     handoff.push("first");
     await().atMost(AWAIT_TIMEOUT).until(() -> received.size() >= 1);
@@ -61,19 +63,17 @@ class DefaultCallbackSubscriptionTest {
     var handoff = new BlockingBoundedHandoff<String>(10);
     var received = new CopyOnWriteArrayList<String>();
 
-    new DefaultCallbackSubscription<>(
+    subscribe(
         handoff,
-        () -> {},
-        value -> {
-          received.add(value);
-          if (value.equals("throw")) {
-            throw new RuntimeException("handler error");
+        new Subscriber<>() {
+          @Override
+          public void onNext(String value) {
+            received.add(value);
+            if (value.equals("throw")) {
+              throw new RuntimeException("handler error");
+            }
           }
-        },
-        null,
-        null,
-        null,
-        null);
+        });
 
     handoff.push("throw");
     handoff.push("after-throw");
@@ -88,8 +88,17 @@ class DefaultCallbackSubscriptionTest {
     var completedRef = new CountDownLatch(1);
 
     var sub =
-        new DefaultCallbackSubscription<>(
-            handoff, () -> {}, value -> {}, null, null, null, completedRef::countDown);
+        subscribe(
+            handoff,
+            new Subscriber<>() {
+              @Override
+              public void onNext(String value) {}
+
+              @Override
+              public void onCompleted() {
+                completedRef.countDown();
+              }
+            });
 
     handoff.markCompleted();
 
@@ -103,8 +112,17 @@ class DefaultCallbackSubscriptionTest {
     var expiredLatch = new CountDownLatch(1);
 
     var sub =
-        new DefaultCallbackSubscription<>(
-            handoff, () -> {}, value -> {}, null, expiredLatch::countDown, null, null);
+        subscribe(
+            handoff,
+            new Subscriber<>() {
+              @Override
+              public void onNext(String value) {}
+
+              @Override
+              public void onExpired() {
+                expiredLatch.countDown();
+              }
+            });
 
     handoff.markExpired();
 
@@ -118,8 +136,17 @@ class DefaultCallbackSubscriptionTest {
     var deletedLatch = new CountDownLatch(1);
 
     var sub =
-        new DefaultCallbackSubscription<>(
-            handoff, () -> {}, value -> {}, null, null, deletedLatch::countDown, null);
+        subscribe(
+            handoff,
+            new Subscriber<>() {
+              @Override
+              public void onNext(String value) {}
+
+              @Override
+              public void onDeleted() {
+                deletedLatch.countDown();
+              }
+            });
 
     handoff.markDeleted();
 
@@ -134,17 +161,18 @@ class DefaultCallbackSubscriptionTest {
     var errorLatch = new CountDownLatch(1);
 
     var sub =
-        new DefaultCallbackSubscription<>(
+        subscribe(
             handoff,
-            () -> {},
-            value -> {},
-            cause -> {
-              errorRef.set(cause);
-              errorLatch.countDown();
-            },
-            null,
-            null,
-            null);
+            new Subscriber<>() {
+              @Override
+              public void onNext(String value) {}
+
+              @Override
+              public void onError(Throwable cause) {
+                errorRef.set(cause);
+                errorLatch.countDown();
+              }
+            });
 
     var boom = new RuntimeException("boom");
     handoff.error(boom);
@@ -155,10 +183,33 @@ class DefaultCallbackSubscriptionTest {
   }
 
   @Test
-  void nullCallbacksAreIgnored() {
+  void onCancelledFiresOnCancelled() {
     var handoff = new CoalescingHandoff<String>();
+    var cancelledLatch = new CountDownLatch(1);
+
     var sub =
-        new DefaultCallbackSubscription<>(handoff, () -> {}, value -> {}, null, null, null, null);
+        subscribe(
+            handoff,
+            new Subscriber<>() {
+              @Override
+              public void onNext(String value) {}
+
+              @Override
+              public void onCancelled() {
+                cancelledLatch.countDown();
+              }
+            });
+
+    handoff.markCancelled();
+
+    await().atMost(AWAIT_TIMEOUT).until(() -> cancelledLatch.getCount() == 0);
+    await().atMost(AWAIT_TIMEOUT).until(() -> !sub.isActive());
+  }
+
+  @Test
+  void defaultSubscriberHandlersAreNoOps() {
+    var handoff = new CoalescingHandoff<String>();
+    var sub = subscribe(handoff, value -> {});
 
     handoff.markCompleted();
 
@@ -168,8 +219,7 @@ class DefaultCallbackSubscriptionTest {
   @Test
   void cancelStopsHandlerLoop() {
     var handoff = new CoalescingHandoff<String>();
-    var sub =
-        new DefaultCallbackSubscription<>(handoff, () -> {}, value -> {}, null, null, null, null);
+    var sub = subscribe(handoff, value -> {});
 
     assertThat(sub.isActive()).isTrue();
     sub.cancel();
@@ -177,13 +227,10 @@ class DefaultCallbackSubscriptionTest {
     await().atMost(Duration.ofMillis(500)).until(() -> !sub.isActive());
   }
 
-  // --- Cancel latency test ---
-
   @Test
   void cancelOnIdleSubscriptionExitsQuickly() {
     var handoff = new CoalescingHandoff<String>();
-    var sub =
-        new DefaultCallbackSubscription<>(handoff, () -> {}, value -> {}, null, null, null, null);
+    var sub = subscribe(handoff, value -> {});
 
     await().atMost(Duration.ofMillis(200)).until(sub::isActive);
 
@@ -194,8 +241,6 @@ class DefaultCallbackSubscriptionTest {
 
     assertThat(Duration.ofNanos(elapsed)).isLessThan(Duration.ofMillis(200));
   }
-
-  // --- Idle subscription does zero periodic work ---
 
   @Test
   void idleSubscriptionDoesNoPeriodicWork() {
@@ -246,9 +291,7 @@ class DefaultCallbackSubscriptionTest {
           }
         };
 
-    var sub =
-        new DefaultCallbackSubscription<>(
-            countingHandoff, () -> {}, value -> {}, null, null, null, null);
+    var sub = subscribe(countingHandoff, value -> {});
 
     await().atMost(Duration.ofMillis(200)).until(sub::isActive);
 
@@ -261,8 +304,6 @@ class DefaultCallbackSubscriptionTest {
     sub.cancel();
     await().atMost(Duration.ofMillis(500)).until(() -> !sub.isActive());
   }
-
-  // --- External interrupt handling ---
 
   @Test
   void externalInterruptExitsHandlerLoop() throws Exception {
@@ -316,9 +357,7 @@ class DefaultCallbackSubscriptionTest {
           }
         };
 
-    var sub =
-        new DefaultCallbackSubscription<>(
-            capturingHandoff, () -> {}, received::add, null, null, null, null);
+    var sub = subscribe(capturingHandoff, received::add);
 
     assertThat(started.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
 
@@ -332,8 +371,6 @@ class DefaultCallbackSubscriptionTest {
         .atMost(Duration.ofMillis(500))
         .until(() -> !received.contains("after-interrupt"));
   }
-
-  // --- Interrupt does NOT fire onError ---
 
   @Test
   void interruptDoesNotFireOnError() throws Exception {
@@ -387,8 +424,17 @@ class DefaultCallbackSubscriptionTest {
           }
         };
 
-    new DefaultCallbackSubscription<>(
-        capturingHandoff, () -> {}, value -> {}, cause -> errorFired.set(true), null, null, null);
+    subscribe(
+        capturingHandoff,
+        new Subscriber<>() {
+          @Override
+          public void onNext(String value) {}
+
+          @Override
+          public void onError(Throwable cause) {
+            errorFired.set(true);
+          }
+        });
 
     assertThat(started.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
     threadRef.get().interrupt();
@@ -399,22 +445,21 @@ class DefaultCallbackSubscriptionTest {
         .until(() -> !errorFired.get());
   }
 
-  // --- Value pushed while parked wakes handler immediately ---
-
   @Test
   void onCompleteHandlerExceptionIsSwallowed() {
     var handoff = new CoalescingHandoff<String>();
 
     var sub =
-        new DefaultCallbackSubscription<>(
+        subscribe(
             handoff,
-            () -> {},
-            value -> {},
-            null,
-            null,
-            null,
-            () -> {
-              throw new RuntimeException("onComplete blew up");
+            new Subscriber<>() {
+              @Override
+              public void onNext(String value) {}
+
+              @Override
+              public void onCompleted() {
+                throw new RuntimeException("onComplete blew up");
+              }
             });
 
     handoff.markCompleted();
@@ -427,16 +472,17 @@ class DefaultCallbackSubscriptionTest {
     var handoff = new CoalescingHandoff<String>();
 
     var sub =
-        new DefaultCallbackSubscription<>(
+        subscribe(
             handoff,
-            () -> {},
-            value -> {},
-            null,
-            () -> {
-              throw new RuntimeException("onExpiration blew up");
-            },
-            null,
-            null);
+            new Subscriber<>() {
+              @Override
+              public void onNext(String value) {}
+
+              @Override
+              public void onExpired() {
+                throw new RuntimeException("onExpiration blew up");
+              }
+            });
 
     handoff.markExpired();
 
@@ -448,16 +494,17 @@ class DefaultCallbackSubscriptionTest {
     var handoff = new CoalescingHandoff<String>();
 
     var sub =
-        new DefaultCallbackSubscription<>(
+        subscribe(
             handoff,
-            () -> {},
-            value -> {},
-            null,
-            null,
-            () -> {
-              throw new RuntimeException("onDelete blew up");
-            },
-            null);
+            new Subscriber<>() {
+              @Override
+              public void onNext(String value) {}
+
+              @Override
+              public void onDeleted() {
+                throw new RuntimeException("onDelete blew up");
+              }
+            });
 
     handoff.markDeleted();
 
@@ -469,18 +516,41 @@ class DefaultCallbackSubscriptionTest {
     var handoff = new CoalescingHandoff<String>();
 
     var sub =
-        new DefaultCallbackSubscription<>(
+        subscribe(
             handoff,
-            () -> {},
-            value -> {},
-            cause -> {
-              throw new RuntimeException("onError blew up");
-            },
-            null,
-            null,
-            null);
+            new Subscriber<>() {
+              @Override
+              public void onNext(String value) {}
+
+              @Override
+              public void onError(Throwable cause) {
+                throw new RuntimeException("onError blew up");
+              }
+            });
 
     handoff.error(new RuntimeException("original"));
+
+    await().atMost(AWAIT_TIMEOUT).until(() -> !sub.isActive());
+  }
+
+  @Test
+  void onCancelledHandlerExceptionIsSwallowed() {
+    var handoff = new CoalescingHandoff<String>();
+
+    var sub =
+        subscribe(
+            handoff,
+            new Subscriber<>() {
+              @Override
+              public void onNext(String value) {}
+
+              @Override
+              public void onCancelled() {
+                throw new RuntimeException("onCancelled blew up");
+              }
+            });
+
+    handoff.markCancelled();
 
     await().atMost(AWAIT_TIMEOUT).until(() -> !sub.isActive());
   }
@@ -490,7 +560,7 @@ class DefaultCallbackSubscriptionTest {
     var handoff = new CoalescingHandoff<String>();
     var received = new CopyOnWriteArrayList<String>();
 
-    new DefaultCallbackSubscription<>(handoff, () -> {}, received::add, null, null, null, null);
+    subscribe(handoff, received::add);
 
     await().atMost(Duration.ofMillis(200)).pollInterval(Duration.ofMillis(10)).until(() -> true);
 

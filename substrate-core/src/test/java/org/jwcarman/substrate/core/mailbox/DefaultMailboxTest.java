@@ -28,8 +28,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.BlockingSubscription;
-import org.jwcarman.substrate.CallbackSubscription;
 import org.jwcarman.substrate.NextResult;
+import org.jwcarman.substrate.SubscriberConfig;
+import org.jwcarman.substrate.Subscription;
 import org.jwcarman.substrate.core.memory.mailbox.InMemoryMailboxSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
@@ -231,9 +232,9 @@ class DefaultMailboxTest {
     AtomicReference<String> captured = new AtomicReference<>();
     CountDownLatch delivered = new CountDownLatch(1);
 
-    CallbackSubscription sub =
+    Subscription sub =
         mailbox.subscribe(
-            value -> {
+            (String value) -> {
               captured.set(value);
               delivered.countDown();
             });
@@ -249,18 +250,19 @@ class DefaultMailboxTest {
     CountDownLatch completeLatch = new CountDownLatch(1);
     AtomicReference<String> order = new AtomicReference<>("");
 
-    CallbackSubscription sub =
+    Subscription sub =
         mailbox.subscribe(
-            value -> {
-              order.updateAndGet(s -> s + "next,");
-              nextLatch.countDown();
-            },
-            b ->
-                b.onComplete(
-                    () -> {
-                      order.updateAndGet(s -> s + "complete");
-                      completeLatch.countDown();
-                    }));
+            (SubscriberConfig<String> cfg) ->
+                cfg.onNext(
+                        value -> {
+                          order.updateAndGet(s -> s + "next,");
+                          nextLatch.countDown();
+                        })
+                    .onCompleted(
+                        () -> {
+                          order.updateAndGet(s -> s + "complete");
+                          completeLatch.countDown();
+                        }));
     mailbox.deliver("value");
     assertThat(completeLatch.await(5, TimeUnit.SECONDS)).isTrue();
     assertThat(order.get()).isEqualTo("next,complete");
@@ -272,8 +274,10 @@ class DefaultMailboxTest {
     CountDownLatch deleteLatch = new CountDownLatch(1);
     AtomicReference<Boolean> onNextFired = new AtomicReference<>(false);
 
-    CallbackSubscription sub =
-        mailbox.subscribe(value -> onNextFired.set(true), b -> b.onDelete(deleteLatch::countDown));
+    Subscription sub =
+        mailbox.subscribe(
+            (SubscriberConfig<String> cfg) ->
+                cfg.onNext(value -> onNextFired.set(true)).onDeleted(deleteLatch::countDown));
     mailbox.delete();
     assertThat(deleteLatch.await(5, TimeUnit.SECONDS)).isTrue();
     assertThat(onNextFired.get()).isFalse();
@@ -291,9 +295,10 @@ class DefaultMailboxTest {
     CountDownLatch expirationLatch = new CountDownLatch(1);
     AtomicReference<Boolean> onNextFired = new AtomicReference<>(false);
 
-    CallbackSubscription sub =
+    Subscription sub =
         shortMailbox.subscribe(
-            value -> onNextFired.set(true), b -> b.onExpiration(expirationLatch::countDown));
+            (SubscriberConfig<String> cfg) ->
+                cfg.onNext(value -> onNextFired.set(true)).onExpired(expirationLatch::countDown));
     assertThat(expirationLatch.await(5, TimeUnit.SECONDS)).isTrue();
     assertThat(onNextFired.get()).isFalse();
     sub.cancel();

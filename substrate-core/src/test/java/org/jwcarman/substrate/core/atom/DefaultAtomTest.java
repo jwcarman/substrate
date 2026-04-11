@@ -31,8 +31,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.BlockingSubscription;
-import org.jwcarman.substrate.CallbackSubscription;
 import org.jwcarman.substrate.NextResult;
+import org.jwcarman.substrate.SubscriberConfig;
+import org.jwcarman.substrate.Subscription;
 import org.jwcarman.substrate.atom.AtomExpiredException;
 import org.jwcarman.substrate.atom.Snapshot;
 import org.jwcarman.substrate.core.memory.atom.InMemoryAtomSpi;
@@ -337,10 +338,10 @@ class DefaultAtomTest {
     AtomicReference<Snapshot<String>> captured = new AtomicReference<>();
     CountDownLatch invoked = new CountDownLatch(1);
 
-    CallbackSubscription sub =
+    Subscription sub =
         atom.subscribe(
             current,
-            snap -> {
+            (Snapshot<String> snap) -> {
               captured.set(snap);
               invoked.countDown();
             });
@@ -364,8 +365,11 @@ class DefaultAtomTest {
     Snapshot<String> current = atom.get();
     AtomicBoolean deleteFired = new AtomicBoolean(false);
 
-    CallbackSubscription sub =
-        atom.subscribe(current, snap -> {}, b -> b.onDelete(() -> deleteFired.set(true)));
+    Subscription sub =
+        atom.subscribe(
+            current,
+            (SubscriberConfig<Snapshot<String>> cfg) ->
+                cfg.onNext(snap -> {}).onDeleted(() -> deleteFired.set(true)));
     try {
       atom.delete();
 
@@ -393,9 +397,11 @@ class DefaultAtomTest {
     Snapshot<String> current = shortAtom.get();
     AtomicBoolean expirationFired = new AtomicBoolean(false);
 
-    CallbackSubscription sub =
+    Subscription sub =
         shortAtom.subscribe(
-            current, snap -> {}, b -> b.onExpiration(() -> expirationFired.set(true)));
+            current,
+            (SubscriberConfig<Snapshot<String>> cfg) ->
+                cfg.onNext(snap -> {}).onExpired(() -> expirationFired.set(true)));
     try {
       await()
           .atMost(Duration.ofSeconds(5))
@@ -409,8 +415,10 @@ class DefaultAtomTest {
   void callbackSubscribeNeverFiresOnComplete() {
     AtomicBoolean completeFired = new AtomicBoolean(false);
 
-    CallbackSubscription sub =
-        atom.subscribe(snap -> {}, b -> b.onComplete(() -> completeFired.set(true)));
+    Subscription sub =
+        atom.subscribe(
+            (SubscriberConfig<Snapshot<String>> cfg) ->
+                cfg.onNext(snap -> {}).onCompleted(() -> completeFired.set(true)));
     try {
       await()
           .pollDelay(Duration.ofMillis(500))
@@ -426,9 +434,9 @@ class DefaultAtomTest {
     AtomicReference<Snapshot<String>> captured = new AtomicReference<>();
     CountDownLatch invoked = new CountDownLatch(1);
 
-    CallbackSubscription sub =
+    Subscription sub =
         atom.subscribe(
-            snap -> {
+            (Snapshot<String> snap) -> {
               captured.set(snap);
               invoked.countDown();
             });

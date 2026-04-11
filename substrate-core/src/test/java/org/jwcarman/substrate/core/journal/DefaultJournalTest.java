@@ -29,7 +29,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.BlockingSubscription;
-import org.jwcarman.substrate.CallbackSubscription;
+import org.jwcarman.substrate.SubscriberConfig;
+import org.jwcarman.substrate.Subscription;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.journal.JournalEntry;
 import org.mockito.Mock;
@@ -161,7 +162,7 @@ class DefaultJournalTest {
   void subscribeCallbackReturnsActiveSubscription() {
     when(spi.readLast(KEY, 1)).thenReturn(List.of());
 
-    CallbackSubscription sub = journal.subscribe(value -> {});
+    Subscription sub = journal.subscribe((JournalEntry<String> value) -> {});
     try {
       assertNotNull(sub);
       assertTrue(sub.isActive());
@@ -174,7 +175,8 @@ class DefaultJournalTest {
   void subscribeCallbackWithCustomizerReturnsActiveSubscription() {
     when(spi.readLast(KEY, 1)).thenReturn(List.of());
 
-    CallbackSubscription sub = journal.subscribe(value -> {}, builder -> {});
+    Subscription sub =
+        journal.subscribe((SubscriberConfig<JournalEntry<String>> cfg) -> cfg.onNext(value -> {}));
     try {
       assertNotNull(sub);
       assertTrue(sub.isActive());
@@ -185,7 +187,7 @@ class DefaultJournalTest {
 
   @Test
   void subscribeAfterCallbackReturnsActiveSubscription() {
-    CallbackSubscription sub = journal.subscribeAfter("entry-1", value -> {});
+    Subscription sub = journal.subscribeAfter("entry-1", (JournalEntry<String> value) -> {});
     try {
       assertNotNull(sub);
       assertTrue(sub.isActive());
@@ -196,7 +198,9 @@ class DefaultJournalTest {
 
   @Test
   void subscribeAfterCallbackWithCustomizerReturnsActiveSubscription() {
-    CallbackSubscription sub = journal.subscribeAfter("entry-1", value -> {}, builder -> {});
+    Subscription sub =
+        journal.subscribeAfter(
+            "entry-1", (SubscriberConfig<JournalEntry<String>> cfg) -> cfg.onNext(value -> {}));
     try {
       assertNotNull(sub);
       assertTrue(sub.isActive());
@@ -209,7 +213,7 @@ class DefaultJournalTest {
   void subscribeLastCallbackReturnsActiveSubscription() {
     when(spi.readLast(KEY, 3)).thenReturn(List.of());
 
-    CallbackSubscription sub = journal.subscribeLast(3, value -> {});
+    Subscription sub = journal.subscribeLast(3, (JournalEntry<String> value) -> {});
     try {
       assertNotNull(sub);
       assertTrue(sub.isActive());
@@ -222,7 +226,9 @@ class DefaultJournalTest {
   void subscribeLastCallbackWithCustomizerReturnsActiveSubscription() {
     when(spi.readLast(KEY, 3)).thenReturn(List.of());
 
-    CallbackSubscription sub = journal.subscribeLast(3, value -> {}, builder -> {});
+    Subscription sub =
+        journal.subscribeLast(
+            3, (SubscriberConfig<JournalEntry<String>> cfg) -> cfg.onNext(value -> {}));
     try {
       assertNotNull(sub);
       assertTrue(sub.isActive());

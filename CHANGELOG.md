@@ -8,6 +8,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 While substrate is in 0.x, the API is considered beta and breaking changes may
 occur between minor versions. The 1.0.0 release will mark API stability.
 
+## [Unreleased]
+
+### Breaking changes
+
+#### Subscriber-based callback API
+
+The callback subscribe API has been rewritten around `Subscriber<T>` and
+`SubscriberConfig<T>`, replacing the previous `Consumer<T> onNext` +
+`Consumer<CallbackSubscriberBuilder<T>> customizer` pattern.
+
+**Removed types:**
+- `CallbackSubscription` (marker interface) — callback subscribe methods
+  now return plain `Subscription`
+- `CallbackSubscriberBuilder<T>` — replaced by `SubscriberConfig<T>`
+
+**Removed internal types:**
+- `DefaultCallbackSubscriberBuilder<T>`
+- `LifecycleCallbacks<T>`
+
+**Changed subscribe signatures on Atom, Journal, and Mailbox:**
+
+```java
+// Before
+CallbackSubscription subscribe(Consumer<T> onNext);
+CallbackSubscription subscribe(Consumer<T> onNext, Consumer<CallbackSubscriberBuilder<T>> customizer);
+
+// After
+Subscription subscribe(Subscriber<T> subscriber);
+Subscription subscribe(Consumer<SubscriberConfig<T>> customizer);
+```
+
+Migrate by either passing a `Subscriber<T>` lambda directly or using
+the `SubscriberConfig<T>` customizer:
+
+```java
+// Lambda (simplest case — Subscriber is a @FunctionalInterface)
+atom.subscribe((Snapshot<Session> snap) -> process(snap));
+
+// SubscriberConfig customizer (for lifecycle handlers)
+atom.subscribe(cfg -> cfg
+    .onNext(snap -> process(snap))
+    .onExpired(() -> reconnect())
+    .onError(err -> log.error("boom", err)));
+```
+
 ## [0.2.1] - 2026-04-11
 
 ### Added

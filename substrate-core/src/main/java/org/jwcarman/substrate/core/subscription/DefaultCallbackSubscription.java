@@ -16,17 +16,17 @@
 package org.jwcarman.substrate.core.subscription;
 
 import java.time.Duration;
-import java.util.function.Consumer;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.jwcarman.substrate.BlockingSubscription;
-import org.jwcarman.substrate.CallbackSubscription;
 import org.jwcarman.substrate.NextResult;
+import org.jwcarman.substrate.Subscriber;
+import org.jwcarman.substrate.Subscription;
 
 /**
  * A thin pump layer over a {@link BlockingSubscription} that converts pull-style delivery into
  * push-style. A dedicated virtual thread loops over {@code source.next(...)} and dispatches each
- * {@link NextResult} to the appropriate handler.
+ * {@link NextResult} to the appropriate {@link Subscriber} method.
  *
  * <p>All state and lifecycle (cancellation, shutdown-coordinator registration, the {@code done}
  * flag, the feeder canceller) lives in the underlying {@link BlockingSubscription}. This class only
@@ -34,7 +34,7 @@ import org.jwcarman.substrate.NextResult;
  *
  * @param <T> the type of values delivered by the subscription
  */
-public class DefaultCallbackSubscription<T> implements CallbackSubscription {
+public class DefaultCallbackSubscription<T> implements Subscription {
 
   private static final Log log = LogFactory.getLog(DefaultCallbackSubscription.class);
   private static final Duration MAX_POLL_DURATION = Duration.ofDays(365);
@@ -42,82 +42,52 @@ public class DefaultCallbackSubscription<T> implements CallbackSubscription {
   private final BlockingSubscription<T> source;
   private final Thread handlerThread;
 
-  public DefaultCallbackSubscription(
-      BlockingSubscription<T> source, Consumer<T> onNext, LifecycleCallbacks<T> callbacks) {
+  public DefaultCallbackSubscription(BlockingSubscription<T> source, Subscriber<T> subscriber) {
     this.source = source;
     this.handlerThread =
         Thread.ofVirtual()
             .name("substrate-callback-handler", 0)
-            .start(() -> runHandlerLoop(onNext, callbacks));
+            .start(() -> runHandlerLoop(subscriber));
   }
 
-  /**
-   * Legacy test-friendly convenience constructor. Constructs a {@link DefaultBlockingSubscription}
-   * from the raw handoff + canceller and wraps it in the callback flavor.
-   */
-  public DefaultCallbackSubscription(
-      NextHandoff<T> handoff,
-      Runnable canceller,
-      Consumer<T> onNext,
-      Consumer<Throwable> onError,
-      Runnable onExpiration,
-      Runnable onDelete,
-      Runnable onComplete) {
-    this(
-        new DefaultBlockingSubscription<>(handoff, canceller),
-        onNext,
-        new LifecycleCallbacks<>(onError, onExpiration, onDelete, onComplete, null));
-  }
-
-  private void runHandlerLoop(Consumer<T> onNext, LifecycleCallbacks<T> callbacks) {
+  private void runHandlerLoop(Subscriber<T> subscriber) {
     while (source.isActive()) {
       NextResult<T> result = source.next(MAX_POLL_DURATION);
-      dispatch(result, onNext, callbacks);
+      dispatch(result, subscriber);
       if (Thread.currentThread().isInterrupted()) {
         return;
       }
     }
   }
 
-  private void dispatch(NextResult<T> result, Consumer<T> onNext, LifecycleCallbacks<T> callbacks) {
+  private void dispatch(NextResult<T> result, Subscriber<T> subscriber) {
     switch (result) {
-      case NextResult.Value<T>(T value) -> safeAccept(onNext, value, "onNext");
+      case NextResult.Value<T>(T value) -> safeOnNext(subscriber, value);
       case NextResult.Timeout<T> _ -> {
         /* re-check loop condition */
       }
-      case NextResult.Completed<T> _ -> safeRun(callbacks.onComplete());
-      case NextResult.Expired<T> _ -> safeRun(callbacks.onExpiration());
-      case NextResult.Deleted<T> _ -> safeRun(callbacks.onDelete());
-      case NextResult.Cancelled<T> _ -> safeRun(callbacks.onCancel());
+      case NextResult.Completed<T> _ -> safeRun(() -> subscriber.onCompleted(), "onCompleted");
+      case NextResult.Expired<T> _ -> safeRun(() -> subscriber.onExpired(), "onExpired");
+      case NextResult.Deleted<T> _ -> safeRun(() -> subscriber.onDeleted(), "onDeleted");
+      case NextResult.Cancelled<T> _ -> safeRun(() -> subscriber.onCancelled(), "onCancelled");
       case NextResult.Errored<T>(Throwable cause) ->
-          safeAcceptThrowable(callbacks.onError(), cause);
+          safeRun(() -> subscriber.onError(cause), "onError");
     }
   }
 
-  private static <T> void safeAccept(Consumer<T> consumer, T value, String label) {
-    if (consumer == null) return;
+  private static <T> void safeOnNext(Subscriber<T> subscriber, T value) {
     try {
-      consumer.accept(value);
+      subscriber.onNext(value);
+    } catch (RuntimeException e) {
+      log.warn("onNext handler threw", e);
+    }
+  }
+
+  private static void safeRun(Runnable action, String label) {
+    try {
+      action.run();
     } catch (RuntimeException e) {
       log.warn(label + " handler threw", e);
-    }
-  }
-
-  private static void safeAcceptThrowable(Consumer<Throwable> consumer, Throwable cause) {
-    if (consumer == null) return;
-    try {
-      consumer.accept(cause);
-    } catch (RuntimeException e) {
-      log.warn("onError handler threw", e);
-    }
-  }
-
-  private static void safeRun(Runnable runnable) {
-    if (runnable == null) return;
-    try {
-      runnable.run();
-    } catch (RuntimeException e) {
-      log.warn("Lifecycle handler threw", e);
     }
   }
 
@@ -128,11 +98,6 @@ public class DefaultCallbackSubscription<T> implements CallbackSubscription {
 
   @Override
   public void cancel() {
-    // Cancelling the underlying blocking subscription is the real teardown —
-    // it marks the handoff, which unblocks our handler thread's next() call.
-    // Interrupting the handler thread is a belt-and-suspenders wake-up for the
-    // rare case where cancel() is called while the handler is busy running a
-    // user callback (not parked in next()).
     source.cancel();
     handlerThread.interrupt();
   }

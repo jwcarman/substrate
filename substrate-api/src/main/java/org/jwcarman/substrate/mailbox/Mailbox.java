@@ -17,8 +17,9 @@ package org.jwcarman.substrate.mailbox;
 
 import java.util.function.Consumer;
 import org.jwcarman.substrate.BlockingSubscription;
-import org.jwcarman.substrate.CallbackSubscriberBuilder;
-import org.jwcarman.substrate.CallbackSubscription;
+import org.jwcarman.substrate.Subscriber;
+import org.jwcarman.substrate.SubscriberConfig;
+import org.jwcarman.substrate.Subscription;
 
 /**
  * A distributed single-delivery mailbox with TTL-based expiration.
@@ -93,20 +94,19 @@ public interface Mailbox<T> {
   BlockingSubscription<T> subscribe();
 
   /**
-   * Callback subscribe with only an onNext handler. The handler is invoked exactly once when the
-   * single delivery arrives. After the handler returns, the subscription naturally terminates via
-   * {@code Completed} and the feeder exits.
+   * Callback subscribe with a ready-made {@link Subscriber}. The subscriber's {@code onNext} is
+   * invoked exactly once when the single delivery arrives. After the handler returns, the
+   * subscription naturally terminates via {@code Completed} and the feeder exits.
    */
-  CallbackSubscription subscribe(Consumer<T> onNext);
+  Subscription subscribe(Subscriber<T> subscriber);
 
   /**
-   * Callback subscribe with onNext and additional lifecycle handlers. {@code onComplete} fires
-   * after the delivered value is consumed by the handler; {@code onExpiration} fires if the
-   * mailbox's TTL elapses before delivery; {@code onDelete} fires if the mailbox is explicitly
-   * deleted before delivery.
+   * Callback subscribe with a {@link SubscriberConfig} customizer. {@code onComplete} fires after
+   * the delivered value is consumed by the handler; {@code onExpiration} fires if the mailbox's TTL
+   * elapses before delivery; {@code onDelete} fires if the mailbox is explicitly deleted before
+   * delivery.
    */
-  CallbackSubscription subscribe(
-      Consumer<T> onNext, Consumer<CallbackSubscriberBuilder<T>> customizer);
+  Subscription subscribe(Consumer<SubscriberConfig<T>> customizer);
 
   /**
    * Returns the unique key that identifies this mailbox within the backing store.

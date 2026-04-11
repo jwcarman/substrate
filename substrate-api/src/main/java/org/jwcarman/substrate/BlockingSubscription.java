@@ -35,7 +35,7 @@ import java.time.Duration;
  * #cancel()}.
  *
  * @param <T> the type of values delivered by this subscription
- * @see CallbackSubscription
+ * @see Subscriber
  * @see NextResult
  */
 public interface BlockingSubscription<T> extends Subscription, AutoCloseable {

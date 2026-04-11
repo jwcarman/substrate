@@ -122,16 +122,16 @@ try (BlockingSubscription<Snapshot<Session>> sub = session.subscribe()) {
     }
 }
 
-// ... or push values to a callback handler
-CallbackSubscription sub = session.subscribe(this::handleChange);
+// ... or push values to a callback handler (Subscriber lambda)
+Subscription sub = session.subscribe(
+    (Snapshot<Session> snap) -> handleChange(snap));
 
-// ... or push values plus register lifecycle handlers via the customizer
-CallbackSubscription sub = session.subscribe(
-    this::handleChange,
-    builder -> builder
-        .onError(err -> log.error("subscription failed", err))
-        .onExpiration(() -> log.info("session lease expired"))
-        .onDelete(() -> log.info("session deleted by another node")));
+// ... or use SubscriberConfig for lifecycle handlers
+Subscription sub = session.subscribe(cfg -> cfg
+    .onNext(this::handleChange)
+    .onError(err -> log.error("subscription failed", err))
+    .onExpired(() -> log.info("session lease expired"))
+    .onDeleted(() -> log.info("session deleted by another node")));
 
 // Cancel the callback subscription when you're done
 sub.cancel();
@@ -224,12 +224,11 @@ try (BlockingSubscription<ElicitationResponse> sub = mailbox.subscribe()) {
 }
 
 // ... or via callback. The handler fires exactly once per subscription;
-// onComplete fires after the handler returns.
-mailbox.subscribe(
-    this::processResponse,
-    builder -> builder
-        .onExpiration(() -> log.info("mailbox expired before delivery"))
-        .onDelete(() -> log.info("mailbox deleted before delivery")));
+// onCompleted fires after the handler returns.
+mailbox.subscribe(cfg -> cfg
+    .onNext(this::processResponse)
+    .onExpired(() -> log.info("mailbox expired before delivery"))
+    .onDeleted(() -> log.info("mailbox deleted before delivery")));
 ```
 
 
@@ -243,9 +242,10 @@ All three primitives expose the same subscription contract via two flavors:
   `next(Duration)` and blocks until a value arrives, the timeout elapses,
   or the subscription reaches a terminal state. Implements `AutoCloseable`
   so try-with-resources cancels the subscription on scope exit.
-- **`CallbackSubscription`** — push-based. Values are delivered to a
-  registered `Consumer<T>` handler on a background virtual thread.
-  Cancel by calling `cancel()`.
+- **Callback (push-based)** — pass a `Subscriber<T>` (or a
+  `SubscriberConfig<T>` customizer) to a primitive's `subscribe` method.
+  Values are delivered on a background virtual thread. The returned
+  `Subscription` is used to cancel.
 
 Every `BlockingSubscription.next(Duration)` returns a `NextResult<T>`
 sealed type with six exhaustive variants:
@@ -260,19 +260,20 @@ sealed type with six exhaustive variants:
 | `Errored(Throwable cause)` | An unexpected error occurred. | No |
 
 Pattern-match exhaustively in a `switch` and the compiler tells you when
-you've forgotten a case. The `CallbackSubscription` flavor maps these
-variants to handlers via `CallbackSubscriberBuilder`:
+you've forgotten a case. The callback flavor maps these variants to
+`Subscriber<T>` methods (or `SubscriberConfig<T>` handlers):
 
-| Builder method | Maps to |
+| Method / Handler | Maps to |
 |---|---|
-| `onError(Consumer<Throwable>)` | `Errored(cause)` |
-| `onExpiration(Runnable)` | `Expired` |
-| `onDelete(Runnable)` | `Deleted` |
-| `onComplete(Runnable)` | `Completed` |
+| `onNext(T)` | `Value(T)` |
+| `onError(Throwable)` | `Errored(cause)` |
+| `onExpired()` | `Expired` |
+| `onDeleted()` | `Deleted` |
+| `onCompleted()` | `Completed` |
+| `onCancelled()` | `Cancelled` |
 
-`Value` and `Timeout` aren't in the table because the `onNext` consumer
-handles `Value` and `Timeout` is a non-event for callback subscriptions
-(they don't have a per-call timeout).
+`Timeout` is a non-event for callback subscriptions (they don't have a
+per-call timeout).
 
 ### Lifecycles
 
@@ -488,15 +489,15 @@ substrate:
 
 - **Blocking-first, callback-optional** — the primary API is blocking
   (`BlockingSubscription.next(Duration)`) and designed for virtual threads.
-  A `CallbackSubscription` flavor is also available when fire-and-forget
-  callback semantics are a better fit. No `Mono`/`Flux` or other
-  Reactive Streams dependencies.
+  A `Subscriber<T>` / `SubscriberConfig<T>` callback flavor is also
+  available when fire-and-forget push semantics are a better fit.
+  No `Mono`/`Flux` or other Reactive Streams dependencies.
 - **Intentionally leased** — every primitive has an explicit TTL; nothing
   lives forever without renewal
 - **SPIs are pure storage** — no notifications, no threading, no futures at
   the SPI layer
 - **Unified subscription model** — all primitives share `BlockingSubscription`,
-  `CallbackSubscription`, and `NextResult<T>` so consumers learn one pattern
+  `Subscriber<T>`, and `NextResult<T>` so consumers learn one pattern
 - **Mix and match** — use Redis for Atom, PostgreSQL for Journal, and NATS
   for Mailbox in the same application
 - **Spring Boot auto-configuration** — drop a backend module on the classpath

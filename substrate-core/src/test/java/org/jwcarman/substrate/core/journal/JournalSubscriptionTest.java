@@ -29,8 +29,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.BlockingSubscription;
-import org.jwcarman.substrate.CallbackSubscription;
 import org.jwcarman.substrate.NextResult;
+import org.jwcarman.substrate.SubscriberConfig;
+import org.jwcarman.substrate.Subscription;
 import org.jwcarman.substrate.core.memory.journal.InMemoryJournalSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.journal.JournalEntry;
@@ -406,9 +407,9 @@ class JournalSubscriptionTest {
     List<String> received = new CopyOnWriteArrayList<>();
     CountDownLatch latch = new CountDownLatch(3);
 
-    CallbackSubscription sub =
+    Subscription sub =
         journal.subscribe(
-            entry -> {
+            (JournalEntry<String> entry) -> {
               received.add(entry.data());
               latch.countDown();
             });
@@ -429,15 +430,15 @@ class JournalSubscriptionTest {
     AtomicBoolean completed = new AtomicBoolean(false);
     CountDownLatch latch = new CountDownLatch(1);
 
-    CallbackSubscription sub =
+    Subscription sub =
         journal.subscribe(
-            entry -> {},
-            b ->
-                b.onComplete(
-                    () -> {
-                      completed.set(true);
-                      latch.countDown();
-                    }));
+            (SubscriberConfig<JournalEntry<String>> cfg) ->
+                cfg.onNext(entry -> {})
+                    .onCompleted(
+                        () -> {
+                          completed.set(true);
+                          latch.countDown();
+                        }));
     try {
       journal.complete(Duration.ofDays(1));
 
@@ -457,10 +458,10 @@ class JournalSubscriptionTest {
     List<String> received = new CopyOnWriteArrayList<>();
     CountDownLatch latch = new CountDownLatch(2);
 
-    CallbackSubscription sub =
+    Subscription sub =
         journal.subscribeAfter(
             id1,
-            entry -> {
+            (JournalEntry<String> entry) -> {
               received.add(entry.data());
               latch.countDown();
             });
@@ -481,10 +482,10 @@ class JournalSubscriptionTest {
     List<String> received = new CopyOnWriteArrayList<>();
     CountDownLatch latch = new CountDownLatch(4);
 
-    CallbackSubscription sub =
+    Subscription sub =
         journal.subscribeLast(
             2,
-            entry -> {
+            (JournalEntry<String> entry) -> {
               received.add(entry.data());
               latch.countDown();
             });

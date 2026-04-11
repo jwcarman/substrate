@@ -24,8 +24,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.BlockingSubscription;
-import org.jwcarman.substrate.CallbackSubscriberBuilder;
-import org.jwcarman.substrate.CallbackSubscription;
+import org.jwcarman.substrate.Subscriber;
+import org.jwcarman.substrate.SubscriberConfig;
+import org.jwcarman.substrate.Subscription;
 import org.jwcarman.substrate.atom.Atom;
 import org.jwcarman.substrate.atom.AtomExpiredException;
 import org.jwcarman.substrate.atom.Snapshot;
@@ -33,8 +34,8 @@ import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.subscription.CoalescingHandoff;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
-import org.jwcarman.substrate.core.subscription.DefaultCallbackSubscriberBuilder;
 import org.jwcarman.substrate.core.subscription.DefaultCallbackSubscription;
+import org.jwcarman.substrate.core.subscription.DefaultSubscriberBuilder;
 import org.jwcarman.substrate.core.subscription.FeederSupport;
 
 public class DefaultAtom<T> implements Atom<T> {
@@ -112,27 +113,24 @@ public class DefaultAtom<T> implements Atom<T> {
   }
 
   @Override
-  public CallbackSubscription subscribe(Consumer<Snapshot<T>> onNext) {
-    return buildCallbackSubscription(null, onNext, null);
+  public Subscription subscribe(Subscriber<Snapshot<T>> subscriber) {
+    return buildCallbackSubscription(null, subscriber);
   }
 
   @Override
-  public CallbackSubscription subscribe(
-      Consumer<Snapshot<T>> onNext, Consumer<CallbackSubscriberBuilder<Snapshot<T>>> customizer) {
-    return buildCallbackSubscription(null, onNext, customizer);
+  public Subscription subscribe(Consumer<SubscriberConfig<Snapshot<T>>> customizer) {
+    return subscribe(DefaultSubscriberBuilder.from(customizer));
   }
 
   @Override
-  public CallbackSubscription subscribe(Snapshot<T> lastSeen, Consumer<Snapshot<T>> onNext) {
-    return buildCallbackSubscription(lastSeen, onNext, null);
+  public Subscription subscribe(Snapshot<T> lastSeen, Subscriber<Snapshot<T>> subscriber) {
+    return buildCallbackSubscription(lastSeen, subscriber);
   }
 
   @Override
-  public CallbackSubscription subscribe(
-      Snapshot<T> lastSeen,
-      Consumer<Snapshot<T>> onNext,
-      Consumer<CallbackSubscriberBuilder<Snapshot<T>>> customizer) {
-    return buildCallbackSubscription(lastSeen, onNext, customizer);
+  public Subscription subscribe(
+      Snapshot<T> lastSeen, Consumer<SubscriberConfig<Snapshot<T>>> customizer) {
+    return subscribe(lastSeen, DefaultSubscriberBuilder.from(customizer));
   }
 
   @Override
@@ -146,22 +144,13 @@ public class DefaultAtom<T> implements Atom<T> {
     return new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
   }
 
-  private CallbackSubscription buildCallbackSubscription(
-      Snapshot<T> lastSeen,
-      Consumer<Snapshot<T>> onNext,
-      Consumer<CallbackSubscriberBuilder<Snapshot<T>>> customizer) {
+  private Subscription buildCallbackSubscription(
+      Snapshot<T> lastSeen, Subscriber<Snapshot<T>> subscriber) {
     CoalescingHandoff<Snapshot<T>> handoff = new CoalescingHandoff<>();
     Runnable canceller = startFeeder(handoff, lastSeen);
-
-    DefaultCallbackSubscriberBuilder<Snapshot<T>> builder =
-        new DefaultCallbackSubscriberBuilder<>();
-    if (customizer != null) {
-      customizer.accept(builder);
-    }
-
     DefaultBlockingSubscription<Snapshot<T>> source =
         new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
-    return new DefaultCallbackSubscription<>(source, onNext, builder.callbacks());
+    return new DefaultCallbackSubscription<>(source, subscriber);
   }
 
   private Runnable startFeeder(CoalescingHandoff<Snapshot<T>> handoff, Snapshot<T> lastSeen) {

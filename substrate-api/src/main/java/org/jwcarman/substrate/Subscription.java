@@ -24,17 +24,20 @@ package org.jwcarman.substrate;
  * expiration, deletion, or error). Calling {@link #cancel()} on an already-inactive subscription is
  * a no-op.
  *
- * <p>The two concrete subscription styles are:
+ * <p>The two delivery styles are:
  *
  * <ul>
- *   <li>{@link BlockingSubscription} — pull-based, caller polls for values via {@link
+ *   <li>{@link BlockingSubscription} — pull-based. The caller polls for values via {@link
  *       BlockingSubscription#next(java.time.Duration) next(Duration)}.
- *   <li>{@link CallbackSubscription} — push-based, values are delivered to a registered handler on
- *       a background thread.
+ *   <li><b>Callback (push-based)</b> — values are delivered to a {@link Subscriber} on a background
+ *       virtual thread. The {@code subscribe} methods on each primitive accept either a ready-made
+ *       {@link Subscriber} or a {@link SubscriberConfig} customizer and return a plain {@code
+ *       Subscription}.
  * </ul>
  *
  * @see BlockingSubscription
- * @see CallbackSubscription
+ * @see Subscriber
+ * @see SubscriberConfig
  */
 public interface Subscription {
 

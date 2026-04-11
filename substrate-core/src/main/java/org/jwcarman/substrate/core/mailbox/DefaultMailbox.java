@@ -19,13 +19,14 @@ import java.util.Optional;
 import java.util.function.Consumer;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.BlockingSubscription;
-import org.jwcarman.substrate.CallbackSubscriberBuilder;
-import org.jwcarman.substrate.CallbackSubscription;
+import org.jwcarman.substrate.Subscriber;
+import org.jwcarman.substrate.SubscriberConfig;
+import org.jwcarman.substrate.Subscription;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
-import org.jwcarman.substrate.core.subscription.DefaultCallbackSubscriberBuilder;
 import org.jwcarman.substrate.core.subscription.DefaultCallbackSubscription;
+import org.jwcarman.substrate.core.subscription.DefaultSubscriberBuilder;
 import org.jwcarman.substrate.core.subscription.FeederSupport;
 import org.jwcarman.substrate.core.subscription.SingleShotHandoff;
 import org.jwcarman.substrate.mailbox.Mailbox;
@@ -77,24 +78,17 @@ public class DefaultMailbox<T> implements Mailbox<T> {
   }
 
   @Override
-  public CallbackSubscription subscribe(Consumer<T> onNext) {
-    return subscribe(onNext, null);
+  public Subscription subscribe(Subscriber<T> subscriber) {
+    SingleShotHandoff<T> handoff = new SingleShotHandoff<>();
+    Runnable canceller = startFeeder(handoff);
+    DefaultBlockingSubscription<T> source =
+        new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
+    return new DefaultCallbackSubscription<>(source, subscriber);
   }
 
   @Override
-  public CallbackSubscription subscribe(
-      Consumer<T> onNext, Consumer<CallbackSubscriberBuilder<T>> customizer) {
-    SingleShotHandoff<T> handoff = new SingleShotHandoff<>();
-    Runnable canceller = startFeeder(handoff);
-
-    DefaultCallbackSubscriberBuilder<T> builder = new DefaultCallbackSubscriberBuilder<>();
-    if (customizer != null) {
-      customizer.accept(builder);
-    }
-
-    DefaultBlockingSubscription<T> source =
-        new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
-    return new DefaultCallbackSubscription<>(source, onNext, builder.callbacks());
+  public Subscription subscribe(Consumer<SubscriberConfig<T>> customizer) {
+    return subscribe(DefaultSubscriberBuilder.from(customizer));
   }
 
   private Runnable startFeeder(SingleShotHandoff<T> handoff) {

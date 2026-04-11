@@ -22,14 +22,15 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.BlockingSubscription;
-import org.jwcarman.substrate.CallbackSubscriberBuilder;
-import org.jwcarman.substrate.CallbackSubscription;
+import org.jwcarman.substrate.Subscriber;
+import org.jwcarman.substrate.SubscriberConfig;
+import org.jwcarman.substrate.Subscription;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.subscription.BlockingBoundedHandoff;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
-import org.jwcarman.substrate.core.subscription.DefaultCallbackSubscriberBuilder;
 import org.jwcarman.substrate.core.subscription.DefaultCallbackSubscription;
+import org.jwcarman.substrate.core.subscription.DefaultSubscriberBuilder;
 import org.jwcarman.substrate.core.subscription.FeederSupport;
 import org.jwcarman.substrate.journal.Journal;
 import org.jwcarman.substrate.journal.JournalEntry;
@@ -136,49 +137,39 @@ public class DefaultJournal<T> implements Journal<T> {
   }
 
   @Override
-  public CallbackSubscription subscribe(Consumer<JournalEntry<T>> onNext) {
+  public Subscription subscribe(Subscriber<JournalEntry<T>> subscriber) {
     List<RawJournalEntry> lastEntries = journalSpi.readLast(key, 1);
     String startingCheckpoint = lastEntries.isEmpty() ? null : lastEntries.getLast().id();
-    return buildCallbackSubscription(startingCheckpoint, List.of(), onNext, null);
+    return buildCallbackSubscription(startingCheckpoint, List.of(), subscriber);
   }
 
   @Override
-  public CallbackSubscription subscribe(
-      Consumer<JournalEntry<T>> onNext,
-      Consumer<CallbackSubscriberBuilder<JournalEntry<T>>> customizer) {
-    List<RawJournalEntry> lastEntries = journalSpi.readLast(key, 1);
-    String startingCheckpoint = lastEntries.isEmpty() ? null : lastEntries.getLast().id();
-    return buildCallbackSubscription(startingCheckpoint, List.of(), onNext, customizer);
+  public Subscription subscribe(Consumer<SubscriberConfig<JournalEntry<T>>> customizer) {
+    return subscribe(DefaultSubscriberBuilder.from(customizer));
   }
 
   @Override
-  public CallbackSubscription subscribeAfter(String afterId, Consumer<JournalEntry<T>> onNext) {
-    return buildCallbackSubscription(afterId, List.of(), onNext, null);
+  public Subscription subscribeAfter(String afterId, Subscriber<JournalEntry<T>> subscriber) {
+    return buildCallbackSubscription(afterId, List.of(), subscriber);
   }
 
   @Override
-  public CallbackSubscription subscribeAfter(
-      String afterId,
-      Consumer<JournalEntry<T>> onNext,
-      Consumer<CallbackSubscriberBuilder<JournalEntry<T>>> customizer) {
-    return buildCallbackSubscription(afterId, List.of(), onNext, customizer);
+  public Subscription subscribeAfter(
+      String afterId, Consumer<SubscriberConfig<JournalEntry<T>>> customizer) {
+    return subscribeAfter(afterId, DefaultSubscriberBuilder.from(customizer));
   }
 
   @Override
-  public CallbackSubscription subscribeLast(int count, Consumer<JournalEntry<T>> onNext) {
+  public Subscription subscribeLast(int count, Subscriber<JournalEntry<T>> subscriber) {
     List<RawJournalEntry> preload = journalSpi.readLast(key, count);
     String startingCheckpoint = preload.isEmpty() ? null : preload.getLast().id();
-    return buildCallbackSubscription(startingCheckpoint, preload, onNext, null);
+    return buildCallbackSubscription(startingCheckpoint, preload, subscriber);
   }
 
   @Override
-  public CallbackSubscription subscribeLast(
-      int count,
-      Consumer<JournalEntry<T>> onNext,
-      Consumer<CallbackSubscriberBuilder<JournalEntry<T>>> customizer) {
-    List<RawJournalEntry> preload = journalSpi.readLast(key, count);
-    String startingCheckpoint = preload.isEmpty() ? null : preload.getLast().id();
-    return buildCallbackSubscription(startingCheckpoint, preload, onNext, customizer);
+  public Subscription subscribeLast(
+      int count, Consumer<SubscriberConfig<JournalEntry<T>>> customizer) {
+    return subscribeLast(count, DefaultSubscriberBuilder.from(customizer));
   }
 
   @Override
@@ -194,24 +185,16 @@ public class DefaultJournal<T> implements Journal<T> {
     return new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
   }
 
-  private CallbackSubscription buildCallbackSubscription(
+  private Subscription buildCallbackSubscription(
       String startingCheckpoint,
       List<RawJournalEntry> preload,
-      Consumer<JournalEntry<T>> onNext,
-      Consumer<CallbackSubscriberBuilder<JournalEntry<T>>> customizer) {
+      Subscriber<JournalEntry<T>> subscriber) {
     BlockingBoundedHandoff<JournalEntry<T>> handoff =
         new BlockingBoundedHandoff<>(subscriptionQueueCapacity);
     Runnable canceller = startFeeder(handoff, startingCheckpoint, preload);
-
-    DefaultCallbackSubscriberBuilder<JournalEntry<T>> builder =
-        new DefaultCallbackSubscriberBuilder<>();
-    if (customizer != null) {
-      customizer.accept(builder);
-    }
-
     DefaultBlockingSubscription<JournalEntry<T>> source =
         new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
-    return new DefaultCallbackSubscription<>(source, onNext, builder.callbacks());
+    return new DefaultCallbackSubscription<>(source, subscriber);
   }
 
   private Runnable startFeeder(
