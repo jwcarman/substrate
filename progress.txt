@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T04:55:00Z
-ITERATION: 50
-SPEC_COMPLETED: 048-core-test-latch-conversions.md
-WHAT_WAS_DONE: Replaced pollDelay sleeps with latches in 8 Category A sites across 5 substrate-core test files: DefaultAtomTest (2 sites — CountDownLatch for thread-start coordination), DefaultMailboxTest (2 sites — CountDownLatch for subscribe/deliver coordination), InMemoryJournalSpiTest (2 sites — CountDownLatch timeout as wall-clock pause), JournalSubscriptionTest (1 site — CountDownLatch timeout replacing 1ms pollDelay), FeederSupportTest (1 site — removed pollDelay from during() absence check). Category B (BlockingBoundedHandoffTest during(50ms)) left as-is. Category C (InMemoryAtomSpiTest:161, DefaultAtomTest:411) not modified.
+LAST_RUN: 2026-04-11T05:00:00Z
+ITERATION: 51
+SPEC_COMPLETED: 049-abstract-handoff-extraction.md
+WHAT_WAS_DONE: Extracted two-level abstract hierarchy from the three NextHandoff implementations: AbstractHandoff (terminal-mark dispatch) and AbstractSingleSlotHandoff (shared lock/condition/slot/pull loop), then refactored CoalescingHandoff, SingleShotHandoff, and BlockingBoundedHandoff to extend them, eliminating ~40% duplication.
 VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw -pl substrate-core verify -DskipITs — BUILD SUCCESS (308 tests, 0 failures)
 STATUS: DONE
 NEXT_SPEC: none
-NOTES: No new @SuppressWarnings added. All pollDelay(...).until(() -> true) patterns eliminated from substrate-core tests. Only remaining pollDelay sites are Category C (wall-clock TTL tests in InMemoryAtomSpiTest and DefaultAtomTest). Files changed: DefaultAtomTest.java, DefaultMailboxTest.java, InMemoryJournalSpiTest.java, JournalSubscriptionTest.java, FeederSupportTest.java.
+NOTES: CoalescingHandoff renamed its `terminal` field to `sealed` (now inherited from AbstractSingleSlotHandoff). CoalescingHandoff went from 113 lines to 52, SingleShotHandoff from 114 to 52, BlockingBoundedHandoff from 100 to 84. No new @SuppressWarnings added. All existing tests pass unchanged.
