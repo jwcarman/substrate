@@ -21,11 +21,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 import java.time.Duration;
-import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.codec.spi.Codec;
+import org.jwcarman.substrate.BlockingSubscription;
+import org.jwcarman.substrate.CallbackSubscription;
+import org.jwcarman.substrate.NextResult;
 import org.jwcarman.substrate.core.memory.mailbox.InMemoryMailboxSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
@@ -73,25 +77,26 @@ class DefaultMailboxTest {
   }
 
   @Test
-  void pollReturnsImmediatelyIfAlreadyDelivered() {
+  void subscribeReturnsValueImmediatelyIfAlreadyDelivered() {
     mailbox.deliver("hello");
 
-    Optional<String> result = mailbox.poll(Duration.ofSeconds(1));
-
-    assertThat(result).contains("hello");
+    BlockingSubscription<String> sub = mailbox.subscribe();
+    NextResult<String> result = sub.next(Duration.ofSeconds(1));
+    assertThat(result).isInstanceOf(NextResult.Value.class);
+    assertThat(((NextResult.Value<String>) result).value()).isEqualTo("hello");
   }
 
   @Test
-  void pollReturnsValueWhenDeliveredLater() {
-    AtomicReference<Optional<String>> result = new AtomicReference<>();
+  void subscribeReturnsValueWhenDeliveredLater() {
+    AtomicReference<NextResult<String>> result = new AtomicReference<>();
 
     Thread.ofVirtual()
         .start(
             () -> {
-              result.set(mailbox.poll(Duration.ofSeconds(5)));
+              BlockingSubscription<String> sub = mailbox.subscribe();
+              result.set(sub.next(Duration.ofSeconds(5)));
             });
 
-    // Give poll time to enter the wait
     await().pollDelay(Duration.ofMillis(50)).atMost(Duration.ofSeconds(1)).until(() -> true);
 
     mailbox.deliver("world");
@@ -101,15 +106,39 @@ class DefaultMailboxTest {
         .untilAsserted(
             () -> {
               assertThat(result.get()).isNotNull();
-              assertThat(result.get()).contains("world");
+              assertThat(result.get()).isInstanceOf(NextResult.Value.class);
+              assertThat(((NextResult.Value<String>) result.get()).value()).isEqualTo("world");
             });
   }
 
   @Test
-  void pollReturnsEmptyOnTimeout() {
-    Optional<String> result = mailbox.poll(Duration.ofMillis(50));
+  void subscribeReturnsTimeoutWhenNoDelivery() {
+    BlockingSubscription<String> sub = mailbox.subscribe();
+    NextResult<String> result = sub.next(Duration.ofMillis(50));
+    assertThat(result).isInstanceOf(NextResult.Timeout.class);
+    sub.cancel();
+  }
 
-    assertThat(result).isEmpty();
+  @Test
+  void subscribeReturnsCompletedAfterValue() {
+    mailbox.deliver("hello");
+
+    BlockingSubscription<String> sub = mailbox.subscribe();
+    NextResult<String> first = sub.next(Duration.ofSeconds(1));
+    assertThat(first).isInstanceOf(NextResult.Value.class);
+
+    NextResult<String> second = sub.next(Duration.ofSeconds(1));
+    assertThat(second).isInstanceOf(NextResult.Completed.class);
+  }
+
+  @Test
+  void subscriptionIsInactiveAfterCompleted() {
+    mailbox.deliver("hello");
+
+    BlockingSubscription<String> sub = mailbox.subscribe();
+    sub.next(Duration.ofSeconds(1));
+    sub.next(Duration.ofSeconds(1));
+    assertThat(sub.isActive()).isFalse();
   }
 
   @Test
@@ -122,25 +151,21 @@ class DefaultMailboxTest {
   }
 
   @Test
-  void deleteRemovesValueFromSpi() {
-    mailbox.deliver("value");
-    assertThat(spi.get(KEY)).isPresent();
-
+  void deleteBeforeDeliveryNotifiesSubscribers() {
+    BlockingSubscription<String> sub = mailbox.subscribe();
     mailbox.delete();
 
-    assertThatThrownBy(() -> spi.get(KEY)).isInstanceOf(MailboxExpiredException.class);
+    await()
+        .atMost(Duration.ofSeconds(5))
+        .untilAsserted(
+            () -> {
+              NextResult<String> result = sub.next(Duration.ofMillis(50));
+              assertThat(result).isInstanceOf(NextResult.Deleted.class);
+            });
   }
 
   @Test
-  void deleteBeforeDeliveryCancelsFuture() {
-    mailbox.delete();
-
-    assertThatThrownBy(() -> spi.get(KEY)).isInstanceOf(MailboxExpiredException.class);
-  }
-
-  @Test
-  void pollReturnsValueWhenNotificationArrivesForMatchingKey() {
-    // Deliver from a separate thread after a brief delay
+  void subscribeReturnsValueWhenNotificationArrivesForMatchingKey() {
     Thread.ofVirtual()
         .start(
             () -> {
@@ -151,17 +176,20 @@ class DefaultMailboxTest {
               mailbox.deliver("async-value");
             });
 
-    Optional<String> result = mailbox.poll(Duration.ofSeconds(5));
-    assertThat(result).contains("async-value");
+    BlockingSubscription<String> sub = mailbox.subscribe();
+    NextResult<String> result = sub.next(Duration.ofSeconds(5));
+    assertThat(result).isInstanceOf(NextResult.Value.class);
+    assertThat(((NextResult.Value<String>) result).value()).isEqualTo("async-value");
   }
 
   @Test
-  void notificationForDifferentKeyDoesNotTriggerRead() {
-    // Send a notification for a different key - should not wake up the reader
+  void notificationForDifferentKeyDoesNotTriggerDelivery() {
     notifier.notify("some-other-key", "payload");
 
-    Optional<String> result = mailbox.poll(Duration.ofMillis(200));
-    assertThat(result).isEmpty();
+    BlockingSubscription<String> sub = mailbox.subscribe();
+    NextResult<String> result = sub.next(Duration.ofMillis(200));
+    assertThat(result).isInstanceOf(NextResult.Timeout.class);
+    sub.cancel();
   }
 
   @Test
@@ -172,14 +200,16 @@ class DefaultMailboxTest {
   }
 
   @Test
-  void pollReturnsOriginalValueAfterMailboxFullException() {
+  void subscribeReturnsOriginalValueAfterMailboxFullException() {
     mailbox.deliver("original");
 
     assertThatThrownBy(() -> mailbox.deliver("replacement"))
         .isInstanceOf(MailboxFullException.class);
 
-    Optional<String> result = mailbox.poll(Duration.ofSeconds(1));
-    assertThat(result).contains("original");
+    BlockingSubscription<String> sub = mailbox.subscribe();
+    NextResult<String> result = sub.next(Duration.ofSeconds(1));
+    assertThat(result).isInstanceOf(NextResult.Value.class);
+    assertThat(((NextResult.Value<String>) result).value()).isEqualTo("original");
   }
 
   @Test
@@ -188,5 +218,135 @@ class DefaultMailboxTest {
     mailbox.delete();
 
     assertThatThrownBy(() -> spi.get(KEY)).isInstanceOf(MailboxExpiredException.class);
+  }
+
+  @Test
+  void callbackSubscribeFiresOnNextOnDelivery() throws InterruptedException {
+    AtomicReference<String> captured = new AtomicReference<>();
+    CountDownLatch delivered = new CountDownLatch(1);
+
+    CallbackSubscription sub =
+        mailbox.subscribe(
+            value -> {
+              captured.set(value);
+              delivered.countDown();
+            });
+    mailbox.deliver("callback-value");
+    assertThat(delivered.await(5, TimeUnit.SECONDS)).isTrue();
+    assertThat(captured.get()).isEqualTo("callback-value");
+    sub.cancel();
+  }
+
+  @Test
+  void callbackSubscribeFiresOnCompleteAfterOnNext() throws InterruptedException {
+    CountDownLatch nextLatch = new CountDownLatch(1);
+    CountDownLatch completeLatch = new CountDownLatch(1);
+    AtomicReference<String> order = new AtomicReference<>("");
+
+    CallbackSubscription sub =
+        mailbox.subscribe(
+            value -> {
+              order.updateAndGet(s -> s + "next,");
+              nextLatch.countDown();
+            },
+            b ->
+                b.onComplete(
+                    () -> {
+                      order.updateAndGet(s -> s + "complete");
+                      completeLatch.countDown();
+                    }));
+    mailbox.deliver("value");
+    assertThat(completeLatch.await(5, TimeUnit.SECONDS)).isTrue();
+    assertThat(order.get()).isEqualTo("next,complete");
+    sub.cancel();
+  }
+
+  @Test
+  void callbackSubscribeFiresOnDeleteWhenDeletedBeforeDelivery() throws InterruptedException {
+    CountDownLatch deleteLatch = new CountDownLatch(1);
+    AtomicReference<Boolean> onNextFired = new AtomicReference<>(false);
+
+    CallbackSubscription sub =
+        mailbox.subscribe(value -> onNextFired.set(true), b -> b.onDelete(deleteLatch::countDown));
+    mailbox.delete();
+    assertThat(deleteLatch.await(5, TimeUnit.SECONDS)).isTrue();
+    assertThat(onNextFired.get()).isFalse();
+    sub.cancel();
+  }
+
+  @Test
+  void callbackSubscribeFiresOnExpirationWhenTtlElapses() throws InterruptedException {
+    InMemoryMailboxSpi shortTtlSpi = new InMemoryMailboxSpi();
+    String shortKey = "substrate:mailbox:short";
+    shortTtlSpi.create(shortKey, Duration.ofMillis(100));
+    DefaultMailbox<String> shortMailbox =
+        new DefaultMailbox<>(shortTtlSpi, shortKey, STRING_CODEC, notifier);
+
+    CountDownLatch expirationLatch = new CountDownLatch(1);
+    AtomicReference<Boolean> onNextFired = new AtomicReference<>(false);
+
+    CallbackSubscription sub =
+        shortMailbox.subscribe(
+            value -> onNextFired.set(true), b -> b.onExpiration(expirationLatch::countDown));
+    assertThat(expirationLatch.await(5, TimeUnit.SECONDS)).isTrue();
+    assertThat(onNextFired.get()).isFalse();
+    sub.cancel();
+  }
+
+  @Test
+  void blockingSubscribeReturnsExpiredWhenTtlElapses() {
+    InMemoryMailboxSpi shortTtlSpi = new InMemoryMailboxSpi();
+    String shortKey = "substrate:mailbox:short";
+    shortTtlSpi.create(shortKey, Duration.ofMillis(100));
+    DefaultMailbox<String> shortMailbox =
+        new DefaultMailbox<>(shortTtlSpi, shortKey, STRING_CODEC, notifier);
+
+    BlockingSubscription<String> sub = shortMailbox.subscribe();
+    await()
+        .atMost(Duration.ofSeconds(5))
+        .untilAsserted(
+            () -> {
+              NextResult<String> result = sub.next(Duration.ofMillis(50));
+              assertThat(result).isInstanceOf(NextResult.Expired.class);
+            });
+  }
+
+  @Test
+  void cancelStopsFeederThread() {
+    BlockingSubscription<String> sub = mailbox.subscribe();
+    assertThat(sub.isActive()).isTrue();
+    sub.cancel();
+    assertThat(sub.isActive()).isFalse();
+  }
+
+  @Test
+  void cancelOnAlreadyReceivedValueIsIdempotent() {
+    mailbox.deliver("value");
+
+    BlockingSubscription<String> sub = mailbox.subscribe();
+    NextResult<String> result = sub.next(Duration.ofSeconds(1));
+    assertThat(result).isInstanceOf(NextResult.Value.class);
+    sub.cancel();
+    assertThat(sub.isActive()).isFalse();
+  }
+
+  @Test
+  void feederThreadExitsAfterSuccessfulPush() {
+    mailbox.deliver("value");
+
+    BlockingSubscription<String> sub = mailbox.subscribe();
+    sub.next(Duration.ofSeconds(1));
+
+    await()
+        .atMost(Duration.ofSeconds(5))
+        .untilAsserted(
+            () -> {
+              long feederCount =
+                  Thread.getAllStackTraces().keySet().stream()
+                      .filter(t -> t.getName().startsWith("substrate-mailbox-feeder"))
+                      .filter(Thread::isAlive)
+                      .count();
+              assertThat(feederCount).isZero();
+            });
   }
 }

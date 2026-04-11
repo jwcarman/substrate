@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.core.mailbox;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -29,6 +30,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.codec.spi.TypeRef;
+import org.jwcarman.substrate.BlockingSubscription;
+import org.jwcarman.substrate.NextResult;
 import org.jwcarman.substrate.core.memory.mailbox.InMemoryMailboxSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.mailbox.Mailbox;
@@ -71,7 +74,10 @@ class MailboxFactoryTest {
     Mailbox<String> mailbox = factory.create("test", String.class, Duration.ofMinutes(5));
     mailbox.deliver("hello");
 
-    assertEquals("hello", mailbox.poll(Duration.ofSeconds(1)).orElseThrow());
+    BlockingSubscription<String> sub = mailbox.subscribe();
+    NextResult<String> result = sub.next(Duration.ofSeconds(1));
+    assertThat(result).isInstanceOf(NextResult.Value.class);
+    assertEquals("hello", ((NextResult.Value<String>) result).value());
   }
 
   @Test

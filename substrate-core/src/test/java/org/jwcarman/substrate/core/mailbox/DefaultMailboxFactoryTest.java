@@ -23,11 +23,12 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 import java.time.Duration;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.codec.spi.CodecFactory;
+import org.jwcarman.substrate.BlockingSubscription;
+import org.jwcarman.substrate.NextResult;
 import org.jwcarman.substrate.core.memory.mailbox.InMemoryMailboxSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.mailbox.Mailbox;
@@ -92,8 +93,9 @@ class DefaultMailboxFactoryTest {
 
     connected.deliver("hello");
 
-    Optional<String> result = created.poll(Duration.ofSeconds(5));
-    assertThat(result).isPresent();
-    assertThat(result.get()).isEqualTo("hello");
+    BlockingSubscription<String> sub = created.subscribe();
+    NextResult<String> result = sub.next(Duration.ofSeconds(5));
+    assertThat(result).isInstanceOf(NextResult.Value.class);
+    assertThat(((NextResult.Value<String>) result).value()).isEqualTo("hello");
   }
 }

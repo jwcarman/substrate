@@ -6,7 +6,8 @@ were identified after 033 was already being implemented.
 
 ## What to build
 
-Three related changes to the subscription machinery from spec 033:
+Five related cleanup changes to the subscription machinery from
+spec 033 and the feeder implementations from specs 034 and 035:
 
 1. **Fix an interrupt-loop bug** in
    `DefaultBlockingSubscription.next(Duration)` and
@@ -31,10 +32,31 @@ Three related changes to the subscription machinery from spec 033:
    it up promptly. Idle subscriptions do zero periodic work; cancel
    latency drops from "up to 1 second" to "microseconds."
 
-All three changes are small and localized to two files in
-`substrate-api` and two files in `substrate-core`. Zero impact on
+4. **Guard `semaphore.tryAcquire` with its return value** in the
+   feeder threads of `DefaultAtom` (from spec 034) and
+   `DefaultJournal` (from spec 035). The current code calls
+   `tryAcquire` and then unconditionally calls `drainPermits`,
+   ignoring the boolean return. The correct pattern — which spec
+   017's original `DefaultJournalCursor` feeder used — is
+   `if (semaphore.tryAcquire(...)) { semaphore.drainPermits(); }`.
+   The behavior difference is that `drainPermits` is only called
+   when `tryAcquire` actually acquired a permit (meaning at least
+   one notification fired); when `tryAcquire` times out, there's
+   nothing stacked to drain.
+
+5. **Rename the `record` local variable in `DefaultAtom`** (two
+   occurrences: inside `get()` and inside the feeder loop). `record`
+   is a Java restricted identifier — it compiles as a variable name
+   but it's confusing because readers expect it to be a type
+   declaration. Rename to `raw` (or `rawAtom`) to avoid the
+   cognitive stumble.
+
+Changes 1, 2, and 3 touch only `substrate-api` and
+`substrate-core/.../subscription`. Changes 4 and 5 touch already-
+committed code in `substrate-core/.../atom/DefaultAtom.java` and
+`substrate-core/.../journal/DefaultJournal.java`. Zero impact on
 primitive interfaces, backends, or tests outside the subscription
-layer.
+and feeder layers.
 
 ## The bug: interrupted consumers spin on Timeout forever
 
@@ -380,6 +402,93 @@ exhaustiveness guarantee and require a separate chain of
 `instanceof` checks to figure out which terminal callback to
 invoke. Strictly worse.
 
+## Feeder cleanup — `DefaultAtom` and `DefaultJournal`
+
+Both feeder implementations currently have the wrong
+`tryAcquire`/`drainPermits` pattern. The code looks like:
+
+```java
+// WRONG — ignores tryAcquire's boolean return
+semaphore.tryAcquire(1, TimeUnit.SECONDS);
+semaphore.drainPermits();
+```
+
+Should be:
+
+```java
+// RIGHT — honors the return value, matches spec 017 pattern
+if (semaphore.tryAcquire(1, TimeUnit.SECONDS)) {
+  semaphore.drainPermits();
+}
+```
+
+The behavior difference: when `tryAcquire` returns false (the
+1-second timeout elapsed without any permits arriving), there's
+nothing stacked up to drain, so `drainPermits` should be skipped.
+When it returns true (at least one `release()` happened during
+the wait), there might be more permits stacked behind it, so
+`drainPermits` clears them in a single call. This is the exact
+pattern spec 017 established when it introduced the semaphore
+nudge model.
+
+**Locations to fix:**
+
+- `substrate-core/src/main/java/org/jwcarman/substrate/core/atom/DefaultAtom.java`
+  — the Atom feeder loop (currently around line 199)
+- `substrate-core/src/main/java/org/jwcarman/substrate/core/journal/DefaultJournal.java`
+  — the Journal feeder loop (currently around line 254)
+
+`DefaultMailbox.java` already has the correct pattern (carried
+over from spec 017's original implementation), so it doesn't need
+fixing. The Mailbox migration spec (spec 036) has the correct
+pattern in its sketch; when Ralph implements it, the resulting
+code will be correct on its first commit.
+
+## `record` variable rename in `DefaultAtom`
+
+`DefaultAtom.java` currently uses `record` as a local variable
+name in two places:
+
+- Inside `get()` (currently around line 81):
+  ```java
+  RawAtom record = atomSpi.read(key).orElseThrow(() -> new AtomExpiredException(key));
+  ```
+- Inside the feeder loop (currently around line 187):
+  ```java
+  Optional<RawAtom> record = atomSpi.read(key);
+  ```
+
+Java allows `record` as a local variable name because it's a
+"restricted identifier" (reserved only in the context of type
+declarations). But the IDE and compiler syntax highlighting often
+treat it specially, readers expect it to be a keyword, and it
+creates a cognitive stumble.
+
+**Rename both occurrences to `raw`** to match the type name
+(`RawAtom`) and avoid the keyword confusion:
+
+```java
+// get() body
+RawAtom raw = atomSpi.read(key).orElseThrow(() -> new AtomExpiredException(key));
+return new Snapshot<>(codec.decode(raw.value()), raw.token());
+
+// feeder loop
+Optional<RawAtom> raw = atomSpi.read(key);
+if (raw.isEmpty()) {
+  handoff.markExpired();
+  return;
+}
+if (!raw.get().token().equals(lastToken.get())) {
+  Snapshot<T> snap = new Snapshot<>(codec.decode(raw.get().value()), raw.get().token());
+  handoff.push(snap);
+  lastToken.set(snap.token());
+}
+```
+
+`DefaultJournal` does not have this issue — check via
+`grep '\brecord\s*=' DefaultJournal.java` to confirm before
+declaring the fix complete.
+
 ## Scope boundary
 
 Spec 037 does **not**:
@@ -402,7 +511,13 @@ Spec 037 ONLY touches:
 - `substrate-core/.../core/subscription/DefaultBlockingSubscription.java`
   — rewrite `next()` body with the cleanup and interrupt checks
 - `substrate-core/.../core/subscription/DefaultCallbackSubscription.java`
-  — add interrupt checks to the handler loop
+  — add interrupt checks to the handler loop, switch to
+  near-infinite pull duration, interrupt the handler thread from
+  `cancel()`
+- `substrate-core/.../core/atom/DefaultAtom.java` — wrap
+  `tryAcquire` in `if`, rename `record` → `raw`
+- `substrate-core/.../core/journal/DefaultJournal.java` — wrap
+  `tryAcquire` in `if`
 - New test file:
   `substrate-core/src/test/java/.../DefaultBlockingSubscriptionTest.java`
   — add tests for interrupt handling and `isTerminal` behavior
@@ -534,6 +649,32 @@ Spec 037 ONLY touches:
       terminal callbacks firing, handler exception swallowing) all
       continue to pass unchanged.
 
+### Feeder cleanup — `DefaultAtom` and `DefaultJournal`
+
+- [ ] `DefaultAtom.java`'s feeder loop wraps `semaphore.tryAcquire`
+      in an `if` that only calls `drainPermits` when `tryAcquire`
+      returned `true`.
+- [ ] `DefaultJournal.java`'s feeder loop wraps `semaphore.tryAcquire`
+      in the same pattern.
+- [ ] A grep for
+      `semaphore\.tryAcquire\([^)]*\);\s*\n\s*semaphore\.drainPermits`
+      in `substrate-core/src/main/java` returns zero matches —
+      confirming no remaining unguarded `drainPermits` calls after
+      an ignored `tryAcquire`.
+- [ ] Existing Atom and Journal subscription tests (from specs 034
+      and 035) continue to pass unchanged — this is a semantics-
+      preserving refactor.
+
+### `record` variable rename in `DefaultAtom`
+
+- [ ] `DefaultAtom.java` no longer uses `record` as a local
+      variable name. Verified by grep for `\brecord\s*=` in
+      `substrate-core/src/main/java/.../atom/DefaultAtom.java`
+      returning zero matches.
+- [ ] Both occurrences (inside `get()` and inside the feeder
+      loop) are renamed to `raw`.
+- [ ] All existing `DefaultAtom` tests continue to pass unchanged.
+
 ### Build
 
 - [ ] Spotless passes: `./mvnw spotless:check`
@@ -545,6 +686,8 @@ Spec 037 ONLY touches:
       continue to pass. The rewrite should be semantically
       equivalent for every non-interrupt case — `isTerminal()` is
       just a cleaner way to express the same logic.
+- [ ] Specs 034 and 035's subscription tests continue to pass
+      unchanged after the feeder and variable-rename cleanups.
 
 ## Implementation notes
 

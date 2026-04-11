@@ -245,9 +245,14 @@ public class DefaultMailbox<T> implements Mailbox<T> {
                 }
                 case EMPTY_BUT_ALIVE -> {
                   // Park on semaphore waiting for the next notification
-                  // or the poll timeout.
-                  semaphore.tryAcquire(1, TimeUnit.SECONDS);
-                  semaphore.drainPermits();
+                  // or the poll timeout. If tryAcquire returns true, we
+                  // got at least one permit — there might be more stacked
+                  // up from rapid notifications, so drain them. If it
+                  // returns false (timeout), nothing is stacked and we
+                  // skip the drain.
+                  if (semaphore.tryAcquire(1, TimeUnit.SECONDS)) {
+                    semaphore.drainPermits();
+                  }
                 }
               }
             }
