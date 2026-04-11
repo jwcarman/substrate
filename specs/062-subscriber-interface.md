@@ -1,4 +1,4 @@
-# Introduce Subscriber<T> and SubscriberConfig<T> interfaces (+ core impls)
+# Introduce Subscriber<T> / SubscriberConfig<T> (api) and ConfiguredSubscriber / DefaultSubscriberBuilder (core)
 
 ## What to build
 
@@ -11,18 +11,27 @@ these types and retires the old `CallbackSubscriberBuilder` /
 The split deliberately keeps `substrate-api` as pure interfaces and
 parks all the implementation details in `substrate-core`:
 
-| Module          | Type                          | Visibility       |
-|-----------------|-------------------------------|------------------|
-| `substrate-api` | `Subscriber<T>`               | public interface |
-| `substrate-api` | `SubscriberConfig<T>`         | public interface |
-| `substrate-core`| `ConfiguredSubscriber<T>`     | public record (in `org.jwcarman.substrate.core.subscription`) |
-| `substrate-core`| `DefaultSubscriberConfig<T>`  | public class (same package) |
+| Module          | Type                         | Visibility       |
+|-----------------|------------------------------|------------------|
+| `substrate-api` | `Subscriber<T>`              | public interface |
+| `substrate-api` | `SubscriberConfig<T>`        | public interface |
+| `substrate-core`| `ConfiguredSubscriber<T>`    | public record (in `org.jwcarman.substrate.core.subscription`) |
+| `substrate-core`| `DefaultSubscriberBuilder<T>`| public class (same package) |
 
 The two api interfaces are clean and contain no static factories,
-no reference to any default impl, and no "build" semantics. The core
-side owns the mutable config, the frozen record, and the bridge
+no reference to any default impl, and no "build" semantics exposed
+as part of the contract. The core side owns the mutable builder,
+the frozen record that implements `Subscriber<T>`, and the bridge
 helper that turns a `Consumer<SubscriberConfig<T>>` customizer into
 a `Subscriber<T>`.
+
+Naming choice: the user-facing interface is `SubscriberConfig<T>`
+(what they see when the customizer lambda runs — a thing to be
+*configured*). The core-side implementation is
+`DefaultSubscriberBuilder<T>` — it implements the `SubscriberConfig<T>`
+contract AND adds a `build()` method that materializes the frozen
+`ConfiguredSubscriber<T>` record. Classic builder pattern with the
+contract and the builder wearing different names on purpose.
 
 ### `Subscriber<T>` (substrate-api)
 
@@ -108,28 +117,33 @@ builder) so it's easy to read in stack traces, trivial to test, and
 obviously immutable once constructed. Public so other core-level
 types (and tests) can reference it by name.
 
-### `DefaultSubscriberConfig<T>` (substrate-core)
+### `DefaultSubscriberBuilder<T>` (substrate-core)
 
-New file: `substrate-core/src/main/java/org/jwcarman/substrate/core/subscription/DefaultSubscriberConfig.java`
+New file: `substrate-core/src/main/java/org/jwcarman/substrate/core/subscription/DefaultSubscriberBuilder.java`
 
 Public mutable concrete implementation of `SubscriberConfig<T>`.
-Stores each registered handler in a field. Provides a public static
-helper that bridges `Consumer<SubscriberConfig<T>>` customizers into
-a `Subscriber<T>`:
+Stores each registered handler in a field. Has a public `build()`
+method that materializes a `ConfiguredSubscriber<T>` record, and a
+public static `from(...)` bridge helper the primitives use to turn
+a customizer lambda into a finished `Subscriber<T>`:
 
 ```java
-public final class DefaultSubscriberConfig<T> implements SubscriberConfig<T> {
+public final class DefaultSubscriberBuilder<T> implements SubscriberConfig<T> {
   private Consumer<T> onNext;
   private Runnable onCompleted;
   // ... etc ...
 
-  @Override public SubscriberConfig<T> onNext(Consumer<T> handler) {
+  // Covariant return: the concrete builder type, not SubscriberConfig<T>.
+  // This keeps .build() reachable after chaining without a cast.
+  @Override public DefaultSubscriberBuilder<T> onNext(Consumer<T> handler) {
     this.onNext = handler;
     return this;
   }
-  // ... etc ...
+  // ... five more setters, each declared with DefaultSubscriberBuilder<T>
+  //     as the return type (covariant override of SubscriberConfig<T>'s
+  //     SubscriberConfig<T> return type) ...
 
-  public Subscriber<T> toSubscriber() {
+  public ConfiguredSubscriber<T> build() {
     if (onNext == null) {
       throw new IllegalStateException(
           "SubscriberConfig requires an onNext handler");
@@ -139,18 +153,44 @@ public final class DefaultSubscriberConfig<T> implements SubscriberConfig<T> {
   }
 
   public static <T> Subscriber<T> from(Consumer<SubscriberConfig<T>> customizer) {
-    DefaultSubscriberConfig<T> config = new DefaultSubscriberConfig<>();
-    customizer.accept(config);
-    return config.toSubscriber();
+    DefaultSubscriberBuilder<T> builder = new DefaultSubscriberBuilder<>();
+    customizer.accept(builder);
+    return builder.build();
   }
 }
 ```
 
-- `toSubscriber()` throws `IllegalStateException` if `onNext` was
-  never registered — a configuration with no value handler is always
-  a mistake. The primitive will surface that exception before starting
+Covariant returns matter here. The interface method
+`SubscriberConfig<T>.onNext(...)` declares a return type of
+`SubscriberConfig<T>`. Java lets an implementing class override that
+with a narrower return type — in this case, `DefaultSubscriberBuilder<T>`
+— as long as the narrower type is a subtype of the declared return.
+That means:
+
+```java
+ConfiguredSubscriber<String> sub = new DefaultSubscriberBuilder<String>()
+    .onNext(s -> process(s))
+    .onError(err -> log.error("boom", err))
+    .build();           // <-- works: .onError() returned the concrete
+                        //     DefaultSubscriberBuilder, so .build() is
+                        //     still in scope.
+```
+
+Inside the customizer-flavor bridge (the `from(...)` helper), we
+accept a `Consumer<SubscriberConfig<T>>` so the user's lambda sees
+only the interface. But the static method creates a concrete
+`DefaultSubscriberBuilder<T>`, passes it to the customizer (widened
+to the interface type for the consumer's perspective), then calls
+`build()` on the concrete reference.
+
+- `build()` throws `IllegalStateException` if `onNext` was never
+  registered — a configuration with no value handler is always a
+  mistake. The primitive will surface that exception before starting
   the feeder.
-- `DefaultSubscriberConfig.from(customizer)` is the canonical bridge
+- `build()`'s return type is `ConfiguredSubscriber<T>` (not
+  `Subscriber<T>`) so callers that want the concrete record can get
+  it without a cast.
+- `DefaultSubscriberBuilder.from(customizer)` is the canonical bridge
   the three primitives will use in spec 063 to implement their
   `Consumer<SubscriberConfig<T>>` customizer-flavor subscribe
   overloads. Public so it's reachable from `DefaultAtom`,
@@ -161,16 +201,16 @@ public final class DefaultSubscriberConfig<T> implements SubscriberConfig<T> {
 - [ ] `substrate-api/src/main/java/org/jwcarman/substrate/Subscriber.java` exists with the shape above. No static factories, no nested types, no references to any default impl.
 - [ ] `substrate-api/src/main/java/org/jwcarman/substrate/SubscriberConfig.java` exists with the shape above. No `build()` method, no static factories, no references to any default impl.
 - [ ] `substrate-core/src/main/java/org/jwcarman/substrate/core/subscription/ConfiguredSubscriber.java` exists as a public record that implements `Subscriber<T>` with null-guarded dispatch to its handler fields.
-- [ ] `substrate-core/src/main/java/org/jwcarman/substrate/core/subscription/DefaultSubscriberConfig.java` exists, implements `SubscriberConfig<T>`, and exposes both a public instance method `Subscriber<T> toSubscriber()` and a public static factory `Subscriber<T> from(Consumer<SubscriberConfig<T>>)`.
+- [ ] `substrate-core/src/main/java/org/jwcarman/substrate/core/subscription/DefaultSubscriberBuilder.java` exists, implements `SubscriberConfig<T>`, declares each of its six fluent setters with a covariant return type of `DefaultSubscriberBuilder<T>` (not `SubscriberConfig<T>`), exposes a public instance method `ConfiguredSubscriber<T> build()`, and exposes a public static factory `Subscriber<T> from(Consumer<SubscriberConfig<T>>)`.
 - [ ] Javadoc on `Subscriber<T>` and `SubscriberConfig<T>` explains when each method fires and shows both a direct lambda-style `Subscriber<T>` usage example and a `Consumer<SubscriberConfig<T>>` customizer usage example.
 - [ ] A new test class `SubscriberTest` in `substrate-api/src/test/java/org/jwcarman/substrate/` covers: default `onCompleted`/`onExpired`/`onDeleted`/`onCancelled`/`onError` impls don't throw when called on a SAM-only `Subscriber<T>` lambda.
 - [ ] A new test class `ConfiguredSubscriberTest` in `substrate-core/src/test/java/org/jwcarman/substrate/core/subscription/` covers the record directly: constructing one with a mix of `null` and non-null handler fields, then asserting that each `Subscriber<T>` method either dispatches to its handler or silently no-ops when the handler is `null`.
-- [ ] A new test class `DefaultSubscriberConfigTest` in the same core package covers:
+- [ ] A new test class `DefaultSubscriberBuilderTest` in the same core package covers:
   - Each setter returns `this`.
-  - `toSubscriber()` returns a `ConfiguredSubscriber<T>` whose interface methods dispatch to the registered callbacks (exercise each one).
-  - `toSubscriber()` with no `onNext` registered throws `IllegalStateException`.
-  - `DefaultSubscriberConfig.from(c -> c.onNext(...).onError(...))` returns a `Subscriber<T>` whose handlers dispatch correctly.
-  - `DefaultSubscriberConfig.from(c -> {})` (no onNext) throws `IllegalStateException`.
+  - `build()` returns a `ConfiguredSubscriber<T>` whose interface methods dispatch to the registered callbacks (exercise each one).
+  - `build()` with no `onNext` registered throws `IllegalStateException`.
+  - `DefaultSubscriberBuilder.from(c -> c.onNext(...).onError(...))` returns a `Subscriber<T>` whose handlers dispatch correctly.
+  - `DefaultSubscriberBuilder.from(c -> {})` (no onNext) throws `IllegalStateException`.
 - [ ] `./mvnw -pl substrate-api,substrate-core verify` passes.
 - [ ] `./mvnw spotless:check` passes.
 - [ ] No existing types are modified — this spec is additive only.
@@ -181,9 +221,9 @@ public final class DefaultSubscriberConfig<T> implements SubscriberConfig<T> {
 - Keep `substrate-api` clean: no static helpers, no nested types, no
   imports from `substrate-core`. The two interfaces should look like
   pure contracts.
-- `ConfiguredSubscriber<T>` and `DefaultSubscriberConfig<T>` both live
-  in `org.jwcarman.substrate.core.subscription` — the same package
-  that already holds `DefaultBlockingSubscription`,
+- `ConfiguredSubscriber<T>` and `DefaultSubscriberBuilder<T>` both
+  live in `org.jwcarman.substrate.core.subscription` — the same
+  package that already holds `DefaultBlockingSubscription`,
   `DefaultCallbackSubscription`, and the handoff types. That keeps
   package-private access straightforward if we want to narrow
   visibility later.
