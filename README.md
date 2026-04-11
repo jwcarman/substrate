@@ -65,8 +65,15 @@ implementations that backend supports.
 </dependencies>
 ```
 
-You can mix backends — e.g., add `substrate-redis` for Atom + Mailbox +
-Notifier and `substrate-postgresql` for Journal in the same application.
+You can mix backends — e.g., add `substrate-redis` for Atom and Mailbox and
+`substrate-postgresql` for Journal in the same application.
+
+**Each backend module is a Spring Boot auto-configuration.** Drop it on the
+classpath and the SPIs it provides register themselves. There's no
+`@EnableSubstrate`, no manual `@Bean` wiring, no `@ComponentScan`. If a
+primitive has no backend on the classpath, an in-memory implementation is
+registered as a fallback (with a one-time warning), so you can develop and
+test against single-node defaults and slot in a real backend later.
 
 ## Usage
 
@@ -212,10 +219,12 @@ module per backend, not per primitive.
 | RabbitMQ   | `substrate-rabbitmq` | — | ✓ | — |
 | SNS/SQS    | `substrate-sns` | — | — | — |
 
-> **Note:** RabbitMQ and SNS/SQS modules don't add any user-facing primitives
-> on their own — they exist as pluggable cross-node notification transports
-> that the other primitives can use under the hood. If your application only
-> needs Atom/Journal/Mailbox, you don't need them.
+> **Note:** Most backend modules also supply a `NotifierSpi` implementation
+> that the primitives use internally to wake subscribers across nodes. You
+> can mix and match: e.g., use `substrate-postgresql` for storage and add
+> `substrate-rabbitmq` or `substrate-sns` purely for the cross-node wake-up
+> transport. `substrate-sns` is notification-only — it doesn't provide any
+> of the three primitives, just an SNS/SQS-backed `NotifierSpi`.
 
 ## Configuration
 
@@ -243,7 +252,11 @@ substrate:
 
 ## Design Principles
 
-- **Zero reactive types** — blocking APIs designed for virtual threads
+- **Blocking-first, callback-optional** — the primary API is blocking
+  (`BlockingSubscription.next(Duration)`) and designed for virtual threads.
+  A `CallbackSubscription` flavor is also available when fire-and-forget
+  callback semantics are a better fit. No `Mono`/`Flux` or other
+  Reactive Streams dependencies.
 - **Intentionally leased** — every primitive has an explicit TTL; nothing
   lives forever without renewal
 - **SPIs are pure storage** — no notifications, no threading, no futures at
