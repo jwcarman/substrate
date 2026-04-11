@@ -300,7 +300,7 @@ class JournalSubscriptionTest {
         switch (sub.next(Duration.ofSeconds(5))) {
           case NextResult.Value<JournalEntry<String>>(var entry) -> {
             received.add(entry.data());
-            await().pollDelay(Duration.ofMillis(1)).atMost(Duration.ofSeconds(1)).until(() -> true);
+            new CountDownLatch(1).await(1, TimeUnit.MILLISECONDS);
           }
           case NextResult.Completed<JournalEntry<String>> _ -> {
             break loop;

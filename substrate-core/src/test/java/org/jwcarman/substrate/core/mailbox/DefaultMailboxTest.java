@@ -87,17 +87,19 @@ class DefaultMailboxTest {
   }
 
   @Test
-  void subscribeReturnsValueWhenDeliveredLater() {
+  void subscribeReturnsValueWhenDeliveredLater() throws InterruptedException {
+    CountDownLatch subscribed = new CountDownLatch(1);
     AtomicReference<NextResult<String>> result = new AtomicReference<>();
 
     Thread.ofVirtual()
         .start(
             () -> {
               BlockingSubscription<String> sub = mailbox.subscribe();
+              subscribed.countDown();
               result.set(sub.next(Duration.ofSeconds(5)));
             });
 
-    await().pollDelay(Duration.ofMillis(50)).atMost(Duration.ofSeconds(1)).until(() -> true);
+    assertThat(subscribed.await(5, TimeUnit.SECONDS)).isTrue();
 
     mailbox.deliver("world");
 
@@ -165,18 +167,22 @@ class DefaultMailboxTest {
   }
 
   @Test
-  void subscribeReturnsValueWhenNotificationArrivesForMatchingKey() {
+  void subscribeReturnsValueWhenNotificationArrivesForMatchingKey() throws InterruptedException {
+    CountDownLatch readyToDeliver = new CountDownLatch(1);
     Thread.ofVirtual()
         .start(
             () -> {
-              await()
-                  .pollDelay(Duration.ofMillis(100))
-                  .atMost(Duration.ofSeconds(1))
-                  .until(() -> true);
+              try {
+                readyToDeliver.await(5, TimeUnit.SECONDS);
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+              }
               mailbox.deliver("async-value");
             });
 
     BlockingSubscription<String> sub = mailbox.subscribe();
+    readyToDeliver.countDown();
     NextResult<String> result = sub.next(Duration.ofSeconds(5));
     assertThat(result).isInstanceOf(NextResult.Value.class);
     assertThat(((NextResult.Value<String>) result).value()).isEqualTo("async-value");

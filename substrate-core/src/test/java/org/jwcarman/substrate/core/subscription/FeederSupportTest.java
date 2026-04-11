@@ -157,7 +157,6 @@ class FeederSupportTest {
 
     int snapshot = invocations.get();
     await()
-        .pollDelay(Duration.ofMillis(200))
         .during(Duration.ofMillis(300))
         .atMost(Duration.ofSeconds(2))
         .until(() -> invocations.get() == snapshot);

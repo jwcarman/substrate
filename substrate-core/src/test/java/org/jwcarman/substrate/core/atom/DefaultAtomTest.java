@@ -208,15 +208,21 @@ class DefaultAtomTest {
   }
 
   @Test
-  void subscribeWithCurrentTokenBlocksUntilSet() {
+  void subscribeWithCurrentTokenBlocksUntilSet() throws InterruptedException {
     Snapshot<String> current = atom.get();
 
     BlockingSubscription<Snapshot<String>> sub = atom.subscribe(current);
     try {
+      CountDownLatch threadStarted = new CountDownLatch(1);
       AtomicReference<NextResult<Snapshot<String>>> result = new AtomicReference<>();
-      Thread.ofVirtual().start(() -> result.set(sub.next(Duration.ofSeconds(5))));
+      Thread.ofVirtual()
+          .start(
+              () -> {
+                threadStarted.countDown();
+                result.set(sub.next(Duration.ofSeconds(5)));
+              });
 
-      await().pollDelay(Duration.ofMillis(50)).atMost(Duration.ofSeconds(1)).until(() -> true);
+      assertThat(threadStarted.await(5, TimeUnit.SECONDS)).isTrue();
 
       atom.set("changed", TTL);
 
@@ -250,15 +256,21 @@ class DefaultAtomTest {
   }
 
   @Test
-  void subscribeDeliversDeletedOnAtomDeletion() {
+  void subscribeDeliversDeletedOnAtomDeletion() throws InterruptedException {
     Snapshot<String> current = atom.get();
 
     BlockingSubscription<Snapshot<String>> sub = atom.subscribe(current);
     try {
+      CountDownLatch threadStarted = new CountDownLatch(1);
       AtomicReference<NextResult<Snapshot<String>>> result = new AtomicReference<>();
-      Thread.ofVirtual().start(() -> result.set(sub.next(Duration.ofSeconds(5))));
+      Thread.ofVirtual()
+          .start(
+              () -> {
+                threadStarted.countDown();
+                result.set(sub.next(Duration.ofSeconds(5)));
+              });
 
-      await().pollDelay(Duration.ofMillis(50)).atMost(Duration.ofSeconds(1)).until(() -> true);
+      assertThat(threadStarted.await(5, TimeUnit.SECONDS)).isTrue();
 
       atom.delete();
 

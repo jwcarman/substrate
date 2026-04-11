@@ -23,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.core.journal.RawJournalEntry;
@@ -80,16 +82,16 @@ class InMemoryJournalSpiTest {
   }
 
   @Test
-  void appendResetsInactivityTimer() {
+  void appendResetsInactivityTimer() throws InterruptedException {
     journal.create(KEY, Duration.ofMillis(200));
     journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
 
     // Wait a bit, then append again to reset the timer
-    await().pollDelay(Duration.ofMillis(100)).atMost(Duration.ofSeconds(1)).until(() -> true);
+    new CountDownLatch(1).await(100, TimeUnit.MILLISECONDS);
     journal.append(KEY, "data2".getBytes(UTF_8), Duration.ofHours(1));
 
     // Wait a bit more — journal should still be alive because append reset the timer
-    await().pollDelay(Duration.ofMillis(100)).atMost(Duration.ofSeconds(1)).until(() -> true);
+    new CountDownLatch(1).await(100, TimeUnit.MILLISECONDS);
     assertDoesNotThrow(() -> journal.append(KEY, "data3".getBytes(UTF_8), Duration.ofHours(1)));
   }
 
