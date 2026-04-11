@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T05:38:11Z
-ITERATION: 54
-SPEC_COMPLETED: 052-fix-handoff-dead-assignment.md
-WHAT_WAS_DONE: Restructured AbstractSingleSlotHandoff.pull(Duration) to hoist the `remaining` variable out of the while loop, so the awaitNanos return value feeds the next iteration instead of being a dead assignment. Fixes Sonar S1854 while keeping S899 satisfied.
-VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw -pl substrate-core verify -DskipITs — BUILD SUCCESS (307 tests, 0 failures)
+LAST_RUN: 2026-04-11T05:41:24Z
+ITERATION: 55
+SPEC_COMPLETED: 053-cover-exceptions-and-nextresult.md
+WHAT_WAS_DONE: Created test directory for substrate-api with 8 test classes covering 7 exception constructors and NextResult.isTerminal() for all 6 sealed variants. Added JUnit Jupiter, AssertJ, and Mockito test dependencies to substrate-api/pom.xml.
+VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw -pl substrate-api test — 20 tests, 0 failures; ./mvnw verify -DskipITs — BUILD SUCCESS (all 13 modules)
 STATUS: MORE_WORK
-NEXT_SPEC: 053-cover-exceptions-and-nextresult.md
-NOTES: Single-line change in AbstractSingleSlotHandoff.java — moved `long remaining = deadlineNanos - System.nanoTime()` before the while loop. No behavior change, no new annotations.
+NEXT_SPEC: 054-nats-atom-autoconfig-test.md
+NOTES: substrate-api now has a working src/test/java/ directory. Mockito deps were required because the parent POM configures mockito as a javaagent in surefire argLine for all modules.
