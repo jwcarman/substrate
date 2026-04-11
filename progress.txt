@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T02:51:00Z
-ITERATION: 40
-SPEC_COMPLETED: 039-public-api-documentation.md
-WHAT_WAS_DONE: Added comprehensive Javadoc to all public API types in substrate-api (20 files) and all SPI/handoff types in substrate-core (15 files). Created 4 package-info.java files for substrate-api packages. Documentation covers class-level purpose, method-level @param/@return/@throws, usage examples for Atom/Journal/Mailbox, cross-references via @link, thread-safety notes, and lifecycle documentation for NextResult variants and subscription types.
-VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — BUILD SUCCESS (all 13 modules, zero test failures); ./mvnw javadoc:javadoc -pl substrate-api — PASS (zero warnings); no @SuppressWarnings introduced; no code logic changes
+LAST_RUN: 2026-04-11T02:58:00Z
+ITERATION: 41
+SPEC_COMPLETED: 038-reduce-feeder-cognitive-complexity.md
+WHAT_WAS_DONE: Extracted shared feeder scaffolding into FeederSupport utility class, refactored DefaultAtom.startFeeder (~58→~20 lines), DefaultJournal.startFeeder (~75→~55 lines across 4 small methods), and DefaultMailbox.startFeeder (~50→~17 lines) to delegate to FeederSupport.start() with primitive-specific step lambdas. Created FeederSupportTest with 7 tests covering loop continuation, clean exit on step returning false, RuntimeException→handoff.error, __DELETED__ notification→markDeleted, canceller stopping the thread, interrupt without error, and key filtering.
+VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — BUILD SUCCESS (all 13 modules, 308 tests, zero failures); no @SuppressWarnings introduced; no code logic changes to existing behavior
 STATUS: DONE
 NEXT_SPEC: none
-NOTES: substrate-core javadoc:javadoc has pre-existing cross-module resolution errors on Default* internal classes (DefaultCallbackSubscriberBuilder can't resolve CallbackSubscriberBuilder from substrate-api) — these predate this spec and are unrelated to the documentation added. Usage examples avoid try-with-resources since BlockingSubscription does not extend AutoCloseable.
+NOTES: DELETED_PAYLOAD constants removed from Default* classes and inlined as string literals in delete() methods since the constant is now private in FeederSupport. Journal's JournalExpiredException and Mailbox's MailboxExpiredException are now caught inside the step lambdas rather than at the loop level, per the FeederSupport design — this preserves correct semantic mapping to markExpired() instead of handoff.error(). The Journal preload pattern uses AtomicBoolean compareAndSet to run exactly once inside the step loop.

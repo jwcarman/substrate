@@ -17,8 +17,6 @@ package org.jwcarman.substrate.core.journal;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -27,18 +25,16 @@ import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.CallbackSubscriberBuilder;
 import org.jwcarman.substrate.CallbackSubscription;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
-import org.jwcarman.substrate.core.notifier.NotifierSubscription;
 import org.jwcarman.substrate.core.subscription.BlockingBoundedHandoff;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultCallbackSubscriberBuilder;
 import org.jwcarman.substrate.core.subscription.DefaultCallbackSubscription;
+import org.jwcarman.substrate.core.subscription.FeederSupport;
 import org.jwcarman.substrate.journal.Journal;
 import org.jwcarman.substrate.journal.JournalEntry;
 import org.jwcarman.substrate.journal.JournalExpiredException;
 
 public class DefaultJournal<T> implements Journal<T> {
-
-  private static final String DELETED_PAYLOAD = "__DELETED__";
 
   private final JournalSpi journalSpi;
   private final String key;
@@ -93,7 +89,7 @@ public class DefaultJournal<T> implements Journal<T> {
   @Override
   public void delete() {
     journalSpi.delete(key);
-    notifier.notify(key, DELETED_PAYLOAD);
+    notifier.notify(key, "__DELETED__");
   }
 
   @Override
@@ -203,117 +199,75 @@ public class DefaultJournal<T> implements Journal<T> {
       BlockingBoundedHandoff<JournalEntry<T>> handoff,
       String startingCheckpoint,
       List<RawJournalEntry> preload) {
-
-    AtomicBoolean running = new AtomicBoolean(true);
-    Semaphore semaphore = new Semaphore(0);
     AtomicReference<String> checkpoint = new AtomicReference<>(startingCheckpoint);
+    AtomicBoolean preloaded = new AtomicBoolean(false);
 
-    NotifierSubscription notifierSub =
-        notifier.subscribe(
-            (notifiedKey, payload) ->
-                handleNotification(notifiedKey, payload, handoff, running, semaphore));
-
-    Thread feederThread =
-        Thread.ofVirtual()
-            .name("substrate-journal-feeder", 0)
-            .start(
-                () -> runFeederLoop(handoff, running, semaphore, checkpoint, preload, notifierSub));
-
-    return () -> {
-      running.set(false);
-      feederThread.interrupt();
-      notifierSub.cancel();
-    };
+    return FeederSupport.start(
+        key,
+        notifier,
+        handoff,
+        "substrate-journal-feeder",
+        () -> runOneIteration(handoff, checkpoint, preloaded, preload));
   }
 
-  private void handleNotification(
-      String notifiedKey,
-      String payload,
+  private boolean runOneIteration(
       BlockingBoundedHandoff<JournalEntry<T>> handoff,
-      AtomicBoolean running,
-      Semaphore semaphore) {
-    if (!key.equals(notifiedKey)) {
+      AtomicReference<String> checkpoint,
+      AtomicBoolean preloaded,
+      List<RawJournalEntry> preload) {
+    pushPreloadIfNeeded(handoff, checkpoint, preloaded, preload);
+    if (!readBatchAndPush(handoff, checkpoint)) {
+      return false;
+    }
+    return !drainIfCompleted(handoff, checkpoint);
+  }
+
+  private void pushPreloadIfNeeded(
+      BlockingBoundedHandoff<JournalEntry<T>> handoff,
+      AtomicReference<String> checkpoint,
+      AtomicBoolean preloaded,
+      List<RawJournalEntry> preload) {
+    if (!preloaded.compareAndSet(false, true)) {
       return;
     }
-    if (DELETED_PAYLOAD.equals(payload)) {
-      handoff.markDeleted();
-      running.set(false);
+    for (RawJournalEntry raw : preload) {
+      handoff.push(decode(raw));
+      checkpoint.set(raw.id());
     }
-    semaphore.release();
   }
 
-  private void runFeederLoop(
-      BlockingBoundedHandoff<JournalEntry<T>> handoff,
-      AtomicBoolean running,
-      Semaphore semaphore,
-      AtomicReference<String> checkpoint,
-      List<RawJournalEntry> preload,
-      NotifierSubscription notifierSub) {
+  private boolean readBatchAndPush(
+      BlockingBoundedHandoff<JournalEntry<T>> handoff, AtomicReference<String> checkpoint) {
     try {
-      pushPreload(handoff, running, checkpoint, preload);
-      while (running.get() && !Thread.currentThread().isInterrupted()) {
-        readBatchAndPush(handoff, running, checkpoint);
-        if (drainIfCompleted(handoff, running, checkpoint)) {
-          return;
-        }
-        waitForNudge(semaphore);
+      List<RawJournalEntry> batch = readAfterCheckpoint(checkpoint.get());
+      for (RawJournalEntry raw : batch) {
+        handoff.push(decode(raw));
+        checkpoint.set(raw.id());
       }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
+      return true;
     } catch (JournalExpiredException e) {
       handoff.markExpired();
-    } catch (RuntimeException e) {
-      handoff.error(e);
-    } finally {
-      notifierSub.cancel();
-    }
-  }
-
-  private void pushPreload(
-      BlockingBoundedHandoff<JournalEntry<T>> handoff,
-      AtomicBoolean running,
-      AtomicReference<String> checkpoint,
-      List<RawJournalEntry> preload) {
-    for (RawJournalEntry raw : preload) {
-      if (!running.get()) return;
-      handoff.push(decode(raw));
-      checkpoint.set(raw.id());
-    }
-  }
-
-  private void readBatchAndPush(
-      BlockingBoundedHandoff<JournalEntry<T>> handoff,
-      AtomicBoolean running,
-      AtomicReference<String> checkpoint) {
-    List<RawJournalEntry> batch = readAfterCheckpoint(checkpoint.get());
-    for (RawJournalEntry raw : batch) {
-      if (!running.get()) return;
-      handoff.push(decode(raw));
-      checkpoint.set(raw.id());
+      return false;
     }
   }
 
   private boolean drainIfCompleted(
-      BlockingBoundedHandoff<JournalEntry<T>> handoff,
-      AtomicBoolean running,
-      AtomicReference<String> checkpoint) {
+      BlockingBoundedHandoff<JournalEntry<T>> handoff, AtomicReference<String> checkpoint) {
     if (!journalSpi.isComplete(key)) {
       return false;
     }
-    List<RawJournalEntry> finalBatch = readAfterCheckpoint(checkpoint.get());
-    for (RawJournalEntry raw : finalBatch) {
-      if (!running.get()) return true;
-      handoff.push(decode(raw));
-      checkpoint.set(raw.id());
+    try {
+      List<RawJournalEntry> finalBatch = readAfterCheckpoint(checkpoint.get());
+      for (RawJournalEntry raw : finalBatch) {
+        handoff.push(decode(raw));
+        checkpoint.set(raw.id());
+      }
+    } catch (JournalExpiredException e) {
+      handoff.markExpired();
+      return true;
     }
     handoff.markCompleted();
     return true;
-  }
-
-  private static void waitForNudge(Semaphore semaphore) throws InterruptedException {
-    if (semaphore.tryAcquire(1, TimeUnit.SECONDS)) {
-      semaphore.drainPermits();
-    }
   }
 
   private List<RawJournalEntry> readAfterCheckpoint(String cp) {
