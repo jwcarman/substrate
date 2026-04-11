@@ -101,7 +101,7 @@ Snapshot<Session> snap = session.get();
 // Renew the lease without changing the value
 session.touch(Duration.ofHours(1));
 
-// Subscribe to changes via blocking poll
+// Subscribe to changes via blocking poll (good for virtual threads)
 try (BlockingSubscription<Snapshot<Session>> sub = session.subscribe()) {
     while (true) {
         switch (sub.next(Duration.ofSeconds(30))) {
@@ -114,8 +114,16 @@ try (BlockingSubscription<Snapshot<Session>> sub = session.subscribe()) {
     }
 }
 
-// ... or with a callback
-session.subscribe(snap -> System.out.println("New value: " + snap.value()));
+// ... or via callback, with optional lifecycle handlers
+CallbackSubscription sub = session.subscribe(
+    snap -> handleChange(snap),
+    builder -> builder
+        .onExpiration(() -> log.info("session lease expired"))
+        .onDelete(() -> log.info("session deleted by another node"))
+        .onError(err -> log.error("subscription failed", err)));
+
+// ... later, when you're done observing
+sub.cancel();
 
 // Lazy connect to an existing atom (no backend I/O until first call)
 Atom<Session> existing = atomFactory.connect("session:abc", Session.class);
