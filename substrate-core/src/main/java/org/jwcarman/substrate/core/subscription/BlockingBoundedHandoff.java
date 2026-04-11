@@ -47,7 +47,7 @@ public class BlockingBoundedHandoff<T> implements NextHandoff<T> {
     if (marked.get()) return;
     try {
       queue.put(new NextResult.Value<>(item));
-    } catch (InterruptedException e) {
+    } catch (InterruptedException _) {
       Thread.currentThread().interrupt();
     }
   }
@@ -62,7 +62,7 @@ public class BlockingBoundedHandoff<T> implements NextHandoff<T> {
     try {
       NextResult<T> r = queue.poll(timeout.toMillis(), TimeUnit.MILLISECONDS);
       return r != null ? r : new NextResult.Timeout<>();
-    } catch (InterruptedException e) {
+    } catch (InterruptedException _) {
       Thread.currentThread().interrupt();
       return new NextResult.Timeout<>();
     }
@@ -92,7 +92,7 @@ public class BlockingBoundedHandoff<T> implements NextHandoff<T> {
     if (marked.compareAndSet(false, true)) {
       try {
         queue.put(terminal);
-      } catch (InterruptedException e) {
+      } catch (InterruptedException _) {
         Thread.currentThread().interrupt();
       }
     }

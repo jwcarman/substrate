@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T04:16:00Z
-ITERATION: 46
-SPEC_COMPLETED: 044-sonar-assertthrows-lambda-cleanup.md
-WHAT_WAS_DONE: Extracted nested method calls (Duration.ofMinutes(), .getBytes(), etc.) from assertThrows/assertThatThrownBy/isThrownBy lambdas into local variables across all 9 backend modules and substrate-core, so each lambda contains exactly one potentially-throwing invocation (Sonar S5778).
-VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — BUILD SUCCESS (all 13 modules, zero failures); manual audit confirmed zero remaining S5778 violations across 125+ assertion sites
+LAST_RUN: 2026-04-11T04:22:00Z
+ITERATION: 47
+SPEC_COMPLETED: 045-sonar-unnamed-pattern-catch.md
+WHAT_WAS_DONE: Replaced unused exception variables with unnamed pattern variables (`_`) in all catch blocks across substrate-core (8 sites in 6 files), substrate-nats (2 sites in NatsAtomSpi), and substrate-mongodb (1 site in MongoDbAtomSpi) — 11 total sites fixed.
+VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — BUILD SUCCESS (all 13 modules, zero failures)
 STATUS: MORE_WORK
-NEXT_SPEC: 045-sonar-unnamed-pattern-catch.md
-NOTES: Fixed ~35 sites across 28 test files. Variables named descriptively (ttl, value, data, oneMinute, etc.). assertThatNoException().isThrownBy() multi-statement lambdas were left alone — they are a different Sonar rule (if any) and not in scope for S5778.
+NEXT_SPEC: 046-sonar-thread-sleep-triage.md
+NOTES: Many catch blocks already used `_` from prior work. All remaining named catch variables (`e`, `ex`) are legitimately referenced in their catch bodies (logging, rethrowing, method args). Files changed: BlockingBoundedHandoff.java (3 sites), CoalescingHandoff.java (1), SingleShotHandoff.java (1), FeederSupport.java (1), DefaultJournal.java (2), DefaultMailbox.java (1), NatsAtomSpi.java (2), MongoDbAtomSpi.java (1).

@@ -245,7 +245,7 @@ public class DefaultJournal<T> implements Journal<T> {
         checkpoint.set(raw.id());
       }
       return true;
-    } catch (JournalExpiredException e) {
+    } catch (JournalExpiredException _) {
       handoff.markExpired();
       return false;
     }
@@ -262,7 +262,7 @@ public class DefaultJournal<T> implements Journal<T> {
         handoff.push(decode(raw));
         checkpoint.set(raw.id());
       }
-    } catch (JournalExpiredException e) {
+    } catch (JournalExpiredException _) {
       handoff.markExpired();
       return true;
     }

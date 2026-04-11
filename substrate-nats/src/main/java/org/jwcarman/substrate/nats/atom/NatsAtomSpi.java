@@ -83,7 +83,7 @@ public class NatsAtomSpi extends AbstractAtomSpi {
       }
       kv.update(toKvKey(key), encode(value, token), entry.getRevision());
       return true;
-    } catch (JetStreamApiException e) {
+    } catch (JetStreamApiException _) {
       return false;
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to set atom in NATS KV", e);
@@ -100,7 +100,7 @@ public class NatsAtomSpi extends AbstractAtomSpi {
       }
       kv.update(toKvKey(key), entry.getValue(), entry.getRevision());
       return true;
-    } catch (JetStreamApiException e) {
+    } catch (JetStreamApiException _) {
       return false;
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to touch atom in NATS KV", e);

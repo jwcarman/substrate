@@ -123,7 +123,7 @@ public final class FeederSupport {
         }
         waitForNudge(semaphore);
       }
-    } catch (InterruptedException e) {
+    } catch (InterruptedException _) {
       Thread.currentThread().interrupt();
     } catch (RuntimeException e) {
       log.warn(label + " caught unexpected error", e);

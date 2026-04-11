@@ -62,7 +62,7 @@ public class MongoDbAtomSpi extends AbstractAtomSpi {
     doc.put(FIELD_EXPIRE_AT, Instant.now().plus(ttl));
     try {
       mongoTemplate.insert(doc, collectionName);
-    } catch (DuplicateKeyException e) {
+    } catch (DuplicateKeyException _) {
       throw new AtomAlreadyExistsException(key);
     }
   }

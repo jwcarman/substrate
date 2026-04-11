@@ -108,7 +108,7 @@ public class DefaultMailbox<T> implements Mailbox<T> {
               return false;
             }
             return true;
-          } catch (MailboxExpiredException e) {
+          } catch (MailboxExpiredException _) {
             handoff.markExpired();
             return false;
           }
