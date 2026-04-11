@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T04:01:00Z
-ITERATION: 43
-SPEC_COMPLETED: 041-sonar-blockers-missing-assertions.md
-WHAT_WAS_DONE: Added explicit assertions to 7 test methods flagged by SonarCloud java:S2699 — 5 idempotency/no-op tests wrapped with assertThatNoException().isThrownBy(), 1 schema-idempotency test likewise wrapped, and 1 mock-based test (deliverUsesLuaScript) given a verify() call to assert the Lua script was invoked.
-VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — BUILD SUCCESS (all modules, zero failures); no @SuppressWarnings introduced; no new dependencies added
-STATUS: DONE
-NEXT_SPEC: none
-NOTES: The RedisMailboxTest.deliverUsesLuaScript fix uses Mockito verify() rather than assertThatNoException because the test name implies a positive behavioral assertion ("uses Lua script"), not just "does not throw." All other 6 sites use assertThatNoException wrapping since their names signal idempotency/no-op intent.
+LAST_RUN: 2026-04-11T04:04:00Z
+ITERATION: 44
+SPEC_COMPLETED: 042-sonar-criticals-and-await-nanos.md
+WHAT_WAS_DONE: Fixed 2 Sonar S1192 criticals (extracted duplicated string literals to constants in FeederSupport and CassandraAtomSpi) and 2 Sonar S899 bugs (assigned awaitNanos return value in CoalescingHandoff and SingleShotHandoff).
+VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — BUILD SUCCESS (all 13 modules, zero failures); no @SuppressWarnings introduced; no new dependencies added
+STATUS: MORE_WORK
+NEXT_SPEC: 043-sonar-record-byte-array-members.md
+NOTES: FeederSupport fix uses a private helper method feederLabel(threadName, key) that builds the label once per runLoop invocation — the three log sites share it via a local variable. CassandraAtomSpi extracts APPLIED_COLUMN constant referenced at all 3 call sites. The awaitNanos fixes are pure assignment-back-to-remaining with no other changes to the loop logic.

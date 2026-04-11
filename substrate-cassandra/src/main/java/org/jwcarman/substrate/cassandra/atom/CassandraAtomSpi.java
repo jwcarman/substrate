@@ -30,6 +30,7 @@ public class CassandraAtomSpi extends AbstractAtomSpi {
   private static final String FIELD_KEY = "key";
   private static final String FIELD_VALUE = "value";
   private static final String FIELD_TOKEN = "token";
+  private static final String APPLIED_COLUMN = "[applied]";
 
   private final CqlSession session;
   private final String tableName;
@@ -104,7 +105,7 @@ public class CassandraAtomSpi extends AbstractAtomSpi {
         session
             .execute(insertIfNotExists.bind(key, ByteBuffer.wrap(value), token, ttlSeconds(ttl)))
             .one();
-    if (row != null && !row.getBoolean("[applied]")) {
+    if (row != null && !row.getBoolean(APPLIED_COLUMN)) {
       throw new AtomAlreadyExistsException(key);
     }
   }
@@ -128,7 +129,7 @@ public class CassandraAtomSpi extends AbstractAtomSpi {
         session
             .execute(updateIfExists.bind(ttlSeconds(ttl), ByteBuffer.wrap(value), token, key))
             .one();
-    return row != null && row.getBoolean("[applied]");
+    return row != null && row.getBoolean(APPLIED_COLUMN);
   }
 
   @Override
@@ -143,7 +144,7 @@ public class CassandraAtomSpi extends AbstractAtomSpi {
     }
     String token = existing.getString(FIELD_TOKEN);
     Row result = session.execute(updateIfExists.bind(ttlSeconds(ttl), value, token, key)).one();
-    return result != null && result.getBoolean("[applied]");
+    return result != null && result.getBoolean(APPLIED_COLUMN);
   }
 
   @Override

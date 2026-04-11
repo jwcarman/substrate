@@ -63,7 +63,7 @@ public class CoalescingHandoff<T> implements NextHandoff<T> {
         long remaining = deadlineNanos - System.nanoTime();
         if (remaining <= 0) return new NextResult.Timeout<>();
         try {
-          notEmpty.awaitNanos(remaining);
+          remaining = notEmpty.awaitNanos(remaining);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
           return new NextResult.Timeout<>();

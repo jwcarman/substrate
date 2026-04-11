@@ -112,8 +112,9 @@ public final class FeederSupport {
       NotifierSubscription notifierSub,
       String threadName,
       String key) {
+    String label = feederLabel(threadName, key);
     if (log.isDebugEnabled()) {
-      log.debug("Feeder '" + threadName + "' started for key '" + key + "'");
+      log.debug(label + " started");
     }
     try {
       while (running.get() && !Thread.currentThread().isInterrupted()) {
@@ -125,14 +126,18 @@ public final class FeederSupport {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     } catch (RuntimeException e) {
-      log.warn("Feeder '" + threadName + "' for key '" + key + "' caught unexpected error", e);
+      log.warn(label + " caught unexpected error", e);
       handoff.error(e);
     } finally {
       notifierSub.cancel();
       if (log.isDebugEnabled()) {
-        log.debug("Feeder '" + threadName + "' exited for key '" + key + "'");
+        log.debug(label + " exited");
       }
     }
+  }
+
+  private static String feederLabel(String threadName, String key) {
+    return "Feeder '" + threadName + "' for key '" + key + "'";
   }
 
   private static void waitForNudge(Semaphore semaphore) throws InterruptedException {
