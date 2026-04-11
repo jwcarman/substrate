@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T05:45:30Z
-ITERATION: 57
-SPEC_COMPLETED: 055-postgres-autoconfig-coverage.md
-WHAT_WAS_DONE: Added disabled-via-property tests to all three Postgres auto-config test classes (Atom, Journal, Mailbox), matching the pattern used by peer backends like NATS. Each test sets the enabled property to false and asserts the SPI bean is not created.
-VERIFICATION: ./mvnw spotless:check -pl substrate-postgresql — PASS; ./mvnw -pl substrate-postgresql verify -DskipITs — 15 tests, 0 failures, BUILD SUCCESS
+LAST_RUN: 2026-04-11T05:48:00Z
+ITERATION: 58
+SPEC_COMPLETED: 056-record-equality-tests.md
+WHAT_WAS_DONE: Added RawAtomTest and AtomEntryTest with 5 tests each covering content equality, byte[] inequality, token inequality, hashCode consistency, and toString readability for the custom equals/hashCode/toString overrides on both record classes.
+VERIFICATION: ./mvnw spotless:check -pl substrate-core,substrate-hazelcast — PASS; ./mvnw -pl substrate-core verify -DskipITs — RawAtomTest 5 tests, 0 failures, BUILD SUCCESS; ./mvnw -pl substrate-hazelcast verify -DskipITs — AtomEntryTest 5 tests, 0 failures, BUILD SUCCESS
 STATUS: MORE_WORK
-NEXT_SPEC: 056-record-equality-tests.md
-NOTES: The coverage gap was exactly as predicted: the @ConditionalOnProperty negative branch was uncovered. Each test class now has 3 tests (happy path, suppresses in-memory fallback, disabled via property), matching NATS and other peer backends.
+NEXT_SPEC: 057-abstract-spi-and-factory-coverage.md
+NOTES: Both records have identical structure (byte[] value, String token) so test patterns are symmetric. No new dependencies or @SuppressWarnings introduced.
