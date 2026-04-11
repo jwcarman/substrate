@@ -95,8 +95,12 @@ Atom<Session> session = atomFactory.create(
 // Update the value (resets the TTL)
 session.set(new Session("user-42", "updated"), Duration.ofHours(1));
 
-// Read the current value
+// Synchronously read the current value. Returns a Snapshot<T> containing
+// the current value plus a staleness token (a SHA-256 fingerprint the SPI
+// uses to detect changes). This is the fast path for "what is the current
+// value right now?" — no subscription, no polling.
 Snapshot<Session> snap = session.get();
+Session current = snap.value();
 
 // Renew the lease without changing the value
 session.touch(Duration.ofHours(1));
@@ -124,6 +128,17 @@ CallbackSubscription sub = session.subscribe(
 
 // ... later, when you're done observing
 sub.cancel();
+
+// Resume from a known snapshot — only deliver values that differ from lastSeen.
+// Each Snapshot carries a SHA-256 staleness token; the SPI compares incoming
+// values against it and skips deliveries that haven't actually changed.
+// Useful for reconnect-after-blip or for skipping the initial state when you
+// already have it locally.
+Snapshot<Session> lastSeen = session.get();
+processInitialState(lastSeen);
+try (BlockingSubscription<Snapshot<Session>> resumed = session.subscribe(lastSeen)) {
+    // resumed only delivers Snapshots whose token differs from lastSeen
+}
 
 // Lazy connect to an existing atom (no backend I/O until first call)
 Atom<Session> existing = atomFactory.connect("session:abc", Session.class);
