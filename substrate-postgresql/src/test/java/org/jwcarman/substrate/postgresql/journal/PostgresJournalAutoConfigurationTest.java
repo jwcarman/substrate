@@ -47,6 +47,17 @@ class PostgresJournalAutoConfigurationTest {
   }
 
   @Test
+  void doesNotCreateJournalSpiWhenDisabled() {
+    new ApplicationContextRunner()
+        .withPropertyValues("substrate.postgresql.journal.enabled=false")
+        .withConfiguration(
+            AutoConfigurations.of(
+                PostgresAutoConfiguration.class, PostgresJournalAutoConfiguration.class))
+        .withUserConfiguration(MockDataSourceConfiguration.class)
+        .run(context -> assertThat(context).doesNotHaveBean(PostgresJournalSpi.class));
+  }
+
+  @Test
   void postgresJournalSuppressesInMemoryFallback() {
     new ApplicationContextRunner()
         .withConfiguration(

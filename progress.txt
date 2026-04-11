@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T05:43:35Z
-ITERATION: 56
-SPEC_COMPLETED: 054-nats-atom-autoconfig-test.md
-WHAT_WAS_DONE: Created NatsAtomAutoConfigurationTest with 3 tests: happy path (bean created), suppression of in-memory fallback, and disabled-via-property. Follows the same pattern as the sibling NatsJournal/Mailbox/Notifier auto-config tests.
-VERIFICATION: ./mvnw spotless:check -pl substrate-nats — PASS; ./mvnw -pl substrate-nats test -Dtest=NatsAtomAutoConfigurationTest — 3 tests, 0 failures; ./mvnw -pl substrate-nats verify -DskipITs — BUILD SUCCESS
+LAST_RUN: 2026-04-11T05:45:30Z
+ITERATION: 57
+SPEC_COMPLETED: 055-postgres-autoconfig-coverage.md
+WHAT_WAS_DONE: Added disabled-via-property tests to all three Postgres auto-config test classes (Atom, Journal, Mailbox), matching the pattern used by peer backends like NATS. Each test sets the enabled property to false and asserts the SPI bean is not created.
+VERIFICATION: ./mvnw spotless:check -pl substrate-postgresql — PASS; ./mvnw -pl substrate-postgresql verify -DskipITs — 15 tests, 0 failures, BUILD SUCCESS
 STATUS: MORE_WORK
-NEXT_SPEC: 055-postgres-autoconfig-coverage.md
-NOTES: NatsAtomAutoConfiguration now has full test coverage via ApplicationContextRunner. The mock Connection stubs keyValueManagement().getStatus() to satisfy the bucket-existence check in the NatsAtomSpi constructor.
+NEXT_SPEC: 056-record-equality-tests.md
+NOTES: The coverage gap was exactly as predicted: the @ConditionalOnProperty negative branch was uncovered. Each test class now has 3 tests (happy path, suppresses in-memory fallback, disabled via property), matching NATS and other peer backends.

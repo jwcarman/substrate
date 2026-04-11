@@ -50,6 +50,17 @@ class PostgresAtomAutoConfigurationTest {
   }
 
   @Test
+  void doesNotCreateAtomSpiWhenDisabled() {
+    new ApplicationContextRunner()
+        .withPropertyValues("substrate.postgresql.atom.enabled=false")
+        .withConfiguration(
+            AutoConfigurations.of(
+                PostgresAutoConfiguration.class, PostgresAtomAutoConfiguration.class))
+        .withUserConfiguration(MockDataSourceConfiguration.class)
+        .run(context -> assertThat(context).doesNotHaveBean(PostgresAtomSpi.class));
+  }
+
+  @Test
   void postgresAtomSuppressesInMemoryFallback() {
     new ApplicationContextRunner()
         .withConfiguration(

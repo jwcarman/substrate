@@ -50,6 +50,17 @@ class PostgresMailboxAutoConfigurationTest {
   }
 
   @Test
+  void doesNotCreateMailboxSpiWhenDisabled() {
+    new ApplicationContextRunner()
+        .withPropertyValues("substrate.postgresql.mailbox.enabled=false")
+        .withConfiguration(
+            AutoConfigurations.of(
+                PostgresAutoConfiguration.class, PostgresMailboxAutoConfiguration.class))
+        .withUserConfiguration(MockDataSourceConfiguration.class)
+        .run(context -> assertThat(context).doesNotHaveBean(PostgresMailboxSpi.class));
+  }
+
+  @Test
   void postgresMailboxSuppressesInMemoryFallback() {
     new ApplicationContextRunner()
         .withConfiguration(
