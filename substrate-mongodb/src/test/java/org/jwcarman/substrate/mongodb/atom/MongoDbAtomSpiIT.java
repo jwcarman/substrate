@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.mongodb.atom;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -134,8 +135,12 @@ class MongoDbAtomSpiIT extends AbstractMongoDbIT {
   void deleteIsIdempotent() {
     String key = spi.atomKey("idempotent-" + System.nanoTime());
 
-    spi.delete(key);
-    spi.delete(key);
+    assertThatNoException()
+        .isThrownBy(
+            () -> {
+              spi.delete(key);
+              spi.delete(key);
+            });
   }
 
   @Test

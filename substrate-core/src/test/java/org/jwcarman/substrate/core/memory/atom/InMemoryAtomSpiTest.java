@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.core.memory.atom;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
@@ -195,7 +196,7 @@ class InMemoryAtomSpiTest {
 
   @Test
   void deleteIsNoOpForAbsentKey() {
-    spi.delete("missing");
+    assertThatNoException().isThrownBy(() -> spi.delete("missing"));
   }
 
   @Test

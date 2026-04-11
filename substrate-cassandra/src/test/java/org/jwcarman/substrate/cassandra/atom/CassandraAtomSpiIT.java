@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.cassandra.atom;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
@@ -248,7 +249,11 @@ class CassandraAtomSpiIT {
 
   @Test
   void schemaAutoCreationHandlesExistingTable() {
-    atom.createSchema();
-    atom.createSchema();
+    assertThatNoException()
+        .isThrownBy(
+            () -> {
+              atom.createSchema();
+              atom.createSchema();
+            });
   }
 }

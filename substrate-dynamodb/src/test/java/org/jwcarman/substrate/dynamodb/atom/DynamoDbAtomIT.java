@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.dynamodb.atom;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.charset.StandardCharsets;
@@ -239,7 +240,11 @@ class DynamoDbAtomIT extends AbstractDynamoDbIT {
 
   @Test
   void createTableIsIdempotent() {
-    atom.createTable();
-    atom.createTable();
+    assertThatNoException()
+        .isThrownBy(
+            () -> {
+              atom.createTable();
+              atom.createTable();
+            });
   }
 }

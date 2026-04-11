@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.redis.atom;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
@@ -153,8 +154,12 @@ class RedisAtomIT {
   void deleteIsIdempotent() {
     String key = atom.atomKey("delete-twice");
 
-    atom.delete(key);
-    atom.delete(key);
+    assertThatNoException()
+        .isThrownBy(
+            () -> {
+              atom.delete(key);
+              atom.delete(key);
+            });
   }
 
   @Test

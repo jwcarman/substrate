@@ -57,6 +57,13 @@ class RedisMailboxTest {
         .thenReturn(1L);
 
     mailbox.deliver("substrate:mailbox:test", "hello".getBytes(StandardCharsets.UTF_8));
+
+    verify(commands)
+        .eval(
+            any(String.class),
+            eq(ScriptOutputType.INTEGER),
+            any(String[].class),
+            eq(Base64.getEncoder().encodeToString("hello".getBytes(StandardCharsets.UTF_8))));
   }
 
   @Test

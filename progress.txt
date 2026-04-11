@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T03:12:00Z
-ITERATION: 42
-SPEC_COMPLETED: 040-feeder-lifecycle-logging.md
-WHAT_WAS_DONE: Added feeder thread lifecycle logging to FeederSupport — DEBUG log on feeder start (before while loop), DEBUG log on feeder exit (in finally block after notifierSub.cancel()), and WARN log on unexpected RuntimeException (before handoff.error). Logger uses Apache commons-logging matching existing convention. The runLoop method now takes threadName and key as additional parameters for log message context; the start method's public signature is unchanged.
-VERIFICATION: ./mvnw spotless:check — PASS (after spotless:apply fixed one line-wrap); ./mvnw verify -DskipITs — BUILD SUCCESS (all modules, zero failures); no @SuppressWarnings introduced; no new dependencies added
+LAST_RUN: 2026-04-11T04:01:00Z
+ITERATION: 43
+SPEC_COMPLETED: 041-sonar-blockers-missing-assertions.md
+WHAT_WAS_DONE: Added explicit assertions to 7 test methods flagged by SonarCloud java:S2699 — 5 idempotency/no-op tests wrapped with assertThatNoException().isThrownBy(), 1 schema-idempotency test likewise wrapped, and 1 mock-based test (deliverUsesLuaScript) given a verify() call to assert the Lua script was invoked.
+VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — BUILD SUCCESS (all modules, zero failures); no @SuppressWarnings introduced; no new dependencies added
 STATUS: DONE
 NEXT_SPEC: none
-NOTES: The log.warn call for RuntimeException does not use an isDebugEnabled/isWarnEnabled guard per the spec — warnings are rare enough that concatenation cost is irrelevant. The two DEBUG calls are guarded by isDebugEnabled() to avoid unnecessary string concatenation.
+NOTES: The RedisMailboxTest.deliverUsesLuaScript fix uses Mockito verify() rather than assertThatNoException because the test name implies a positive behavioral assertion ("uses Lua script"), not just "does not throw." All other 6 sites use assertThatNoException wrapping since their names signal idempotency/no-op intent.
