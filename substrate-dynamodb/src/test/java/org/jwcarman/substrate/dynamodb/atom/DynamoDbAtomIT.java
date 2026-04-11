@@ -18,6 +18,7 @@ package org.jwcarman.substrate.dynamodb.atom;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -187,15 +188,7 @@ class DynamoDbAtomIT extends AbstractDynamoDbIT {
     String key = atom.atomKey("ttl-" + System.nanoTime());
     atom.create(key, "ephemeral".getBytes(StandardCharsets.UTF_8), "tok1", Duration.ofSeconds(1));
 
-    // Wait for the TTL to pass — the read-side check filters expired items
-    // even before DynamoDB's eventual sweep removes them physically.
-    try {
-      Thread.sleep(1500);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
-
-    assertThat(atom.read(key)).isEmpty();
+    await().atMost(Duration.ofSeconds(5)).until(() -> atom.read(key).isEmpty());
   }
 
   @Test
@@ -203,14 +196,12 @@ class DynamoDbAtomIT extends AbstractDynamoDbIT {
     String key = atom.atomKey("ttlset-" + System.nanoTime());
     atom.create(key, "data".getBytes(StandardCharsets.UTF_8), "tok1", Duration.ofSeconds(1));
 
-    try {
-      Thread.sleep(1500);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
-
-    assertThat(atom.set(key, "new".getBytes(StandardCharsets.UTF_8), "tok2", Duration.ofMinutes(5)))
-        .isFalse();
+    await()
+        .atMost(Duration.ofSeconds(5))
+        .until(
+            () ->
+                !atom.set(
+                    key, "new".getBytes(StandardCharsets.UTF_8), "tok2", Duration.ofMinutes(5)));
   }
 
   @Test
@@ -218,13 +209,7 @@ class DynamoDbAtomIT extends AbstractDynamoDbIT {
     String key = atom.atomKey("ttltouch-" + System.nanoTime());
     atom.create(key, "data".getBytes(StandardCharsets.UTF_8), "tok1", Duration.ofSeconds(1));
 
-    try {
-      Thread.sleep(1500);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
-
-    assertThat(atom.touch(key, Duration.ofMinutes(5))).isFalse();
+    await().atMost(Duration.ofSeconds(5)).until(() -> !atom.touch(key, Duration.ofMinutes(5)));
   }
 
   @Test

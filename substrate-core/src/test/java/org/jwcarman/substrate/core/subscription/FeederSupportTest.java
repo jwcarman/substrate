@@ -155,15 +155,12 @@ class FeederSupportTest {
 
     canceller.run();
 
+    int snapshot = invocations.get();
     await()
         .pollDelay(Duration.ofMillis(200))
+        .during(Duration.ofMillis(300))
         .atMost(Duration.ofSeconds(2))
-        .untilAsserted(
-            () -> {
-              int snapshot = invocations.get();
-              Thread.sleep(100);
-              assertThat(invocations.get()).isEqualTo(snapshot);
-            });
+        .until(() -> invocations.get() == snapshot);
   }
 
   @Test

@@ -17,6 +17,7 @@ package org.jwcarman.substrate.core.subscription;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertTimeout;
 
 import java.time.Duration;
@@ -101,8 +102,7 @@ class BlockingBoundedHandoffTest {
         Duration.ofSeconds(2),
         () -> {
           started.await();
-          Thread.sleep(50);
-          assertThat(blocked.get()).isTrue();
+          await().during(Duration.ofMillis(50)).atMost(Duration.ofSeconds(1)).until(blocked::get);
 
           handoff.pull(SHORT_TIMEOUT);
           thread.join(1000);

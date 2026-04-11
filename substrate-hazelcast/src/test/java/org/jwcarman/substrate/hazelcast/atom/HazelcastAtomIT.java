@@ -220,12 +220,9 @@ class HazelcastAtomIT extends AbstractHazelcastIT {
 
     spi.touch(key, Duration.ofMinutes(5));
 
-    try {
-      Thread.sleep(3000);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
-
-    assertThat(spi.read(key)).isPresent();
+    await()
+        .pollDelay(Duration.ofSeconds(3))
+        .atMost(Duration.ofSeconds(5))
+        .untilAsserted(() -> assertThat(spi.read(key)).isPresent());
   }
 }

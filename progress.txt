@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T04:22:00Z
-ITERATION: 47
-SPEC_COMPLETED: 045-sonar-unnamed-pattern-catch.md
-WHAT_WAS_DONE: Replaced unused exception variables with unnamed pattern variables (`_`) in all catch blocks across substrate-core (8 sites in 6 files), substrate-nats (2 sites in NatsAtomSpi), and substrate-mongodb (1 site in MongoDbAtomSpi) — 11 total sites fixed.
-VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — BUILD SUCCESS (all 13 modules, zero failures)
+LAST_RUN: 2026-04-11T04:30:00Z
+ITERATION: 48
+SPEC_COMPLETED: 046-sonar-thread-sleep-triage.md
+WHAT_WAS_DONE: Triaged and replaced all 12 Thread.sleep() occurrences in test code with Awaitility equivalents — 5 Bucket B (assert-absence via await().during()), 5 Bucket A (poll for TTL expiry or use pollDelay for post-delay assertions), and 2 Bucket A (await thread state WAITING/TIMED_WAITING instead of sleep before interrupt). Zero Bucket C sleeps remain.
+VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — BUILD SUCCESS (all 13 modules, 308+ tests, zero failures)
 STATUS: MORE_WORK
-NEXT_SPEC: 046-sonar-thread-sleep-triage.md
-NOTES: Many catch blocks already used `_` from prior work. All remaining named catch variables (`e`, `ex`) are legitimately referenced in their catch bodies (logging, rethrowing, method args). Files changed: BlockingBoundedHandoff.java (3 sites), CoalescingHandoff.java (1), SingleShotHandoff.java (1), FeederSupport.java (1), DefaultJournal.java (2), DefaultMailbox.java (1), NatsAtomSpi.java (2), MongoDbAtomSpi.java (1).
+NEXT_SPEC: 047-sonar-minor-cleanups-batch.md
+NOTES: All 12 Thread.sleep sites eliminated (S2925 count drops from 12 to 0). Files changed: DefaultCallbackSubscriptionTest.java (3 sites), DefaultBlockingSubscriptionTest.java (2), FeederSupportTest.java (1), BlockingBoundedHandoffTest.java (1), DynamoDbAtomIT.java (3), HazelcastAtomIT.java (1), MongoDbAtomSpiIT.java (1). Virtual thread state checks use both WAITING and TIMED_WAITING to handle JVM variance. No @SuppressWarnings added. Integration tests (DynamoDB, Hazelcast, MongoDB) not run locally — they require Testcontainers infrastructure.

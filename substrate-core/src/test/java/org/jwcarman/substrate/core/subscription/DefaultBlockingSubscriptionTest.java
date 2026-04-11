@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.core.subscription;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
@@ -179,7 +180,13 @@ class DefaultBlockingSubscriptionTest {
                   latch.countDown();
                 });
 
-    Thread.sleep(50);
+    await()
+        .atMost(Duration.ofSeconds(1))
+        .until(
+            () -> {
+              var s = consumer.getState();
+              return s == Thread.State.WAITING || s == Thread.State.TIMED_WAITING;
+            });
     consumer.interrupt();
 
     assertThat(latch.await(1, TimeUnit.SECONDS)).isTrue();
@@ -203,7 +210,13 @@ class DefaultBlockingSubscriptionTest {
                   loopExited.set(true);
                 });
 
-    Thread.sleep(50);
+    await()
+        .atMost(Duration.ofSeconds(1))
+        .until(
+            () -> {
+              var s = consumer.getState();
+              return s == Thread.State.WAITING || s == Thread.State.TIMED_WAITING;
+            });
     consumer.interrupt();
     consumer.join(500);
 

@@ -248,15 +248,13 @@ class DefaultCallbackSubscriptionTest {
     await().atMost(Duration.ofMillis(200)).until(sub::isActive);
 
     int pullsBefore = pullCount.get();
-    Thread.sleep(3000);
-    int pullsAfter = pullCount.get();
+    await()
+        .during(Duration.ofSeconds(3))
+        .atMost(Duration.ofSeconds(4))
+        .until(() -> (pullCount.get() - pullsBefore) <= 1);
 
     sub.cancel();
     await().atMost(Duration.ofMillis(500)).until(() -> !sub.isActive());
-
-    assertThat(pullsAfter - pullsBefore)
-        .as("No pull calls should return during a 3-second idle window")
-        .isLessThanOrEqualTo(1);
   }
 
   // --- External interrupt handling ---
@@ -319,8 +317,10 @@ class DefaultCallbackSubscriptionTest {
     await().atMost(Duration.ofMillis(500)).until(() -> !sub.isActive());
 
     handoff.push("after-interrupt");
-    Thread.sleep(100);
-    assertThat(received).doesNotContain("after-interrupt");
+    await()
+        .during(Duration.ofMillis(100))
+        .atMost(Duration.ofMillis(500))
+        .until(() -> !received.contains("after-interrupt"));
   }
 
   // --- Interrupt does NOT fire onError ---
@@ -378,8 +378,10 @@ class DefaultCallbackSubscriptionTest {
     assertThat(started.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
     threadRef.get().interrupt();
 
-    Thread.sleep(200);
-    assertThat(errorFired.get()).isFalse();
+    await()
+        .during(Duration.ofMillis(200))
+        .atMost(Duration.ofMillis(500))
+        .until(() -> !errorFired.get());
   }
 
   // --- Value pushed while parked wakes handler immediately ---
