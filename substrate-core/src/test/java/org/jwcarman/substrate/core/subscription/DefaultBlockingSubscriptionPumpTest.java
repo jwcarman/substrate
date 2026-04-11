@@ -21,20 +21,22 @@ import static org.awaitility.Awaitility.await;
 import java.time.Duration;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.Subscriber;
+import org.jwcarman.substrate.Subscription;
+import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 
-class DefaultCallbackSubscriptionTest {
+class DefaultBlockingSubscriptionPumpTest {
 
   private static final Duration AWAIT_TIMEOUT = Duration.ofSeconds(5);
 
-  private DefaultCallbackSubscription<String> subscribe(
-      NextHandoff<String> handoff, Subscriber<String> subscriber) {
-    var source = new DefaultBlockingSubscription<>(handoff, () -> {});
-    return new DefaultCallbackSubscription<>(source, subscriber);
+  private Subscription startPump(NextHandoff<String> handoff, Subscriber<String> subscriber) {
+    return new DefaultBlockingSubscription<>(handoff, () -> {}, new ShutdownCoordinator())
+        .start(subscriber);
   }
 
   @Test
@@ -43,7 +45,7 @@ class DefaultCallbackSubscriptionTest {
     var received = new CopyOnWriteArrayList<String>();
     var latch = new CountDownLatch(2);
 
-    subscribe(
+    startPump(
         handoff,
         value -> {
           received.add(value);
@@ -63,7 +65,7 @@ class DefaultCallbackSubscriptionTest {
     var handoff = new BlockingBoundedHandoff<String>(10);
     var received = new CopyOnWriteArrayList<String>();
 
-    subscribe(
+    startPump(
         handoff,
         new Subscriber<>() {
           @Override
@@ -88,7 +90,7 @@ class DefaultCallbackSubscriptionTest {
     var completedRef = new CountDownLatch(1);
 
     var sub =
-        subscribe(
+        startPump(
             handoff,
             new Subscriber<>() {
               @Override
@@ -112,7 +114,7 @@ class DefaultCallbackSubscriptionTest {
     var expiredLatch = new CountDownLatch(1);
 
     var sub =
-        subscribe(
+        startPump(
             handoff,
             new Subscriber<>() {
               @Override
@@ -136,7 +138,7 @@ class DefaultCallbackSubscriptionTest {
     var deletedLatch = new CountDownLatch(1);
 
     var sub =
-        subscribe(
+        startPump(
             handoff,
             new Subscriber<>() {
               @Override
@@ -161,7 +163,7 @@ class DefaultCallbackSubscriptionTest {
     var errorLatch = new CountDownLatch(1);
 
     var sub =
-        subscribe(
+        startPump(
             handoff,
             new Subscriber<>() {
               @Override
@@ -188,7 +190,7 @@ class DefaultCallbackSubscriptionTest {
     var cancelledLatch = new CountDownLatch(1);
 
     var sub =
-        subscribe(
+        startPump(
             handoff,
             new Subscriber<>() {
               @Override
@@ -209,7 +211,7 @@ class DefaultCallbackSubscriptionTest {
   @Test
   void defaultSubscriberHandlersAreNoOps() {
     var handoff = new CoalescingHandoff<String>();
-    var sub = subscribe(handoff, value -> {});
+    var sub = startPump(handoff, value -> {});
 
     handoff.markCompleted();
 
@@ -219,7 +221,7 @@ class DefaultCallbackSubscriptionTest {
   @Test
   void cancelStopsHandlerLoop() {
     var handoff = new CoalescingHandoff<String>();
-    var sub = subscribe(handoff, value -> {});
+    var sub = startPump(handoff, value -> {});
 
     assertThat(sub.isActive()).isTrue();
     sub.cancel();
@@ -230,7 +232,7 @@ class DefaultCallbackSubscriptionTest {
   @Test
   void cancelOnIdleSubscriptionExitsQuickly() {
     var handoff = new CoalescingHandoff<String>();
-    var sub = subscribe(handoff, value -> {});
+    var sub = startPump(handoff, value -> {});
 
     await().atMost(Duration.ofMillis(200)).until(sub::isActive);
 
@@ -291,7 +293,7 @@ class DefaultCallbackSubscriptionTest {
           }
         };
 
-    var sub = subscribe(countingHandoff, value -> {});
+    var sub = startPump(countingHandoff, value -> {});
 
     await().atMost(Duration.ofMillis(200)).until(sub::isActive);
 
@@ -357,9 +359,9 @@ class DefaultCallbackSubscriptionTest {
           }
         };
 
-    var sub = subscribe(capturingHandoff, received::add);
+    var sub = startPump(capturingHandoff, received::add);
 
-    assertThat(started.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+    assertThat(started.await(2, TimeUnit.SECONDS)).isTrue();
 
     threadRef.get().interrupt();
 
@@ -424,7 +426,7 @@ class DefaultCallbackSubscriptionTest {
           }
         };
 
-    subscribe(
+    startPump(
         capturingHandoff,
         new Subscriber<>() {
           @Override
@@ -436,7 +438,7 @@ class DefaultCallbackSubscriptionTest {
           }
         });
 
-    assertThat(started.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+    assertThat(started.await(2, TimeUnit.SECONDS)).isTrue();
     threadRef.get().interrupt();
 
     await()
@@ -450,7 +452,7 @@ class DefaultCallbackSubscriptionTest {
     var handoff = new CoalescingHandoff<String>();
 
     var sub =
-        subscribe(
+        startPump(
             handoff,
             new Subscriber<>() {
               @Override
@@ -472,7 +474,7 @@ class DefaultCallbackSubscriptionTest {
     var handoff = new CoalescingHandoff<String>();
 
     var sub =
-        subscribe(
+        startPump(
             handoff,
             new Subscriber<>() {
               @Override
@@ -494,7 +496,7 @@ class DefaultCallbackSubscriptionTest {
     var handoff = new CoalescingHandoff<String>();
 
     var sub =
-        subscribe(
+        startPump(
             handoff,
             new Subscriber<>() {
               @Override
@@ -516,7 +518,7 @@ class DefaultCallbackSubscriptionTest {
     var handoff = new CoalescingHandoff<String>();
 
     var sub =
-        subscribe(
+        startPump(
             handoff,
             new Subscriber<>() {
               @Override
@@ -538,7 +540,7 @@ class DefaultCallbackSubscriptionTest {
     var handoff = new CoalescingHandoff<String>();
 
     var sub =
-        subscribe(
+        startPump(
             handoff,
             new Subscriber<>() {
               @Override
@@ -560,7 +562,7 @@ class DefaultCallbackSubscriptionTest {
     var handoff = new CoalescingHandoff<String>();
     var received = new CopyOnWriteArrayList<String>();
 
-    subscribe(handoff, received::add);
+    startPump(handoff, received::add);
 
     await().atMost(Duration.ofMillis(200)).pollInterval(Duration.ofMillis(10)).until(() -> true);
 
@@ -570,5 +572,33 @@ class DefaultCallbackSubscriptionTest {
         .atMost(Duration.ofMillis(200))
         .pollInterval(Duration.ofMillis(10))
         .until(() -> received.contains("wake-up"));
+  }
+
+  @Test
+  void startAfterCancelFiresOnCancelledSynchronouslyAndDoesNotSpawnPump() {
+    var handoff = new CoalescingHandoff<String>();
+    var coordinator = new ShutdownCoordinator();
+    var sub = new DefaultBlockingSubscription<>(handoff, () -> {}, coordinator);
+
+    sub.cancel();
+
+    var callerThread = new AtomicReference<Thread>();
+    var cancelledCount = new AtomicInteger(0);
+
+    sub.start(
+        new Subscriber<>() {
+          @Override
+          public void onNext(String value) {}
+
+          @Override
+          public void onCancelled() {
+            callerThread.set(Thread.currentThread());
+            cancelledCount.incrementAndGet();
+          }
+        });
+
+    assertThat(cancelledCount.get()).isEqualTo(1);
+    assertThat(callerThread.get()).isSameAs(Thread.currentThread());
+    assertThat(sub.isActive()).isFalse();
   }
 }

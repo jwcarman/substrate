@@ -25,7 +25,6 @@ import org.jwcarman.substrate.Subscription;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
-import org.jwcarman.substrate.core.subscription.DefaultCallbackSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultSubscriberBuilder;
 import org.jwcarman.substrate.core.subscription.FeederSupport;
 import org.jwcarman.substrate.core.subscription.SingleShotHandoff;
@@ -81,9 +80,8 @@ public class DefaultMailbox<T> implements Mailbox<T> {
   public Subscription subscribe(Subscriber<T> subscriber) {
     SingleShotHandoff<T> handoff = new SingleShotHandoff<>();
     Runnable canceller = startFeeder(handoff);
-    DefaultBlockingSubscription<T> source =
-        new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
-    return new DefaultCallbackSubscription<>(source, subscriber);
+    return new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator)
+        .start(subscriber);
   }
 
   @Override

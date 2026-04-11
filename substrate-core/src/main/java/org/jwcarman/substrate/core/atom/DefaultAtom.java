@@ -34,7 +34,6 @@ import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.subscription.CoalescingHandoff;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
-import org.jwcarman.substrate.core.subscription.DefaultCallbackSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultSubscriberBuilder;
 import org.jwcarman.substrate.core.subscription.FeederSupport;
 
@@ -148,9 +147,8 @@ public class DefaultAtom<T> implements Atom<T> {
       Snapshot<T> lastSeen, Subscriber<Snapshot<T>> subscriber) {
     CoalescingHandoff<Snapshot<T>> handoff = new CoalescingHandoff<>();
     Runnable canceller = startFeeder(handoff, lastSeen);
-    DefaultBlockingSubscription<Snapshot<T>> source =
-        new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
-    return new DefaultCallbackSubscription<>(source, subscriber);
+    return new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator)
+        .start(subscriber);
   }
 
   private Runnable startFeeder(CoalescingHandoff<Snapshot<T>> handoff, Snapshot<T> lastSeen) {

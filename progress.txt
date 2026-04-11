@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T19:25:00Z
-ITERATION: 66
-SPEC_COMPLETED: 063-subscriber-primitive-api.md
-WHAT_WAS_DONE: Migrated Atom, Journal, and Mailbox from CallbackSubscription/CallbackSubscriberBuilder to Subscriber<T>/SubscriberConfig<T>. Deleted CallbackSubscription, CallbackSubscriberBuilder, DefaultCallbackSubscriberBuilder, LifecycleCallbacks, and their tests. Rewrote DefaultCallbackSubscription to take Subscriber<T>. Updated all primitive interfaces, implementations, and tests. Updated README and CHANGELOG.
-VERIFICATION: ./mvnw verify — BUILD SUCCESS (all tests pass). ./mvnw spotless:check — BUILD SUCCESS. No CallbackSubscription/CallbackSubscriberBuilder/LifecycleCallbacks/DefaultCallbackSubscriberBuilder references in src/main or src/test. No new @SuppressWarnings annotations.
-STATUS: MORE_WORK
-NEXT_SPEC: 064-consolidate-callback-into-blocking-subscription.md
-NOTES: Spec 064 consolidates DefaultCallbackSubscription into DefaultBlockingSubscription via a new synchronized start(Subscriber<T>) method that spawns the pump thread outside the constructor. Motivations: (1) eliminate the this-escape from DefaultCallbackSubscription's constructor, (2) one class to reason about and test. Public API on Atom/Journal/Mailbox unchanged; this is a pure internal refactor. A targeted method-reference cleanup in DefaultCallbackSubscription.dispatch was landed ad-hoc in commit 2391646 before this spec — that file is going to be deleted by 064 but the cleanup keeps the current tree tidy.
+LAST_RUN: 2026-04-11T20:35:00Z
+ITERATION: 67
+SPEC_COMPLETED: 064-consolidate-callback-into-blocking-subscription.md
+WHAT_WAS_DONE: Consolidated DefaultCallbackSubscription into DefaultBlockingSubscription via a new synchronized start(Subscriber<T>) method. Deleted DefaultCallbackSubscription and its test. Created DefaultBlockingSubscriptionPumpTest with all 19 migrated test cases plus a new startAfterCancelFiresOnCancelledSynchronouslyAndDoesNotSpawnPump test. Updated DefaultAtom, DefaultJournal, and DefaultMailbox to use .start(subscriber) instead of wrapping in DefaultCallbackSubscription.
+VERIFICATION: ./mvnw verify — BUILD SUCCESS (all modules, all tests pass). ./mvnw spotless:check — passes. grep -r "DefaultCallbackSubscription" src/main src/test — no matches. No new @SuppressWarnings annotations.
+STATUS: DONE
+NEXT_SPEC: none
+NOTES: The linter aggressively removes convenience constructors when editing files; had to restore them since they are used by existing tests. All convenience constructors on DefaultAtom, DefaultJournal, DefaultMailbox, and DefaultBlockingSubscription remain intact.

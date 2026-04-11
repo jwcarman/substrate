@@ -29,7 +29,6 @@ import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.subscription.BlockingBoundedHandoff;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
-import org.jwcarman.substrate.core.subscription.DefaultCallbackSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultSubscriberBuilder;
 import org.jwcarman.substrate.core.subscription.FeederSupport;
 import org.jwcarman.substrate.journal.Journal;
@@ -192,9 +191,8 @@ public class DefaultJournal<T> implements Journal<T> {
     BlockingBoundedHandoff<JournalEntry<T>> handoff =
         new BlockingBoundedHandoff<>(subscriptionQueueCapacity);
     Runnable canceller = startFeeder(handoff, startingCheckpoint, preload);
-    DefaultBlockingSubscription<JournalEntry<T>> source =
-        new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
-    return new DefaultCallbackSubscription<>(source, subscriber);
+    return new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator)
+        .start(subscriber);
   }
 
   private Runnable startFeeder(
