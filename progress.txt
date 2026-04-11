@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T20:35:00Z
-ITERATION: 67
-SPEC_COMPLETED: 064-consolidate-callback-into-blocking-subscription.md
-WHAT_WAS_DONE: Consolidated DefaultCallbackSubscription into DefaultBlockingSubscription via a new synchronized start(Subscriber<T>) method. Deleted DefaultCallbackSubscription and its test. Created DefaultBlockingSubscriptionPumpTest with all 19 migrated test cases plus a new startAfterCancelFiresOnCancelledSynchronouslyAndDoesNotSpawnPump test. Updated DefaultAtom, DefaultJournal, and DefaultMailbox to use .start(subscriber) instead of wrapping in DefaultCallbackSubscription.
-VERIFICATION: ./mvnw verify — BUILD SUCCESS (all modules, all tests pass). ./mvnw spotless:check — passes. grep -r "DefaultCallbackSubscription" src/main src/test — no matches. No new @SuppressWarnings annotations.
-STATUS: DONE
-NEXT_SPEC: none
-NOTES: The linter aggressively removes convenience constructors when editing files; had to restore them since they are used by existing tests. All convenience constructors on DefaultAtom, DefaultJournal, DefaultMailbox, and DefaultBlockingSubscription remain intact.
+LAST_RUN: 2026-04-11T22:00:00Z
+ITERATION: 68
+SPEC_COMPLETED: manual-cleanup-after-spec-064
+WHAT_WAS_DONE: Post-064 manual cleanup outside the spec loop: extracted CallbackPumpSubscription from the consolidated DefaultBlockingSubscription (walking back the start() method approach because the mixed pull/push mode was smelly), removed the seven test-only convenience constructors from DefaultAtom/Journal/Mailbox and their factories + DefaultBlockingSubscription, restructured DefaultJournal/Factory to take a JournalLimits record (Sonar S107 bundle), applied 29 Sonar code-smell fixes + 1 bug fix + 3 new-code coverage tests across the subscription and lifecycle packages, added BlockingSubscription default close() coverage test, fixed dead substrate.journal.max-ttl key in substrate-defaults.properties.
+VERIFICATION: ./mvnw verify — BUILD SUCCESS (all modules). Sonar next run should show quality gate OK with BlockingSubscription at 100% coverage.
+STATUS: MORE_WORK
+NEXT_SPEC: 065-typed-notifier-routing.md
+NOTES: Spec 065 replaces the stringly-typed notifier protocol with a typed routing layer. New DefaultNotifier in substrate-core wraps the existing NotifierSpi; SPI collapses to byte[] opaque broadcast; typed Notifier interface with 7 per-type producer methods and 3 per-type subscribe methods. PrimitiveType, EventType, RawNotification are all package-private to the notifier package — only the sealed Notification hierarchy is public. FeederSupport takes a BiFunction subscribe binding instead of a NotifierSpi. Wide blast radius across every backend notifier module (Redis, NATS, RabbitMQ, SNS, Hazelcast, Postgres) but mechanical: each backend's signature change from (String, String) to (byte[]) is usually a simplification. Explicitly NOT touching the "__COMPLETED__" storage tombstones in CassandraJournalSpi and RabbitMqJournalSpi — those are backend storage format concerns and out of scope.
