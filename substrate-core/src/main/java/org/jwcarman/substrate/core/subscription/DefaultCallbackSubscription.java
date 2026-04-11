@@ -66,10 +66,10 @@ public class DefaultCallbackSubscription<T> implements Subscription {
       case NextResult.Timeout<T> _ -> {
         /* re-check loop condition */
       }
-      case NextResult.Completed<T> _ -> safeRun(() -> subscriber.onCompleted(), "onCompleted");
-      case NextResult.Expired<T> _ -> safeRun(() -> subscriber.onExpired(), "onExpired");
-      case NextResult.Deleted<T> _ -> safeRun(() -> subscriber.onDeleted(), "onDeleted");
-      case NextResult.Cancelled<T> _ -> safeRun(() -> subscriber.onCancelled(), "onCancelled");
+      case NextResult.Completed<T> _ -> safeRun(subscriber::onCompleted, "onCompleted");
+      case NextResult.Expired<T> _ -> safeRun(subscriber::onExpired, "onExpired");
+      case NextResult.Deleted<T> _ -> safeRun(subscriber::onDeleted, "onDeleted");
+      case NextResult.Cancelled<T> _ -> safeRun(subscriber::onCancelled, "onCancelled");
       case NextResult.Errored<T>(Throwable cause) ->
           safeRun(() -> subscriber.onError(cause), "onError");
     }
