@@ -31,6 +31,7 @@ import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.codec.spi.TypeRef;
 import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.NextResult;
+import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.memory.journal.InMemoryJournalSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.journal.Journal;
@@ -46,6 +47,8 @@ class JournalFactoryTest {
   @Mock private Codec<String> stringCodec;
   @Mock private Codec<List<String>> listCodec;
 
+  private final ShutdownCoordinator coordinator = new ShutdownCoordinator();
+
   @Test
   void createReturnsBoundJournalWithPrefixedKey() {
     InMemoryJournalSpi spi = new InMemoryJournalSpi();
@@ -58,7 +61,8 @@ class JournalFactoryTest {
             1024,
             Duration.ofHours(24),
             Duration.ofDays(7),
-            Duration.ofDays(30));
+            Duration.ofDays(30),
+            coordinator);
 
     Journal<String> journal = factory.create("my-stream", String.class, Duration.ofHours(1));
 
@@ -81,7 +85,8 @@ class JournalFactoryTest {
             1024,
             Duration.ofHours(24),
             Duration.ofDays(7),
-            Duration.ofDays(30));
+            Duration.ofDays(30),
+            coordinator);
 
     Journal<String> journal = factory.create("test", String.class, Duration.ofHours(1));
     String id = journal.append("hello", Duration.ofHours(1));
@@ -112,7 +117,8 @@ class JournalFactoryTest {
             1024,
             Duration.ofHours(24),
             Duration.ofDays(7),
-            Duration.ofDays(30));
+            Duration.ofDays(30),
+            coordinator);
 
     Journal<List<String>> journal = factory.create("typed-stream", typeRef, Duration.ofHours(1));
 

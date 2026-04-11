@@ -31,6 +31,7 @@ import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.SubscriberConfig;
 import org.jwcarman.substrate.Subscription;
+import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.journal.JournalEntry;
 import org.mockito.Mock;
@@ -44,6 +45,8 @@ class DefaultJournalTest {
   @Mock private JournalSpi spi;
   @Mock private Codec<String> codec;
   @Mock private NotifierSpi notifier;
+
+  private final ShutdownCoordinator coordinator = new ShutdownCoordinator();
   private DefaultJournal<String> journal;
 
   @BeforeEach
@@ -57,7 +60,7 @@ class DefaultJournalTest {
     lenient().when(notifier.subscribe(any())).thenReturn(() -> {});
     journal =
         new DefaultJournal<>(
-            spi, KEY, codec, notifier, 1024, Duration.ofDays(7), Duration.ofDays(30));
+            spi, KEY, codec, notifier, 1024, Duration.ofDays(7), Duration.ofDays(30), coordinator);
   }
 
   @Test

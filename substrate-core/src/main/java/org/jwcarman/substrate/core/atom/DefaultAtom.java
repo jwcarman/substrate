@@ -32,6 +32,7 @@ import org.jwcarman.substrate.atom.AtomExpiredException;
 import org.jwcarman.substrate.atom.Snapshot;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
+import org.jwcarman.substrate.core.subscription.CallbackPumpSubscription;
 import org.jwcarman.substrate.core.subscription.CoalescingHandoff;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultSubscriberBuilder;
@@ -59,16 +60,6 @@ public class DefaultAtom<T> implements Atom<T> {
     this.notifier = notifier;
     this.maxTtl = maxTtl;
     this.shutdownCoordinator = shutdownCoordinator;
-  }
-
-  /**
-   * Test-friendly convenience constructor that creates a private, throwaway {@link
-   * ShutdownCoordinator}. Production code should always use the full constructor above with the
-   * Spring-managed coordinator bean.
-   */
-  public DefaultAtom(
-      AtomSpi atomSpi, String key, Codec<T> codec, NotifierSpi notifier, Duration maxTtl) {
-    this(atomSpi, key, codec, notifier, maxTtl, new ShutdownCoordinator());
   }
 
   @Override
@@ -113,7 +104,7 @@ public class DefaultAtom<T> implements Atom<T> {
 
   @Override
   public Subscription subscribe(Subscriber<Snapshot<T>> subscriber) {
-    return buildCallbackSubscription(null, subscriber);
+    return buildCallbackPumpSubscription(null, subscriber);
   }
 
   @Override
@@ -123,7 +114,7 @@ public class DefaultAtom<T> implements Atom<T> {
 
   @Override
   public Subscription subscribe(Snapshot<T> lastSeen, Subscriber<Snapshot<T>> subscriber) {
-    return buildCallbackSubscription(lastSeen, subscriber);
+    return buildCallbackPumpSubscription(lastSeen, subscriber);
   }
 
   @Override
@@ -143,12 +134,12 @@ public class DefaultAtom<T> implements Atom<T> {
     return new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
   }
 
-  private Subscription buildCallbackSubscription(
+  private Subscription buildCallbackPumpSubscription(
       Snapshot<T> lastSeen, Subscriber<Snapshot<T>> subscriber) {
     CoalescingHandoff<Snapshot<T>> handoff = new CoalescingHandoff<>();
     Runnable canceller = startFeeder(handoff, lastSeen);
-    return new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator)
-        .start(subscriber);
+    var source = new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
+    return new CallbackPumpSubscription<>(source, subscriber);
   }
 
   private Runnable startFeeder(CoalescingHandoff<Snapshot<T>> handoff, Snapshot<T> lastSeen) {

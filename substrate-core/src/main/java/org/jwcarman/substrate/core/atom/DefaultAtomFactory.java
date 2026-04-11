@@ -45,12 +45,6 @@ public class DefaultAtomFactory implements AtomFactory {
     this.shutdownCoordinator = shutdownCoordinator;
   }
 
-  /** Test-friendly convenience constructor with a throwaway {@link ShutdownCoordinator}. */
-  public DefaultAtomFactory(
-      AtomSpi atomSpi, CodecFactory codecFactory, NotifierSpi notifier, Duration maxTtl) {
-    this(atomSpi, codecFactory, notifier, maxTtl, new ShutdownCoordinator());
-  }
-
   @Override
   public <T> Atom<T> create(String name, Class<T> type, T initialValue, Duration ttl) {
     validateTtl(ttl);

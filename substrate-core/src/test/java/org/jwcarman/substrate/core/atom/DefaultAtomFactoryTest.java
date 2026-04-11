@@ -33,6 +33,7 @@ import org.jwcarman.codec.spi.TypeRef;
 import org.jwcarman.substrate.atom.Atom;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
 import org.jwcarman.substrate.atom.AtomExpiredException;
+import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.memory.atom.InMemoryAtomSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 
@@ -66,6 +67,7 @@ class DefaultAtomFactoryTest {
         }
       };
 
+  private final ShutdownCoordinator coordinator = new ShutdownCoordinator();
   private InMemoryAtomSpi spi;
   private InMemoryNotifier notifier;
   private DefaultAtomFactory factory;
@@ -74,7 +76,8 @@ class DefaultAtomFactoryTest {
   void setUp() {
     spi = new InMemoryAtomSpi();
     notifier = new InMemoryNotifier();
-    factory = new DefaultAtomFactory(spi, CODEC_FACTORY, notifier, Duration.ofHours(24));
+    factory =
+        new DefaultAtomFactory(spi, CODEC_FACTORY, notifier, Duration.ofHours(24), coordinator);
   }
 
   @Test
@@ -176,7 +179,8 @@ class DefaultAtomFactoryTest {
         };
 
     DefaultAtomFactory lazyFactory =
-        new DefaultAtomFactory(failOnAnySpiCall, CODEC_FACTORY, notifier, Duration.ofHours(24));
+        new DefaultAtomFactory(
+            failOnAnySpiCall, CODEC_FACTORY, notifier, Duration.ofHours(24), coordinator);
 
     Atom<String> atom = lazyFactory.connect("test", String.class);
     assertThat(atom).isNotNull();

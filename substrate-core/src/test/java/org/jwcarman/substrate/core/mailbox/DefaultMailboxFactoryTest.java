@@ -30,6 +30,7 @@ import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.codec.spi.TypeRef;
 import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.NextResult;
+import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.memory.mailbox.InMemoryMailboxSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.mailbox.Mailbox;
@@ -43,6 +44,8 @@ class DefaultMailboxFactoryTest {
   @Mock private CodecFactory codecFactory;
   @Mock private Codec<String> stringCodec;
 
+  private final ShutdownCoordinator coordinator = new ShutdownCoordinator();
+
   @Test
   void connectDoesNotCallSpiCreate() {
     MailboxSpi spi = mock(MailboxSpi.class);
@@ -52,7 +55,7 @@ class DefaultMailboxFactoryTest {
 
     DefaultMailboxFactory factory =
         new DefaultMailboxFactory(
-            spi, codecFactory, new InMemoryNotifier(), Duration.ofMinutes(30));
+            spi, codecFactory, new InMemoryNotifier(), Duration.ofMinutes(30), coordinator);
 
     Mailbox<String> mailbox = factory.connect("test", String.class);
 
@@ -69,7 +72,7 @@ class DefaultMailboxFactoryTest {
     InMemoryMailboxSpi spi = new InMemoryMailboxSpi();
     DefaultMailboxFactory factory =
         new DefaultMailboxFactory(
-            spi, codecFactory, new InMemoryNotifier(), Duration.ofMinutes(30));
+            spi, codecFactory, new InMemoryNotifier(), Duration.ofMinutes(30), coordinator);
 
     Mailbox<String> mailbox = factory.connect("nonexistent", String.class);
 
@@ -80,7 +83,11 @@ class DefaultMailboxFactoryTest {
   void createWithClassThrowsWhenTtlExceedsMax() {
     DefaultMailboxFactory factory =
         new DefaultMailboxFactory(
-            mock(MailboxSpi.class), codecFactory, new InMemoryNotifier(), Duration.ofMinutes(30));
+            mock(MailboxSpi.class),
+            codecFactory,
+            new InMemoryNotifier(),
+            Duration.ofMinutes(30),
+            coordinator);
 
     Duration excessiveTtl = Duration.ofHours(1);
     assertThatThrownBy(() -> factory.create("test", String.class, excessiveTtl))
@@ -91,7 +98,11 @@ class DefaultMailboxFactoryTest {
   void createWithTypeRefThrowsWhenTtlExceedsMax() {
     DefaultMailboxFactory factory =
         new DefaultMailboxFactory(
-            mock(MailboxSpi.class), codecFactory, new InMemoryNotifier(), Duration.ofMinutes(30));
+            mock(MailboxSpi.class),
+            codecFactory,
+            new InMemoryNotifier(),
+            Duration.ofMinutes(30),
+            coordinator);
 
     TypeRef<String> typeRef = new TypeRef<>() {};
     Duration excessiveTtl = Duration.ofHours(1);
@@ -108,7 +119,7 @@ class DefaultMailboxFactoryTest {
 
     DefaultMailboxFactory factory =
         new DefaultMailboxFactory(
-            spi, codecFactory, new InMemoryNotifier(), Duration.ofMinutes(30));
+            spi, codecFactory, new InMemoryNotifier(), Duration.ofMinutes(30), coordinator);
 
     Mailbox<String> mailbox = factory.connect("test", typeRef);
     assertThat(mailbox.key()).isEqualTo("substrate:mailbox:test");
@@ -126,7 +137,7 @@ class DefaultMailboxFactoryTest {
     InMemoryMailboxSpi spi = new InMemoryMailboxSpi();
     InMemoryNotifier notifier = new InMemoryNotifier();
     DefaultMailboxFactory factory =
-        new DefaultMailboxFactory(spi, codecFactory, notifier, Duration.ofMinutes(30));
+        new DefaultMailboxFactory(spi, codecFactory, notifier, Duration.ofMinutes(30), coordinator);
 
     Mailbox<String> created = factory.create("existing", String.class, Duration.ofMinutes(5));
     Mailbox<String> connected = factory.connect("existing", String.class);

@@ -53,26 +53,6 @@ public class DefaultJournalFactory implements JournalFactory {
     this.shutdownCoordinator = shutdownCoordinator;
   }
 
-  /** Test-friendly convenience constructor with a throwaway {@link ShutdownCoordinator}. */
-  public DefaultJournalFactory(
-      JournalSpi journalSpi,
-      CodecFactory codecFactory,
-      NotifierSpi notifier,
-      int subscriptionQueueCapacity,
-      Duration maxInactivityTtl,
-      Duration maxEntryTtl,
-      Duration maxRetentionTtl) {
-    this(
-        journalSpi,
-        codecFactory,
-        notifier,
-        subscriptionQueueCapacity,
-        maxInactivityTtl,
-        maxEntryTtl,
-        maxRetentionTtl,
-        new ShutdownCoordinator());
-  }
-
   @Override
   public <T> Journal<T> create(String name, Class<T> type, Duration inactivityTtl) {
     validateInactivityTtl(inactivityTtl);

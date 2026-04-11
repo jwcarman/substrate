@@ -30,13 +30,13 @@ import org.jwcarman.substrate.Subscriber;
 import org.jwcarman.substrate.Subscription;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 
-class DefaultBlockingSubscriptionPumpTest {
+class CallbackPumpSubscriptionTest {
 
   private static final Duration AWAIT_TIMEOUT = Duration.ofSeconds(5);
 
   private Subscription startPump(NextHandoff<String> handoff, Subscriber<String> subscriber) {
-    return new DefaultBlockingSubscription<>(handoff, () -> {}, new ShutdownCoordinator())
-        .start(subscriber);
+    var source = new DefaultBlockingSubscription<>(handoff, () -> {}, new ShutdownCoordinator());
+    return new CallbackPumpSubscription<>(source, subscriber);
   }
 
   @Test
@@ -575,30 +575,35 @@ class DefaultBlockingSubscriptionPumpTest {
   }
 
   @Test
-  void startAfterCancelFiresOnCancelledSynchronouslyAndDoesNotSpawnPump() {
+  void wrappingAnAlreadyCancelledSourceStillDeliversOnCancelled() {
     var handoff = new CoalescingHandoff<String>();
     var coordinator = new ShutdownCoordinator();
-    var sub = new DefaultBlockingSubscription<>(handoff, () -> {}, coordinator);
+    var source = new DefaultBlockingSubscription<>(handoff, () -> {}, coordinator);
 
-    sub.cancel();
+    // Cancel the source BEFORE wrapping it in the pump — the pump's first
+    // call to next() should observe the handoff's Cancelled marker and
+    // dispatch onCancelled to the subscriber.
+    source.cancel();
 
-    var callerThread = new AtomicReference<Thread>();
     var cancelledCount = new AtomicInteger(0);
+    var latch = new CountDownLatch(1);
 
-    sub.start(
-        new Subscriber<>() {
-          @Override
-          public void onNext(String value) {}
+    var sub =
+        new CallbackPumpSubscription<>(
+            source,
+            new Subscriber<>() {
+              @Override
+              public void onNext(String value) {}
 
-          @Override
-          public void onCancelled() {
-            callerThread.set(Thread.currentThread());
-            cancelledCount.incrementAndGet();
-          }
-        });
+              @Override
+              public void onCancelled() {
+                cancelledCount.incrementAndGet();
+                latch.countDown();
+              }
+            });
 
+    await().atMost(Duration.ofSeconds(1)).until(() -> latch.getCount() == 0);
+    await().atMost(Duration.ofMillis(500)).until(() -> !sub.isActive());
     assertThat(cancelledCount.get()).isEqualTo(1);
-    assertThat(callerThread.get()).isSameAs(Thread.currentThread());
-    assertThat(sub.isActive()).isFalse();
   }
 }

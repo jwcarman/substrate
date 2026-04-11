@@ -24,6 +24,7 @@ import org.jwcarman.substrate.SubscriberConfig;
 import org.jwcarman.substrate.Subscription;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
+import org.jwcarman.substrate.core.subscription.CallbackPumpSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultSubscriberBuilder;
 import org.jwcarman.substrate.core.subscription.FeederSupport;
@@ -52,11 +53,6 @@ public class DefaultMailbox<T> implements Mailbox<T> {
     this.shutdownCoordinator = shutdownCoordinator;
   }
 
-  /** Test-friendly convenience constructor with a throwaway {@link ShutdownCoordinator}. */
-  public DefaultMailbox(MailboxSpi mailboxSpi, String key, Codec<T> codec, NotifierSpi notifier) {
-    this(mailboxSpi, key, codec, notifier, new ShutdownCoordinator());
-  }
-
   @Override
   public void deliver(T value) {
     mailboxSpi.deliver(key, codec.encode(value));
@@ -80,8 +76,8 @@ public class DefaultMailbox<T> implements Mailbox<T> {
   public Subscription subscribe(Subscriber<T> subscriber) {
     SingleShotHandoff<T> handoff = new SingleShotHandoff<>();
     Runnable canceller = startFeeder(handoff);
-    return new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator)
-        .start(subscriber);
+    var source = new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
+    return new CallbackPumpSubscription<>(source, subscriber);
   }
 
   @Override

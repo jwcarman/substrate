@@ -44,12 +44,6 @@ public class DefaultMailboxFactory implements MailboxFactory {
     this.shutdownCoordinator = shutdownCoordinator;
   }
 
-  /** Test-friendly convenience constructor with a throwaway {@link ShutdownCoordinator}. */
-  public DefaultMailboxFactory(
-      MailboxSpi mailboxSpi, CodecFactory codecFactory, NotifierSpi notifier, Duration maxTtl) {
-    this(mailboxSpi, codecFactory, notifier, maxTtl, new ShutdownCoordinator());
-  }
-
   @Override
   public <T> Mailbox<T> create(String name, Class<T> type, Duration ttl) {
     if (ttl.compareTo(maxTtl) > 0) {

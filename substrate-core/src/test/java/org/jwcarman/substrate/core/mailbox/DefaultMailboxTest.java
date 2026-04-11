@@ -31,6 +31,7 @@ import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.NextResult;
 import org.jwcarman.substrate.SubscriberConfig;
 import org.jwcarman.substrate.Subscription;
+import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.memory.mailbox.InMemoryMailboxSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
@@ -53,6 +54,7 @@ class DefaultMailboxTest {
         }
       };
 
+  private final ShutdownCoordinator coordinator = new ShutdownCoordinator();
   private InMemoryMailboxSpi spi;
   private InMemoryNotifier notifier;
   private DefaultMailbox<String> mailbox;
@@ -62,7 +64,7 @@ class DefaultMailboxTest {
     spi = new InMemoryMailboxSpi();
     notifier = new InMemoryNotifier();
     spi.create(KEY, Duration.ofMinutes(5));
-    mailbox = new DefaultMailbox<>(spi, KEY, STRING_CODEC, notifier);
+    mailbox = new DefaultMailbox<>(spi, KEY, STRING_CODEC, notifier, coordinator);
   }
 
   @Test
@@ -290,7 +292,7 @@ class DefaultMailboxTest {
     String shortKey = "substrate:mailbox:short";
     shortTtlSpi.create(shortKey, Duration.ofMillis(100));
     DefaultMailbox<String> shortMailbox =
-        new DefaultMailbox<>(shortTtlSpi, shortKey, STRING_CODEC, notifier);
+        new DefaultMailbox<>(shortTtlSpi, shortKey, STRING_CODEC, notifier, coordinator);
 
     CountDownLatch expirationLatch = new CountDownLatch(1);
     AtomicReference<Boolean> onNextFired = new AtomicReference<>(false);
@@ -310,7 +312,7 @@ class DefaultMailboxTest {
     String shortKey = "substrate:mailbox:short";
     shortTtlSpi.create(shortKey, Duration.ofMillis(100));
     DefaultMailbox<String> shortMailbox =
-        new DefaultMailbox<>(shortTtlSpi, shortKey, STRING_CODEC, notifier);
+        new DefaultMailbox<>(shortTtlSpi, shortKey, STRING_CODEC, notifier, coordinator);
 
     BlockingSubscription<String> sub = shortMailbox.subscribe();
     await()

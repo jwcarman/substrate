@@ -28,6 +28,7 @@ import org.jwcarman.substrate.Subscription;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.subscription.BlockingBoundedHandoff;
+import org.jwcarman.substrate.core.subscription.CallbackPumpSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultSubscriberBuilder;
 import org.jwcarman.substrate.core.subscription.FeederSupport;
@@ -63,26 +64,6 @@ public class DefaultJournal<T> implements Journal<T> {
     this.maxEntryTtl = maxEntryTtl;
     this.maxRetentionTtl = maxRetentionTtl;
     this.shutdownCoordinator = shutdownCoordinator;
-  }
-
-  /** Test-friendly convenience constructor with a throwaway {@link ShutdownCoordinator}. */
-  public DefaultJournal(
-      JournalSpi journalSpi,
-      String key,
-      Codec<T> codec,
-      NotifierSpi notifier,
-      int subscriptionQueueCapacity,
-      Duration maxEntryTtl,
-      Duration maxRetentionTtl) {
-    this(
-        journalSpi,
-        key,
-        codec,
-        notifier,
-        subscriptionQueueCapacity,
-        maxEntryTtl,
-        maxRetentionTtl,
-        new ShutdownCoordinator());
   }
 
   @Override
@@ -139,7 +120,7 @@ public class DefaultJournal<T> implements Journal<T> {
   public Subscription subscribe(Subscriber<JournalEntry<T>> subscriber) {
     List<RawJournalEntry> lastEntries = journalSpi.readLast(key, 1);
     String startingCheckpoint = lastEntries.isEmpty() ? null : lastEntries.getLast().id();
-    return buildCallbackSubscription(startingCheckpoint, List.of(), subscriber);
+    return buildCallbackPumpSubscription(startingCheckpoint, List.of(), subscriber);
   }
 
   @Override
@@ -149,7 +130,7 @@ public class DefaultJournal<T> implements Journal<T> {
 
   @Override
   public Subscription subscribeAfter(String afterId, Subscriber<JournalEntry<T>> subscriber) {
-    return buildCallbackSubscription(afterId, List.of(), subscriber);
+    return buildCallbackPumpSubscription(afterId, List.of(), subscriber);
   }
 
   @Override
@@ -162,7 +143,7 @@ public class DefaultJournal<T> implements Journal<T> {
   public Subscription subscribeLast(int count, Subscriber<JournalEntry<T>> subscriber) {
     List<RawJournalEntry> preload = journalSpi.readLast(key, count);
     String startingCheckpoint = preload.isEmpty() ? null : preload.getLast().id();
-    return buildCallbackSubscription(startingCheckpoint, preload, subscriber);
+    return buildCallbackPumpSubscription(startingCheckpoint, preload, subscriber);
   }
 
   @Override
@@ -184,15 +165,15 @@ public class DefaultJournal<T> implements Journal<T> {
     return new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
   }
 
-  private Subscription buildCallbackSubscription(
+  private Subscription buildCallbackPumpSubscription(
       String startingCheckpoint,
       List<RawJournalEntry> preload,
       Subscriber<JournalEntry<T>> subscriber) {
     BlockingBoundedHandoff<JournalEntry<T>> handoff =
         new BlockingBoundedHandoff<>(subscriptionQueueCapacity);
     Runnable canceller = startFeeder(handoff, startingCheckpoint, preload);
-    return new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator)
-        .start(subscriber);
+    var source = new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
+    return new CallbackPumpSubscription<>(source, subscriber);
   }
 
   private Runnable startFeeder(

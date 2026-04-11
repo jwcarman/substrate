@@ -32,6 +32,7 @@ import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.codec.spi.TypeRef;
 import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.NextResult;
+import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.memory.mailbox.InMemoryMailboxSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.mailbox.Mailbox;
@@ -46,13 +47,15 @@ class MailboxFactoryTest {
   @Mock private Codec<String> stringCodec;
   @Mock private Codec<List<String>> listCodec;
 
+  private final ShutdownCoordinator coordinator = new ShutdownCoordinator();
+
   @Test
   void createReturnsBoundMailboxWithPrefixedKey() {
     InMemoryMailboxSpi spi = new InMemoryMailboxSpi();
     InMemoryNotifier notifier = new InMemoryNotifier();
     when(codecFactory.create(String.class)).thenReturn(stringCodec);
     MailboxFactory factory =
-        new DefaultMailboxFactory(spi, codecFactory, notifier, Duration.ofMinutes(30));
+        new DefaultMailboxFactory(spi, codecFactory, notifier, Duration.ofMinutes(30), coordinator);
 
     Mailbox<String> mailbox = factory.create("my-elicit", String.class, Duration.ofMinutes(5));
 
@@ -69,7 +72,7 @@ class MailboxFactoryTest {
     when(stringCodec.decode(any(byte[].class)))
         .thenAnswer(inv -> new String((byte[]) inv.getArgument(0), UTF_8));
     MailboxFactory factory =
-        new DefaultMailboxFactory(spi, codecFactory, notifier, Duration.ofMinutes(30));
+        new DefaultMailboxFactory(spi, codecFactory, notifier, Duration.ofMinutes(30), coordinator);
 
     Mailbox<String> mailbox = factory.create("test", String.class, Duration.ofMinutes(5));
     mailbox.deliver("hello");
@@ -91,7 +94,7 @@ class MailboxFactoryTest {
         .thenAnswer(inv -> inv.getArgument(0).toString().getBytes(UTF_8));
     lenient().when(listCodec.decode(any(byte[].class))).thenAnswer(inv -> List.of("decoded"));
     MailboxFactory factory =
-        new DefaultMailboxFactory(spi, codecFactory, notifier, Duration.ofMinutes(30));
+        new DefaultMailboxFactory(spi, codecFactory, notifier, Duration.ofMinutes(30), coordinator);
 
     Mailbox<List<String>> mailbox = factory.create("typed-elicit", typeRef, Duration.ofMinutes(5));
 

@@ -32,6 +32,7 @@ import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.NextResult;
 import org.jwcarman.substrate.SubscriberConfig;
 import org.jwcarman.substrate.Subscription;
+import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.memory.journal.InMemoryJournalSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.journal.JournalEntry;
@@ -51,6 +52,7 @@ class JournalSubscriptionTest {
         }
       };
 
+  private final ShutdownCoordinator coordinator = new ShutdownCoordinator();
   private InMemoryJournalSpi journalSpi;
   private InMemoryNotifier notifier;
   private DefaultJournal<String> journal;
@@ -68,7 +70,8 @@ class JournalSubscriptionTest {
             notifier,
             1024,
             Duration.ofDays(7),
-            Duration.ofDays(30));
+            Duration.ofDays(30),
+            coordinator);
   }
 
   @Test
@@ -510,7 +513,8 @@ class JournalSubscriptionTest {
             notifier,
             1,
             Duration.ofDays(7),
-            Duration.ofDays(30));
+            Duration.ofDays(30),
+            coordinator);
 
     journal.append("e1", Duration.ofHours(1));
     journal.append("e2", Duration.ofHours(1));

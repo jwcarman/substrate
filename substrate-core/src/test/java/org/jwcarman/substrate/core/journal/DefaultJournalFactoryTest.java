@@ -29,6 +29,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.codec.spi.TypeRef;
+import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.memory.journal.InMemoryJournalSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.journal.Journal;
@@ -43,6 +44,7 @@ class DefaultJournalFactoryTest {
   @Mock private CodecFactory codecFactory;
   @Mock private Codec<String> stringCodec;
 
+  private final ShutdownCoordinator coordinator = new ShutdownCoordinator();
   private InMemoryJournalSpi spi;
   private DefaultJournalFactory factory;
 
@@ -64,7 +66,8 @@ class DefaultJournalFactoryTest {
             1024,
             Duration.ofHours(24),
             Duration.ofDays(7),
-            Duration.ofDays(30));
+            Duration.ofDays(30),
+            coordinator);
   }
 
   @Test

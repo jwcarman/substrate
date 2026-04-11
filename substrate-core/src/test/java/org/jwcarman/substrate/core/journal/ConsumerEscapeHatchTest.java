@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.NextResult;
+import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.memory.journal.InMemoryJournalSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.journal.JournalEntry;
@@ -55,7 +56,14 @@ class ConsumerEscapeHatchTest {
 
     DefaultJournal<String> journal =
         new DefaultJournal<>(
-            spi, key, STRING_CODEC, notifier, 1024, Duration.ofDays(7), Duration.ofDays(30));
+            spi,
+            key,
+            STRING_CODEC,
+            notifier,
+            1024,
+            Duration.ofDays(7),
+            Duration.ofDays(30),
+            new ShutdownCoordinator());
 
     journal.append("one-entry", Duration.ofHours(1));
 
