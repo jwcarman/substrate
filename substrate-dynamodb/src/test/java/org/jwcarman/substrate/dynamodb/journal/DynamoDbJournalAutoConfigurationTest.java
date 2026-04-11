@@ -46,6 +46,17 @@ class DynamoDbJournalAutoConfigurationTest {
   }
 
   @Test
+  void doesNotCreateJournalSpiWhenDisabled() {
+    new ApplicationContextRunner()
+        .withPropertyValues("substrate.dynamodb.journal.enabled=false")
+        .withConfiguration(
+            AutoConfigurations.of(
+                DynamoDbAutoConfiguration.class, DynamoDbJournalAutoConfiguration.class))
+        .withUserConfiguration(MockDynamoDbConfiguration.class)
+        .run(context -> assertThat(context).doesNotHaveBean(DynamoDbJournalSpi.class));
+  }
+
+  @Test
   void dynamoDbJournalSuppressesInMemoryFallback() {
     new ApplicationContextRunner()
         .withConfiguration(

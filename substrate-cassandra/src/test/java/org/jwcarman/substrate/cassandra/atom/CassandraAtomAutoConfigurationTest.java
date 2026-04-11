@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.substrate.cassandra.journal;
+package org.jwcarman.substrate.cassandra.atom;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -24,55 +24,55 @@ import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.cassandra.CassandraAutoConfiguration;
+import org.jwcarman.substrate.core.atom.AtomSpi;
 import org.jwcarman.substrate.core.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.core.journal.JournalSpi;
-import org.jwcarman.substrate.core.memory.journal.InMemoryJournalSpi;
+import org.jwcarman.substrate.core.memory.atom.InMemoryAtomSpi;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-class CassandraJournalAutoConfigurationTest {
+class CassandraAtomAutoConfigurationTest {
 
   @Test
-  void createsCassandraJournalSpiBean() {
+  void createsCassandraAtomSpiBean() {
     new ApplicationContextRunner()
         .withConfiguration(
             AutoConfigurations.of(
-                CassandraAutoConfiguration.class, CassandraJournalAutoConfiguration.class))
+                CassandraAutoConfiguration.class, CassandraAtomAutoConfiguration.class))
         .withUserConfiguration(MockCqlSessionConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(CassandraJournalSpi.class);
-              assertThat(context).hasSingleBean(JournalSpi.class);
+              assertThat(context).hasSingleBean(CassandraAtomSpi.class);
+              assertThat(context).hasSingleBean(AtomSpi.class);
             });
   }
 
   @Test
-  void doesNotCreateJournalSpiWhenDisabled() {
+  void doesNotCreateAtomSpiWhenDisabled() {
     new ApplicationContextRunner()
-        .withPropertyValues("substrate.cassandra.journal.enabled=false")
+        .withPropertyValues("substrate.cassandra.atom.enabled=false")
         .withConfiguration(
             AutoConfigurations.of(
-                CassandraAutoConfiguration.class, CassandraJournalAutoConfiguration.class))
+                CassandraAutoConfiguration.class, CassandraAtomAutoConfiguration.class))
         .withUserConfiguration(MockCqlSessionConfiguration.class)
-        .run(context -> assertThat(context).doesNotHaveBean(CassandraJournalSpi.class));
+        .run(context -> assertThat(context).doesNotHaveBean(CassandraAtomSpi.class));
   }
 
   @Test
-  void cassandraJournalSuppressesInMemoryFallback() {
+  void cassandraAtomSuppressesInMemoryFallback() {
     new ApplicationContextRunner()
         .withConfiguration(
             AutoConfigurations.of(
                 CassandraAutoConfiguration.class,
-                CassandraJournalAutoConfiguration.class,
+                CassandraAtomAutoConfiguration.class,
                 SubstrateAutoConfiguration.class))
         .withUserConfiguration(MockCqlSessionConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(JournalSpi.class);
-              assertThat(context.getBean(JournalSpi.class)).isInstanceOf(CassandraJournalSpi.class);
-              assertThat(context).doesNotHaveBean(InMemoryJournalSpi.class);
+              assertThat(context).hasSingleBean(AtomSpi.class);
+              assertThat(context.getBean(AtomSpi.class)).isInstanceOf(CassandraAtomSpi.class);
+              assertThat(context).doesNotHaveBean(InMemoryAtomSpi.class);
             });
   }
 

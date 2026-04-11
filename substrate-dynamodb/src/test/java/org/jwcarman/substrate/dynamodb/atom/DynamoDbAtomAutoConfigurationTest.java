@@ -13,16 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.substrate.dynamodb.mailbox;
+package org.jwcarman.substrate.dynamodb.atom;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import org.junit.jupiter.api.Test;
+import org.jwcarman.substrate.core.atom.AtomSpi;
 import org.jwcarman.substrate.core.autoconfigure.SubstrateAutoConfiguration;
-import org.jwcarman.substrate.core.mailbox.MailboxSpi;
-import org.jwcarman.substrate.core.memory.mailbox.InMemoryMailboxSpi;
-import org.jwcarman.substrate.core.notifier.NotifierSpi;
+import org.jwcarman.substrate.core.memory.atom.InMemoryAtomSpi;
 import org.jwcarman.substrate.dynamodb.DynamoDbAutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -30,47 +29,47 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
-class DynamoDbMailboxAutoConfigurationTest {
+class DynamoDbAtomAutoConfigurationTest {
 
   @Test
-  void createsDynamoDbMailboxSpiBean() {
+  void createsDynamoDbAtomSpiBean() {
     new ApplicationContextRunner()
         .withConfiguration(
             AutoConfigurations.of(
-                DynamoDbAutoConfiguration.class, DynamoDbMailboxAutoConfiguration.class))
+                DynamoDbAutoConfiguration.class, DynamoDbAtomAutoConfiguration.class))
         .withUserConfiguration(MockDynamoDbConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(DynamoDbMailboxSpi.class);
-              assertThat(context).hasSingleBean(MailboxSpi.class);
+              assertThat(context).hasSingleBean(DynamoDbAtomSpi.class);
+              assertThat(context).hasSingleBean(AtomSpi.class);
             });
   }
 
   @Test
-  void doesNotCreateMailboxSpiWhenDisabled() {
+  void doesNotCreateAtomSpiWhenDisabled() {
     new ApplicationContextRunner()
-        .withPropertyValues("substrate.dynamodb.mailbox.enabled=false")
+        .withPropertyValues("substrate.dynamodb.atom.enabled=false")
         .withConfiguration(
             AutoConfigurations.of(
-                DynamoDbAutoConfiguration.class, DynamoDbMailboxAutoConfiguration.class))
+                DynamoDbAutoConfiguration.class, DynamoDbAtomAutoConfiguration.class))
         .withUserConfiguration(MockDynamoDbConfiguration.class)
-        .run(context -> assertThat(context).doesNotHaveBean(DynamoDbMailboxSpi.class));
+        .run(context -> assertThat(context).doesNotHaveBean(DynamoDbAtomSpi.class));
   }
 
   @Test
-  void dynamoDbMailboxSuppressesInMemoryFallback() {
+  void dynamoDbAtomSuppressesInMemoryFallback() {
     new ApplicationContextRunner()
         .withConfiguration(
             AutoConfigurations.of(
                 DynamoDbAutoConfiguration.class,
-                DynamoDbMailboxAutoConfiguration.class,
+                DynamoDbAtomAutoConfiguration.class,
                 SubstrateAutoConfiguration.class))
         .withUserConfiguration(MockDynamoDbConfiguration.class)
         .run(
             context -> {
-              assertThat(context).hasSingleBean(MailboxSpi.class);
-              assertThat(context.getBean(MailboxSpi.class)).isInstanceOf(DynamoDbMailboxSpi.class);
-              assertThat(context).doesNotHaveBean(InMemoryMailboxSpi.class);
+              assertThat(context).hasSingleBean(AtomSpi.class);
+              assertThat(context.getBean(AtomSpi.class)).isInstanceOf(DynamoDbAtomSpi.class);
+              assertThat(context).doesNotHaveBean(InMemoryAtomSpi.class);
             });
   }
 
@@ -80,11 +79,6 @@ class DynamoDbMailboxAutoConfigurationTest {
     @Bean
     DynamoDbClient dynamoDbClient() {
       return mock(DynamoDbClient.class);
-    }
-
-    @Bean
-    NotifierSpi notifier() {
-      return mock(NotifierSpi.class);
     }
   }
 }
