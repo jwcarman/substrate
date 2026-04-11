@@ -15,11 +15,7 @@
  */
 package org.jwcarman.substrate.core.subscription;
 
-import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import org.jwcarman.substrate.NextResult;
 
 /**
@@ -29,12 +25,7 @@ import org.jwcarman.substrate.NextResult;
  *
  * @param <T> the type of values transferred through the handoff
  */
-public class SingleShotHandoff<T> implements NextHandoff<T> {
-
-  private final Lock lock = new ReentrantLock();
-  private final Condition notEmpty = lock.newCondition();
-  private NextResult<T> slot;
-  private boolean sealed;
+public class SingleShotHandoff<T> extends AbstractSingleSlotHandoff<T> {
 
   @Override
   public void push(T item) {
@@ -56,59 +47,7 @@ public class SingleShotHandoff<T> implements NextHandoff<T> {
   }
 
   @Override
-  public NextResult<T> pull(Duration timeout) {
-    lock.lock();
-    try {
-      long deadlineNanos = System.nanoTime() + timeout.toNanos();
-      while (slot == null) {
-        long remaining = deadlineNanos - System.nanoTime();
-        if (remaining <= 0) return new NextResult.Timeout<>();
-        try {
-          remaining = notEmpty.awaitNanos(remaining);
-        } catch (InterruptedException _) {
-          Thread.currentThread().interrupt();
-          return new NextResult.Timeout<>();
-        }
-      }
-      NextResult<T> result = slot;
-      if (result instanceof NextResult.Value<T>) {
-        slot = new NextResult.Completed<>();
-      }
-      return result;
-    } finally {
-      lock.unlock();
-    }
-  }
-
-  @Override
-  public void error(Throwable cause) {
-    mark(new NextResult.Errored<>(cause));
-  }
-
-  @Override
-  public void markCompleted() {
-    mark(new NextResult.Completed<>());
-  }
-
-  @Override
-  public void markExpired() {
-    mark(new NextResult.Expired<>());
-  }
-
-  @Override
-  public void markDeleted() {
-    mark(new NextResult.Deleted<>());
-  }
-
-  private void mark(NextResult<T> terminalValue) {
-    lock.lock();
-    try {
-      if (sealed) return;
-      slot = terminalValue;
-      sealed = true;
-      notEmpty.signalAll();
-    } finally {
-      lock.unlock();
-    }
+  protected NextResult<T> consumeSlot() {
+    return new NextResult.Completed<>();
   }
 }

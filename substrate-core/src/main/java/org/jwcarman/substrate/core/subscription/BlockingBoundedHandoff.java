@@ -30,7 +30,7 @@ import org.jwcarman.substrate.NextResult;
  *
  * @param <T> the type of values transferred through the handoff
  */
-public class BlockingBoundedHandoff<T> implements NextHandoff<T> {
+public class BlockingBoundedHandoff<T> extends AbstractHandoff<T> {
 
   private final BlockingQueue<NextResult<T>> queue;
   private final AtomicBoolean marked = new AtomicBoolean(false);
@@ -69,26 +69,7 @@ public class BlockingBoundedHandoff<T> implements NextHandoff<T> {
   }
 
   @Override
-  public void error(Throwable cause) {
-    mark(new NextResult.Errored<>(cause));
-  }
-
-  @Override
-  public void markCompleted() {
-    mark(new NextResult.Completed<>());
-  }
-
-  @Override
-  public void markExpired() {
-    mark(new NextResult.Expired<>());
-  }
-
-  @Override
-  public void markDeleted() {
-    mark(new NextResult.Deleted<>());
-  }
-
-  private void mark(NextResult<T> terminal) {
+  protected void mark(NextResult<T> terminal) {
     if (marked.compareAndSet(false, true)) {
       try {
         queue.put(terminal);
