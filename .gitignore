@@ -1,3 +1,11 @@
 logs/
 target/
 .idea/
+
+# maven-release-plugin / versions-maven-plugin backup files
+release.properties
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+pom.xml.tag
+pom.xml.backup
