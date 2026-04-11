@@ -23,12 +23,16 @@ import static org.awaitility.Awaitility.await;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.Base64;
-import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.codec.spi.Codec;
+import org.jwcarman.substrate.BlockingSubscription;
+import org.jwcarman.substrate.CallbackSubscription;
+import org.jwcarman.substrate.NextResult;
 import org.jwcarman.substrate.atom.AtomExpiredException;
 import org.jwcarman.substrate.atom.Snapshot;
 import org.jwcarman.substrate.core.memory.atom.InMemoryAtomSpi;
@@ -157,86 +161,286 @@ class DefaultAtomTest {
   }
 
   @Test
-  void watchReturnsImmediatelyWhenTokenDiffers() {
+  void deletePublishesDeletedNotification() {
+    AtomicReference<String> notifiedPayload = new AtomicReference<>();
+    notifier.subscribe(
+        (key, payload) -> {
+          if (KEY.equals(key)) {
+            notifiedPayload.set(payload);
+          }
+        });
+
+    atom.delete();
+
+    assertThat(notifiedPayload.get()).isEqualTo("__DELETED__");
+  }
+
+  // ═══════════════ blocking subscribe tests ═══════════════
+
+  @Test
+  void subscribeDeliversCurrentSnapshotAsFirstResult() {
+    BlockingSubscription<Snapshot<String>> sub = atom.subscribe();
+    try {
+      NextResult<Snapshot<String>> result = sub.next(Duration.ofSeconds(5));
+
+      assertThat(result).isInstanceOf(NextResult.Value.class);
+      NextResult.Value<Snapshot<String>> value = (NextResult.Value<Snapshot<String>>) result;
+      assertThat(value.value().value()).isEqualTo("initial");
+    } finally {
+      sub.cancel();
+    }
+  }
+
+  @Test
+  void subscribeWithStaleLastSeenDeliversCurrentImmediately() {
     Snapshot<String> staleSnapshot = new Snapshot<>("old", "stale-token");
 
-    Optional<Snapshot<String>> result = atom.watch(staleSnapshot, Duration.ofSeconds(1));
+    BlockingSubscription<Snapshot<String>> sub = atom.subscribe(staleSnapshot);
+    try {
+      NextResult<Snapshot<String>> result = sub.next(Duration.ofSeconds(5));
 
-    assertThat(result).isPresent();
-    assertThat(result.get().value()).isEqualTo("initial");
+      assertThat(result).isInstanceOf(NextResult.Value.class);
+      NextResult.Value<Snapshot<String>> value = (NextResult.Value<Snapshot<String>>) result;
+      assertThat(value.value().value()).isEqualTo("initial");
+    } finally {
+      sub.cancel();
+    }
   }
 
   @Test
-  void watchWithNullLastSeenReturnsImmediately() {
-    Optional<Snapshot<String>> result = atom.watch(null, Duration.ofSeconds(1));
-
-    assertThat(result).isPresent();
-    assertThat(result.get().value()).isEqualTo("initial");
-  }
-
-  @Test
-  void watchBlocksUntilSetAndReturnsNewSnapshot() {
+  void subscribeWithCurrentTokenBlocksUntilSet() {
     Snapshot<String> current = atom.get();
-    AtomicReference<Optional<Snapshot<String>>> result = new AtomicReference<>();
 
-    Thread.ofVirtual().start(() -> result.set(atom.watch(current, Duration.ofSeconds(5))));
+    BlockingSubscription<Snapshot<String>> sub = atom.subscribe(current);
+    try {
+      AtomicReference<NextResult<Snapshot<String>>> result = new AtomicReference<>();
+      Thread.ofVirtual().start(() -> result.set(sub.next(Duration.ofSeconds(5))));
 
-    await().pollDelay(Duration.ofMillis(50)).atMost(Duration.ofSeconds(1)).until(() -> true);
+      await().pollDelay(Duration.ofMillis(50)).atMost(Duration.ofSeconds(1)).until(() -> true);
 
-    atom.set("changed", TTL);
+      atom.set("changed", TTL);
 
-    await()
-        .atMost(Duration.ofSeconds(5))
-        .untilAsserted(
-            () -> {
-              assertThat(result.get()).isNotNull();
-              assertThat(result.get()).isPresent();
-              assertThat(result.get().get().value()).isEqualTo("changed");
+      await()
+          .atMost(Duration.ofSeconds(5))
+          .untilAsserted(
+              () -> {
+                assertThat(result.get()).isNotNull();
+                assertThat(result.get()).isInstanceOf(NextResult.Value.class);
+                NextResult.Value<Snapshot<String>> value =
+                    (NextResult.Value<Snapshot<String>>) result.get();
+                assertThat(value.value().value()).isEqualTo("changed");
+              });
+    } finally {
+      sub.cancel();
+    }
+  }
+
+  @Test
+  void subscribeReturnsTimeoutWhenNothingChanges() {
+    Snapshot<String> current = atom.get();
+
+    BlockingSubscription<Snapshot<String>> sub = atom.subscribe(current);
+    try {
+      NextResult<Snapshot<String>> result = sub.next(Duration.ofMillis(200));
+
+      assertThat(result).isInstanceOf(NextResult.Timeout.class);
+    } finally {
+      sub.cancel();
+    }
+  }
+
+  @Test
+  void subscribeDeliversDeletedOnAtomDeletion() {
+    Snapshot<String> current = atom.get();
+
+    BlockingSubscription<Snapshot<String>> sub = atom.subscribe(current);
+    try {
+      AtomicReference<NextResult<Snapshot<String>>> result = new AtomicReference<>();
+      Thread.ofVirtual().start(() -> result.set(sub.next(Duration.ofSeconds(5))));
+
+      await().pollDelay(Duration.ofMillis(50)).atMost(Duration.ofSeconds(1)).until(() -> true);
+
+      atom.delete();
+
+      await()
+          .atMost(Duration.ofSeconds(5))
+          .untilAsserted(() -> assertThat(result.get()).isInstanceOf(NextResult.Deleted.class));
+    } finally {
+      sub.cancel();
+    }
+  }
+
+  @Test
+  void subscribeDeliversExpiredWhenAtomTtlElapses() {
+    InMemoryAtomSpi shortSpi = new InMemoryAtomSpi();
+    InMemoryNotifier shortNotifier = new InMemoryNotifier();
+
+    byte[] bytes = STRING_CODEC.encode("ephemeral");
+    String token = DefaultAtom.token(bytes);
+    Duration shortTtl = Duration.ofMillis(200);
+    shortSpi.create(KEY, bytes, token, shortTtl);
+
+    DefaultAtom<String> shortAtom =
+        new DefaultAtom<>(shortSpi, KEY, STRING_CODEC, shortNotifier, Duration.ofHours(24));
+
+    Snapshot<String> current = shortAtom.get();
+
+    BlockingSubscription<Snapshot<String>> sub = shortAtom.subscribe(current);
+    try {
+      await()
+          .atMost(Duration.ofSeconds(5))
+          .untilAsserted(
+              () -> {
+                NextResult<Snapshot<String>> result = sub.next(Duration.ofMillis(100));
+                assertThat(result).isInstanceOf(NextResult.Expired.class);
+              });
+    } finally {
+      sub.cancel();
+    }
+  }
+
+  @Test
+  void subscribeCoalescesRapidSets() {
+    Snapshot<String> current = atom.get();
+
+    BlockingSubscription<Snapshot<String>> sub = atom.subscribe(current);
+    try {
+      atom.set("v1", TTL);
+      atom.set("v2", TTL);
+      atom.set("v3", TTL);
+
+      await()
+          .atMost(Duration.ofSeconds(5))
+          .untilAsserted(
+              () -> {
+                NextResult<Snapshot<String>> result = sub.next(Duration.ofSeconds(2));
+                assertThat(result).isInstanceOf(NextResult.Value.class);
+                NextResult.Value<Snapshot<String>> value =
+                    (NextResult.Value<Snapshot<String>>) result;
+                assertThat(value.value().value()).isEqualTo("v3");
+              });
+    } finally {
+      sub.cancel();
+    }
+  }
+
+  // ═══════════════ callback subscribe tests ═══════════════
+
+  @Test
+  void callbackSubscribeFiresOnNextForNewSnapshot() {
+    Snapshot<String> current = atom.get();
+    AtomicReference<Snapshot<String>> captured = new AtomicReference<>();
+    CountDownLatch invoked = new CountDownLatch(1);
+
+    CallbackSubscription sub =
+        atom.subscribe(
+            current,
+            snap -> {
+              captured.set(snap);
+              invoked.countDown();
             });
+    try {
+      atom.set("callback-value", TTL);
+
+      await()
+          .atMost(Duration.ofSeconds(5))
+          .untilAsserted(
+              () -> {
+                assertThat(invoked.await(0, TimeUnit.MILLISECONDS)).isTrue();
+                assertThat(captured.get().value()).isEqualTo("callback-value");
+              });
+    } finally {
+      sub.cancel();
+    }
   }
 
   @Test
-  void watchReturnsEmptyOnTimeout() {
+  void callbackSubscribeFiresOnDeleteWhenAtomDeleted() {
     Snapshot<String> current = atom.get();
+    AtomicBoolean deleteFired = new AtomicBoolean(false);
 
-    Optional<Snapshot<String>> result = atom.watch(current, Duration.ofMillis(100));
+    CallbackSubscription sub =
+        atom.subscribe(current, snap -> {}, b -> b.onDelete(() -> deleteFired.set(true)));
+    try {
+      atom.delete();
 
-    assertThat(result).isEmpty();
+      await()
+          .atMost(Duration.ofSeconds(5))
+          .untilAsserted(() -> assertThat(deleteFired.get()).isTrue());
+    } finally {
+      sub.cancel();
+    }
   }
 
   @Test
-  void watchThrowsOnDeadAtomAtCallTime() {
-    Snapshot<String> current = atom.get();
-    atom.delete();
+  void callbackSubscribeFiresOnExpirationWhenAtomExpires() {
+    InMemoryAtomSpi shortSpi = new InMemoryAtomSpi();
+    InMemoryNotifier shortNotifier = new InMemoryNotifier();
 
-    assertThatThrownBy(() -> atom.watch(current, Duration.ofSeconds(1)))
-        .isInstanceOf(AtomExpiredException.class);
+    byte[] bytes = STRING_CODEC.encode("ephemeral");
+    String token = DefaultAtom.token(bytes);
+    Duration shortTtl = Duration.ofMillis(200);
+    shortSpi.create(KEY, bytes, token, shortTtl);
+
+    DefaultAtom<String> shortAtom =
+        new DefaultAtom<>(shortSpi, KEY, STRING_CODEC, shortNotifier, Duration.ofHours(24));
+
+    Snapshot<String> current = shortAtom.get();
+    AtomicBoolean expirationFired = new AtomicBoolean(false);
+
+    CallbackSubscription sub =
+        shortAtom.subscribe(
+            current, snap -> {}, b -> b.onExpiration(() -> expirationFired.set(true)));
+    try {
+      await()
+          .atMost(Duration.ofSeconds(5))
+          .untilAsserted(() -> assertThat(expirationFired.get()).isTrue());
+    } finally {
+      sub.cancel();
+    }
   }
 
   @Test
-  void watchThrowsWhenAtomDiesDuringWait() {
-    Snapshot<String> current = atom.get();
-    AtomicReference<Throwable> caught = new AtomicReference<>();
+  void callbackSubscribeNeverFiresOnComplete() {
+    AtomicBoolean completeFired = new AtomicBoolean(false);
 
-    Thread.ofVirtual()
-        .start(
-            () -> {
-              try {
-                atom.watch(current, Duration.ofSeconds(5));
-              } catch (AtomExpiredException e) {
-                caught.set(e);
-              }
+    CallbackSubscription sub =
+        atom.subscribe(snap -> {}, b -> b.onComplete(() -> completeFired.set(true)));
+    try {
+      await()
+          .pollDelay(Duration.ofMillis(500))
+          .atMost(Duration.ofSeconds(2))
+          .untilAsserted(() -> assertThat(completeFired.get()).isFalse());
+    } finally {
+      sub.cancel();
+    }
+  }
+
+  @Test
+  void callbackSubscribeFromCurrentStateDeliversInitialSnapshot() {
+    AtomicReference<Snapshot<String>> captured = new AtomicReference<>();
+    CountDownLatch invoked = new CountDownLatch(1);
+
+    CallbackSubscription sub =
+        atom.subscribe(
+            snap -> {
+              captured.set(snap);
+              invoked.countDown();
             });
-
-    await().pollDelay(Duration.ofMillis(50)).atMost(Duration.ofSeconds(1)).until(() -> true);
-
-    atom.delete();
-    notifier.notify(KEY, "deleted");
-
-    await()
-        .atMost(Duration.ofSeconds(5))
-        .untilAsserted(() -> assertThat(caught.get()).isInstanceOf(AtomExpiredException.class));
+    try {
+      await()
+          .atMost(Duration.ofSeconds(5))
+          .untilAsserted(
+              () -> {
+                assertThat(invoked.await(0, TimeUnit.MILLISECONDS)).isTrue();
+                assertThat(captured.get().value()).isEqualTo("initial");
+              });
+    } finally {
+      sub.cancel();
+    }
   }
+
+  // ═══════════════ token & TTL tests ═══════════════
 
   @Test
   void tokenIsContentDerived() throws Exception {

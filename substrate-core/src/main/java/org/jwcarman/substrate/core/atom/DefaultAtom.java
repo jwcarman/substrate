@@ -18,19 +18,30 @@ package org.jwcarman.substrate.core.atom;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import org.jwcarman.codec.spi.Codec;
+import org.jwcarman.substrate.BlockingSubscription;
+import org.jwcarman.substrate.CallbackSubscriberBuilder;
+import org.jwcarman.substrate.CallbackSubscription;
 import org.jwcarman.substrate.atom.Atom;
 import org.jwcarman.substrate.atom.AtomExpiredException;
 import org.jwcarman.substrate.atom.Snapshot;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.notifier.NotifierSubscription;
+import org.jwcarman.substrate.core.subscription.CoalescingHandoff;
+import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
+import org.jwcarman.substrate.core.subscription.DefaultCallbackSubscriberBuilder;
+import org.jwcarman.substrate.core.subscription.DefaultCallbackSubscription;
 
 public class DefaultAtom<T> implements Atom<T> {
+
+  private static final String DELETED_PAYLOAD = "__DELETED__";
 
   private final AtomSpi atomSpi;
   private final String key;
@@ -72,60 +83,136 @@ public class DefaultAtom<T> implements Atom<T> {
   }
 
   @Override
-  public Optional<Snapshot<T>> watch(Snapshot<T> lastSeen, Duration timeout) {
-    Semaphore semaphore = new Semaphore(0);
-    NotifierSubscription subscription =
-        notifier.subscribe(
-            (notifiedKey, payload) -> {
-              if (key.equals(notifiedKey)) {
-                semaphore.release();
-              }
-            });
-    try {
-      Instant deadline = Instant.now().plus(timeout);
-
-      while (true) {
-        Optional<RawAtom> record = atomSpi.read(key);
-        if (record.isEmpty()) {
-          throw new AtomExpiredException(key);
-        }
-
-        String currentToken = record.get().token();
-        String lastSeenToken = lastSeen != null ? lastSeen.token() : null;
-
-        if (!currentToken.equals(lastSeenToken)) {
-          return Optional.of(new Snapshot<>(codec.decode(record.get().value()), currentToken));
-        }
-
-        Duration remaining = Duration.between(Instant.now(), deadline);
-        if (remaining.isNegative() || remaining.isZero()) {
-          return Optional.empty();
-        }
-
-        try {
-          if (semaphore.tryAcquire(remaining.toMillis(), TimeUnit.MILLISECONDS)) {
-            semaphore.drainPermits();
-          } else {
-            return Optional.empty();
-          }
-        } catch (InterruptedException _) {
-          Thread.currentThread().interrupt();
-          return Optional.empty();
-        }
-      }
-    } finally {
-      subscription.cancel();
-    }
+  public void delete() {
+    atomSpi.delete(key);
+    notifier.notify(key, DELETED_PAYLOAD);
   }
 
   @Override
-  public void delete() {
-    atomSpi.delete(key);
+  public BlockingSubscription<Snapshot<T>> subscribe() {
+    return buildBlockingSubscription(null);
+  }
+
+  @Override
+  public BlockingSubscription<Snapshot<T>> subscribe(Snapshot<T> lastSeen) {
+    return buildBlockingSubscription(lastSeen);
+  }
+
+  @Override
+  public CallbackSubscription subscribe(Consumer<Snapshot<T>> onNext) {
+    return buildCallbackSubscription(null, onNext, null);
+  }
+
+  @Override
+  public CallbackSubscription subscribe(
+      Consumer<Snapshot<T>> onNext, Consumer<CallbackSubscriberBuilder<Snapshot<T>>> customizer) {
+    return buildCallbackSubscription(null, onNext, customizer);
+  }
+
+  @Override
+  public CallbackSubscription subscribe(Snapshot<T> lastSeen, Consumer<Snapshot<T>> onNext) {
+    return buildCallbackSubscription(lastSeen, onNext, null);
+  }
+
+  @Override
+  public CallbackSubscription subscribe(
+      Snapshot<T> lastSeen,
+      Consumer<Snapshot<T>> onNext,
+      Consumer<CallbackSubscriberBuilder<Snapshot<T>>> customizer) {
+    return buildCallbackSubscription(lastSeen, onNext, customizer);
   }
 
   @Override
   public String key() {
     return key;
+  }
+
+  private BlockingSubscription<Snapshot<T>> buildBlockingSubscription(Snapshot<T> lastSeen) {
+    CoalescingHandoff<Snapshot<T>> handoff = new CoalescingHandoff<>();
+    Runnable canceller = startFeeder(handoff, lastSeen);
+    return new DefaultBlockingSubscription<>(handoff, canceller);
+  }
+
+  private CallbackSubscription buildCallbackSubscription(
+      Snapshot<T> lastSeen,
+      Consumer<Snapshot<T>> onNext,
+      Consumer<CallbackSubscriberBuilder<Snapshot<T>>> customizer) {
+    CoalescingHandoff<Snapshot<T>> handoff = new CoalescingHandoff<>();
+    Runnable canceller = startFeeder(handoff, lastSeen);
+
+    DefaultCallbackSubscriberBuilder<Snapshot<T>> builder =
+        new DefaultCallbackSubscriberBuilder<>();
+    if (customizer != null) {
+      customizer.accept(builder);
+    }
+
+    return new DefaultCallbackSubscription<>(
+        handoff,
+        canceller,
+        onNext,
+        builder.errorHandler(),
+        builder.expirationHandler(),
+        builder.deleteHandler(),
+        builder.completeHandler());
+  }
+
+  private Runnable startFeeder(CoalescingHandoff<Snapshot<T>> handoff, Snapshot<T> lastSeen) {
+    AtomicBoolean running = new AtomicBoolean(true);
+    Semaphore semaphore = new Semaphore(0);
+    AtomicReference<String> lastToken =
+        new AtomicReference<>(lastSeen != null ? lastSeen.token() : null);
+
+    NotifierSubscription notifierSub =
+        notifier.subscribe(
+            (notifiedKey, payload) -> {
+              if (!key.equals(notifiedKey)) {
+                return;
+              }
+              if (DELETED_PAYLOAD.equals(payload)) {
+                handoff.markDeleted();
+                running.set(false);
+                semaphore.release();
+              } else {
+                semaphore.release();
+              }
+            });
+
+    Thread feederThread =
+        Thread.ofVirtual()
+            .name("substrate-atom-feeder", 0)
+            .start(
+                () -> {
+                  try {
+                    while (running.get() && !Thread.currentThread().isInterrupted()) {
+                      Optional<RawAtom> record = atomSpi.read(key);
+                      if (record.isEmpty()) {
+                        handoff.markExpired();
+                        return;
+                      }
+                      if (!record.get().token().equals(lastToken.get())) {
+                        Snapshot<T> snap =
+                            new Snapshot<>(
+                                codec.decode(record.get().value()), record.get().token());
+                        handoff.push(snap);
+                        lastToken.set(snap.token());
+                      }
+                      semaphore.tryAcquire(1, TimeUnit.SECONDS);
+                      semaphore.drainPermits();
+                    }
+                  } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                  } catch (RuntimeException e) {
+                    handoff.error(e);
+                  } finally {
+                    notifierSub.cancel();
+                  }
+                });
+
+    return () -> {
+      running.set(false);
+      feederThread.interrupt();
+      notifierSub.cancel();
+    };
   }
 
   static String token(byte[] encodedBytes) {
