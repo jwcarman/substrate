@@ -90,10 +90,12 @@ class JournalSubscriptionTest {
       while (sub.isActive()) {
         switch (sub.next(Duration.ofSeconds(5))) {
           case NextResult.Value<JournalEntry<String>>(var entry) -> received.add(entry.data());
-          case NextResult.Completed<JournalEntry<String>> c -> {
+          case NextResult.Completed<JournalEntry<String>> _ -> {
             break loop;
           }
-          default -> {}
+          default -> {
+            /* not relevant to this test */
+          }
         }
       }
     } finally {
@@ -122,11 +124,13 @@ class JournalSubscriptionTest {
       loop:
       while (sub.isActive()) {
         switch (sub.next(Duration.ofSeconds(5))) {
-          case NextResult.Completed<JournalEntry<String>> c -> {
+          case NextResult.Completed<JournalEntry<String>> _ -> {
             subscriptionEnded.set(true);
             break loop;
           }
-          default -> {}
+          default -> {
+            /* not relevant to this test */
+          }
         }
       }
     } finally {
@@ -298,10 +302,12 @@ class JournalSubscriptionTest {
             received.add(entry.data());
             await().pollDelay(Duration.ofMillis(1)).atMost(Duration.ofSeconds(1)).until(() -> true);
           }
-          case NextResult.Completed<JournalEntry<String>> c -> {
+          case NextResult.Completed<JournalEntry<String>> _ -> {
             break loop;
           }
-          default -> {}
+          default -> {
+            /* not relevant to this test */
+          }
         }
       }
 
@@ -377,10 +383,12 @@ class JournalSubscriptionTest {
       while (sub.isActive()) {
         switch (sub.next(Duration.ofSeconds(5))) {
           case NextResult.Value<JournalEntry<String>>(var entry) -> received.add(entry.data());
-          case NextResult.Completed<JournalEntry<String>> c -> {
+          case NextResult.Completed<JournalEntry<String>> _ -> {
             break loop;
           }
-          default -> {}
+          default -> {
+            /* not relevant to this test */
+          }
         }
       }
 

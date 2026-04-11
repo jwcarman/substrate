@@ -45,6 +45,8 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
   private static final String FIELD_TIMESTAMP = "timestamp";
   private static final String FIELD_TTL = "ttl";
   private static final String COMPLETED_ENTRY_ID = "COMPLETED";
+  private static final String EXPR_KEY_ALIAS = "#k";
+  private static final String EXPR_KEY_PARAM = ":k";
 
   private final DynamoDbClient client;
   private final String tableName;
@@ -103,11 +105,13 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
           QueryRequest.builder()
               .tableName(tableName)
               .keyConditionExpression("#k = :k AND " + FIELD_ENTRY_ID + " > :eid")
-              .expressionAttributeNames(Map.of("#k", FIELD_KEY))
+              .expressionAttributeNames(Map.of(EXPR_KEY_ALIAS, FIELD_KEY))
               .expressionAttributeValues(
                   Map.of(
-                      ":k", AttributeValue.builder().s(key).build(),
-                      ":eid", AttributeValue.builder().s(afterId).build()))
+                      EXPR_KEY_PARAM,
+                      AttributeValue.builder().s(key).build(),
+                      ":eid",
+                      AttributeValue.builder().s(afterId).build()))
               .scanIndexForward(true);
 
       if (exclusiveStartKey != null) {
@@ -135,8 +139,9 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
             QueryRequest.builder()
                 .tableName(tableName)
                 .keyConditionExpression("#k = :k")
-                .expressionAttributeNames(Map.of("#k", FIELD_KEY))
-                .expressionAttributeValues(Map.of(":k", AttributeValue.builder().s(key).build()))
+                .expressionAttributeNames(Map.of(EXPR_KEY_ALIAS, FIELD_KEY))
+                .expressionAttributeValues(
+                    Map.of(EXPR_KEY_PARAM, AttributeValue.builder().s(key).build()))
                 .scanIndexForward(false)
                 .limit(count + 1)
                 .build());
@@ -178,11 +183,13 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
             QueryRequest.builder()
                 .tableName(tableName)
                 .keyConditionExpression("#k = :k AND " + FIELD_ENTRY_ID + " = :eid")
-                .expressionAttributeNames(Map.of("#k", FIELD_KEY))
+                .expressionAttributeNames(Map.of(EXPR_KEY_ALIAS, FIELD_KEY))
                 .expressionAttributeValues(
                     Map.of(
-                        ":k", AttributeValue.builder().s(key).build(),
-                        ":eid", AttributeValue.builder().s(COMPLETED_ENTRY_ID).build()))
+                        EXPR_KEY_PARAM,
+                        AttributeValue.builder().s(key).build(),
+                        ":eid",
+                        AttributeValue.builder().s(COMPLETED_ENTRY_ID).build()))
                 .limit(1)
                 .build());
     return !response.items().isEmpty();
@@ -197,9 +204,10 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
           QueryRequest.builder()
               .tableName(tableName)
               .keyConditionExpression("#k = :k")
-              .expressionAttributeValues(Map.of(":k", AttributeValue.builder().s(key).build()))
+              .expressionAttributeValues(
+                  Map.of(EXPR_KEY_PARAM, AttributeValue.builder().s(key).build()))
               .projectionExpression("#k, " + FIELD_ENTRY_ID)
-              .expressionAttributeNames(Map.of("#k", FIELD_KEY));
+              .expressionAttributeNames(Map.of(EXPR_KEY_ALIAS, FIELD_KEY));
 
       if (exclusiveStartKey != null) {
         queryBuilder.exclusiveStartKey(exclusiveStartKey);

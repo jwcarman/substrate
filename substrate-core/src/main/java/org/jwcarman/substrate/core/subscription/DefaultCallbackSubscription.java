@@ -71,16 +71,18 @@ public class DefaultCallbackSubscription<T> implements CallbackSubscription {
             log.warn("onNext handler threw", e);
           }
         }
-        case NextResult.Timeout<T> t -> {}
-        case NextResult.Completed<T> c -> {
+        case NextResult.Timeout<T> _ -> {
+          /* re-check loop condition */
+        }
+        case NextResult.Completed<T> _ -> {
           done.set(true);
           safeRun(onComplete);
         }
-        case NextResult.Expired<T> e -> {
+        case NextResult.Expired<T> _ -> {
           done.set(true);
           safeRun(onExpiration);
         }
-        case NextResult.Deleted<T> d -> {
+        case NextResult.Deleted<T> _ -> {
           done.set(true);
           safeRun(onDelete);
         }

@@ -29,7 +29,6 @@ import org.jwcarman.substrate.core.subscription.FeederSupport;
 import org.jwcarman.substrate.core.subscription.SingleShotHandoff;
 import org.jwcarman.substrate.mailbox.Mailbox;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
-import org.jwcarman.substrate.mailbox.MailboxFullException;
 
 public class DefaultMailbox<T> implements Mailbox<T> {
 
@@ -47,11 +46,7 @@ public class DefaultMailbox<T> implements Mailbox<T> {
 
   @Override
   public void deliver(T value) {
-    try {
-      mailboxSpi.deliver(key, codec.encode(value));
-    } catch (MailboxExpiredException | MailboxFullException e) {
-      throw e;
-    }
+    mailboxSpi.deliver(key, codec.encode(value));
     notifier.notify(key, "delivered");
   }
 

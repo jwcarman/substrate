@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T04:30:00Z
-ITERATION: 48
-SPEC_COMPLETED: 046-sonar-thread-sleep-triage.md
-WHAT_WAS_DONE: Triaged and replaced all 12 Thread.sleep() occurrences in test code with Awaitility equivalents — 5 Bucket B (assert-absence via await().during()), 5 Bucket A (poll for TTL expiry or use pollDelay for post-delay assertions), and 2 Bucket A (await thread state WAITING/TIMED_WAITING instead of sleep before interrupt). Zero Bucket C sleeps remain.
-VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — BUILD SUCCESS (all 13 modules, 308+ tests, zero failures)
-STATUS: MORE_WORK
-NEXT_SPEC: 047-sonar-minor-cleanups-batch.md
-NOTES: All 12 Thread.sleep sites eliminated (S2925 count drops from 12 to 0). Files changed: DefaultCallbackSubscriptionTest.java (3 sites), DefaultBlockingSubscriptionTest.java (2), FeederSupportTest.java (1), BlockingBoundedHandoffTest.java (1), DynamoDbAtomIT.java (3), HazelcastAtomIT.java (1), MongoDbAtomSpiIT.java (1). Virtual thread state checks use both WAITING and TIMED_WAITING to handle JVM variance. No @SuppressWarnings added. Integration tests (DynamoDB, Hazelcast, MongoDB) not run locally — they require Testcontainers infrastructure.
+LAST_RUN: 2026-04-11T04:41:00Z
+ITERATION: 49
+SPEC_COMPLETED: 047-sonar-minor-cleanups-batch.md
+WHAT_WAS_DONE: Fixed 17 minor Sonar code smells across 5 files: S1481 (8 unused pattern variables → _ in DefaultCallbackSubscription and JournalSubscriptionTest), S108 (6 empty switch blocks → added intent comments), S1192 (2 duplicated strings "#k"/":k" → extracted EXPR_KEY_ALIAS/EXPR_KEY_PARAM constants in DynamoDbJournalSpi), S2737 (1 catch-only-rethrows → removed redundant try-catch in DefaultMailbox.deliver). S6213/S2326/S4144/S1068 had zero remaining instances (already resolved by prior specs).
+VERIFICATION: ./mvnw spotless:check — PASS; ./mvnw verify -DskipITs — BUILD SUCCESS (all 13 modules, zero failures)
+STATUS: DONE
+NEXT_SPEC: none
+NOTES: No new @SuppressWarnings added. Files changed: DefaultMailbox.java (removed redundant try-catch + unused MailboxFullException import), DefaultCallbackSubscription.java (4 pattern vars → _, added comment to empty Timeout case), JournalSubscriptionTest.java (4 pattern vars → _, 4 empty default cases → commented), ConsumerEscapeHatchTest.java (1 empty default case → commented), DynamoDbJournalSpi.java (extracted 2 string constants EXPR_KEY_ALIAS and EXPR_KEY_PARAM). This was the last Sonar cleanup spec in the queue — project should be at or near 0 open Sonar issues.

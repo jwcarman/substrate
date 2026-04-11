@@ -75,7 +75,9 @@ class ConsumerEscapeHatchTest {
                       expiredResult.set(e);
                       break loop;
                     }
-                    default -> {}
+                    default -> {
+                      /* not relevant to this test */
+                    }
                   }
                 }
               } finally {
