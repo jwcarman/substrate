@@ -33,12 +33,21 @@ public class DefaultBlockingSubscription<T> implements BlockingSubscription<T> {
 
   @Override
   public NextResult<T> next(Duration timeout) {
-    NextResult<T> result = handoff.pull(timeout);
-    switch (result) {
-      case NextResult.Value<T> v -> {}
-      case NextResult.Timeout<T> t -> {}
-      default -> done.set(true);
+    if (Thread.currentThread().isInterrupted()) {
+      done.set(true);
+      return new NextResult.Timeout<>();
     }
+
+    NextResult<T> result = handoff.pull(timeout);
+
+    if (result.isTerminal()) {
+      done.set(true);
+    }
+
+    if (Thread.currentThread().isInterrupted()) {
+      done.set(true);
+    }
+
     return result;
   }
 

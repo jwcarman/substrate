@@ -78,8 +78,8 @@ public class DefaultAtom<T> implements Atom<T> {
 
   @Override
   public Snapshot<T> get() {
-    RawAtom record = atomSpi.read(key).orElseThrow(() -> new AtomExpiredException(key));
-    return new Snapshot<>(codec.decode(record.value()), record.token());
+    RawAtom raw = atomSpi.read(key).orElseThrow(() -> new AtomExpiredException(key));
+    return new Snapshot<>(codec.decode(raw.value()), raw.token());
   }
 
   @Override
@@ -184,20 +184,20 @@ public class DefaultAtom<T> implements Atom<T> {
                 () -> {
                   try {
                     while (running.get() && !Thread.currentThread().isInterrupted()) {
-                      Optional<RawAtom> record = atomSpi.read(key);
-                      if (record.isEmpty()) {
+                      Optional<RawAtom> raw = atomSpi.read(key);
+                      if (raw.isEmpty()) {
                         handoff.markExpired();
                         return;
                       }
-                      if (!record.get().token().equals(lastToken.get())) {
+                      if (!raw.get().token().equals(lastToken.get())) {
                         Snapshot<T> snap =
-                            new Snapshot<>(
-                                codec.decode(record.get().value()), record.get().token());
+                            new Snapshot<>(codec.decode(raw.get().value()), raw.get().token());
                         handoff.push(snap);
                         lastToken.set(snap.token());
                       }
-                      semaphore.tryAcquire(1, TimeUnit.SECONDS);
-                      semaphore.drainPermits();
+                      if (semaphore.tryAcquire(1, TimeUnit.SECONDS)) {
+                        semaphore.drainPermits();
+                      }
                     }
                   } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();

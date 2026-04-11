@@ -21,6 +21,8 @@ import static org.awaitility.Awaitility.await;
 import java.time.Duration;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
@@ -172,6 +174,230 @@ class DefaultCallbackSubscriptionTest {
     assertThat(sub.isActive()).isTrue();
     sub.cancel();
 
-    await().atMost(Duration.ofSeconds(3)).until(() -> !sub.isActive());
+    await().atMost(Duration.ofMillis(500)).until(() -> !sub.isActive());
+  }
+
+  // --- Cancel latency test ---
+
+  @Test
+  void cancelOnIdleSubscriptionExitsQuickly() {
+    var handoff = new CoalescingHandoff<String>();
+    var sub =
+        new DefaultCallbackSubscription<>(handoff, () -> {}, value -> {}, null, null, null, null);
+
+    await().atMost(Duration.ofMillis(200)).until(sub::isActive);
+
+    long start = System.nanoTime();
+    sub.cancel();
+    await().atMost(Duration.ofMillis(200)).until(() -> !sub.isActive());
+    long elapsed = System.nanoTime() - start;
+
+    assertThat(Duration.ofNanos(elapsed)).isLessThan(Duration.ofMillis(200));
+  }
+
+  // --- Idle subscription does zero periodic work ---
+
+  @Test
+  void idleSubscriptionDoesNoPeriodicWork() throws Exception {
+    var handoff = new CoalescingHandoff<String>();
+    var pullCount = new AtomicInteger(0);
+
+    var countingHandoff =
+        new NextHandoff<String>() {
+          @Override
+          public void push(String item) {
+            handoff.push(item);
+          }
+
+          @Override
+          public void pushAll(java.util.List<String> items) {
+            handoff.pushAll(items);
+          }
+
+          @Override
+          public org.jwcarman.substrate.NextResult<String> pull(Duration timeout) {
+            pullCount.incrementAndGet();
+            return handoff.pull(timeout);
+          }
+
+          @Override
+          public void error(Throwable cause) {
+            handoff.error(cause);
+          }
+
+          @Override
+          public void markCompleted() {
+            handoff.markCompleted();
+          }
+
+          @Override
+          public void markExpired() {
+            handoff.markExpired();
+          }
+
+          @Override
+          public void markDeleted() {
+            handoff.markDeleted();
+          }
+        };
+
+    var sub =
+        new DefaultCallbackSubscription<>(
+            countingHandoff, () -> {}, value -> {}, null, null, null, null);
+
+    await().atMost(Duration.ofMillis(200)).until(sub::isActive);
+
+    int pullsBefore = pullCount.get();
+    Thread.sleep(3000);
+    int pullsAfter = pullCount.get();
+
+    sub.cancel();
+    await().atMost(Duration.ofMillis(500)).until(() -> !sub.isActive());
+
+    assertThat(pullsAfter - pullsBefore)
+        .as("No pull calls should return during a 3-second idle window")
+        .isLessThanOrEqualTo(1);
+  }
+
+  // --- External interrupt handling ---
+
+  @Test
+  void externalInterruptExitsHandlerLoop() throws Exception {
+    var handoff = new CoalescingHandoff<String>();
+    var threadRef = new AtomicReference<Thread>();
+    var started = new CountDownLatch(1);
+    var received = new CopyOnWriteArrayList<String>();
+
+    var capturingHandoff =
+        new NextHandoff<String>() {
+          @Override
+          public void push(String item) {
+            handoff.push(item);
+          }
+
+          @Override
+          public void pushAll(java.util.List<String> items) {
+            handoff.pushAll(items);
+          }
+
+          @Override
+          public org.jwcarman.substrate.NextResult<String> pull(Duration timeout) {
+            threadRef.compareAndSet(null, Thread.currentThread());
+            started.countDown();
+            return handoff.pull(timeout);
+          }
+
+          @Override
+          public void error(Throwable cause) {
+            handoff.error(cause);
+          }
+
+          @Override
+          public void markCompleted() {
+            handoff.markCompleted();
+          }
+
+          @Override
+          public void markExpired() {
+            handoff.markExpired();
+          }
+
+          @Override
+          public void markDeleted() {
+            handoff.markDeleted();
+          }
+        };
+
+    var sub =
+        new DefaultCallbackSubscription<>(
+            capturingHandoff, () -> {}, received::add, null, null, null, null);
+
+    assertThat(started.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+
+    threadRef.get().interrupt();
+
+    await().atMost(Duration.ofMillis(500)).until(() -> !sub.isActive());
+
+    handoff.push("after-interrupt");
+    Thread.sleep(100);
+    assertThat(received).doesNotContain("after-interrupt");
+  }
+
+  // --- Interrupt does NOT fire onError ---
+
+  @Test
+  void interruptDoesNotFireOnError() throws Exception {
+    var handoff = new CoalescingHandoff<String>();
+    var threadRef = new AtomicReference<Thread>();
+    var started = new CountDownLatch(1);
+    var errorFired = new AtomicBoolean(false);
+
+    var capturingHandoff =
+        new NextHandoff<String>() {
+          @Override
+          public void push(String item) {
+            handoff.push(item);
+          }
+
+          @Override
+          public void pushAll(java.util.List<String> items) {
+            handoff.pushAll(items);
+          }
+
+          @Override
+          public org.jwcarman.substrate.NextResult<String> pull(Duration timeout) {
+            threadRef.compareAndSet(null, Thread.currentThread());
+            started.countDown();
+            return handoff.pull(timeout);
+          }
+
+          @Override
+          public void error(Throwable cause) {
+            handoff.error(cause);
+          }
+
+          @Override
+          public void markCompleted() {
+            handoff.markCompleted();
+          }
+
+          @Override
+          public void markExpired() {
+            handoff.markExpired();
+          }
+
+          @Override
+          public void markDeleted() {
+            handoff.markDeleted();
+          }
+        };
+
+    new DefaultCallbackSubscription<>(
+        capturingHandoff, () -> {}, value -> {}, cause -> errorFired.set(true), null, null, null);
+
+    assertThat(started.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+    threadRef.get().interrupt();
+
+    Thread.sleep(200);
+    assertThat(errorFired.get()).isFalse();
+  }
+
+  // --- Value pushed while parked wakes handler immediately ---
+
+  @Test
+  void valuePushedWhileParkedWakesHandlerImmediately() {
+    var handoff = new CoalescingHandoff<String>();
+    var received = new CopyOnWriteArrayList<String>();
+
+    new DefaultCallbackSubscription<>(handoff, () -> {}, received::add, null, null, null, null);
+
+    await().atMost(Duration.ofMillis(200)).pollInterval(Duration.ofMillis(10)).until(() -> true);
+
+    handoff.push("wake-up");
+
+    await()
+        .atMost(Duration.ofMillis(200))
+        .pollInterval(Duration.ofMillis(10))
+        .until(() -> received.contains("wake-up"));
   }
 }

@@ -126,8 +126,9 @@ public class DefaultMailbox<T> implements Mailbox<T> {
                         handoff.push(codec.decode(value.get()));
                         return;
                       }
-                      semaphore.tryAcquire(1, TimeUnit.SECONDS);
-                      semaphore.drainPermits();
+                      if (semaphore.tryAcquire(1, TimeUnit.SECONDS)) {
+                        semaphore.drainPermits();
+                      }
                     }
                   } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();

@@ -18,7 +18,11 @@ package org.jwcarman.substrate.core.subscription;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.NextResult;
 
@@ -108,5 +112,121 @@ class DefaultBlockingSubscriptionTest {
     sub.cancel();
     sub.cancel();
     assertThat(canceller.get()).isEqualTo(2);
+  }
+
+  // --- isTerminal tests ---
+
+  @Test
+  void valueIsNotTerminal() {
+    assertThat(new NextResult.Value<>("x").isTerminal()).isFalse();
+  }
+
+  @Test
+  void timeoutIsNotTerminal() {
+    assertThat(new NextResult.Timeout<>().isTerminal()).isFalse();
+  }
+
+  @Test
+  void completedIsTerminal() {
+    assertThat(new NextResult.Completed<>().isTerminal()).isTrue();
+  }
+
+  @Test
+  void expiredIsTerminal() {
+    assertThat(new NextResult.Expired<>().isTerminal()).isTrue();
+  }
+
+  @Test
+  void deletedIsTerminal() {
+    assertThat(new NextResult.Deleted<>().isTerminal()).isTrue();
+  }
+
+  @Test
+  void erroredIsTerminal() {
+    assertThat(new NextResult.Errored<>(new RuntimeException("x")).isTerminal()).isTrue();
+  }
+
+  // --- Interrupt handling tests ---
+
+  @Test
+  void preInterruptedThreadReturnsTimeoutAndFlipsDone() {
+    var handoff = new BlockingBoundedHandoff<String>(10);
+    var sub = new DefaultBlockingSubscription<>(handoff, () -> {});
+
+    Thread.currentThread().interrupt();
+    try {
+      NextResult<String> result = sub.next(Duration.ofSeconds(30));
+      assertThat(result).isInstanceOf(NextResult.Timeout.class);
+      assertThat(sub.isActive()).isFalse();
+      assertThat(Thread.currentThread().isInterrupted()).isTrue();
+    } finally {
+      Thread.interrupted();
+    }
+  }
+
+  @Test
+  void interruptDuringPullFlipsDone() throws Exception {
+    var handoff = new CoalescingHandoff<String>();
+    var sub = new DefaultBlockingSubscription<>(handoff, () -> {});
+    var resultRef = new AtomicReference<NextResult<String>>();
+    var latch = new CountDownLatch(1);
+
+    Thread consumer =
+        Thread.ofVirtual()
+            .start(
+                () -> {
+                  resultRef.set(sub.next(Duration.ofSeconds(30)));
+                  latch.countDown();
+                });
+
+    Thread.sleep(50);
+    consumer.interrupt();
+
+    assertThat(latch.await(1, TimeUnit.SECONDS)).isTrue();
+    assertThat(resultRef.get()).isInstanceOf(NextResult.Timeout.class);
+    assertThat(sub.isActive()).isFalse();
+  }
+
+  @Test
+  void consumerLoopExitsCleanlyUnderInterrupt() throws Exception {
+    var handoff = new CoalescingHandoff<String>();
+    var sub = new DefaultBlockingSubscription<>(handoff, () -> {});
+    var loopExited = new AtomicBoolean(false);
+
+    Thread consumer =
+        Thread.ofVirtual()
+            .start(
+                () -> {
+                  while (sub.isActive()) {
+                    sub.next(Duration.ofSeconds(30));
+                  }
+                  loopExited.set(true);
+                });
+
+    Thread.sleep(50);
+    consumer.interrupt();
+    consumer.join(500);
+
+    assertThat(loopExited.get()).isTrue();
+    assertThat(consumer.isAlive()).isFalse();
+  }
+
+  @Test
+  void valueDoesNotFlipActive() {
+    var handoff = new BlockingBoundedHandoff<String>(10);
+    handoff.push("hello");
+    var sub = new DefaultBlockingSubscription<>(handoff, () -> {});
+
+    sub.next(SHORT_TIMEOUT);
+    assertThat(sub.isActive()).isTrue();
+  }
+
+  @Test
+  void timeoutWithoutInterruptDoesNotFlipActive() {
+    var handoff = new BlockingBoundedHandoff<String>(10);
+    var sub = new DefaultBlockingSubscription<>(handoff, () -> {});
+
+    sub.next(SHORT_TIMEOUT);
+    assertThat(sub.isActive()).isTrue();
   }
 }

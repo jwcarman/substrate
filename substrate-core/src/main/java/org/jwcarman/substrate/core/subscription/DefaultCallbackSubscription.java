@@ -26,9 +26,11 @@ import org.jwcarman.substrate.NextResult;
 public class DefaultCallbackSubscription<T> implements CallbackSubscription {
 
   private static final Log log = LogFactory.getLog(DefaultCallbackSubscription.class);
-  private static final Duration HANDLER_POLL_INTERVAL = Duration.ofSeconds(1);
+  private static final Duration MAX_POLL_DURATION = Duration.ofDays(365);
 
+  private final Runnable canceller;
   private final AtomicBoolean done = new AtomicBoolean(false);
+  private final Thread handlerThread;
 
   public DefaultCallbackSubscription(
       NextHandoff<T> handoff,
@@ -38,24 +40,29 @@ public class DefaultCallbackSubscription<T> implements CallbackSubscription {
       Runnable onExpiration,
       Runnable onDelete,
       Runnable onComplete) {
-    Thread.ofVirtual()
-        .name("substrate-callback-handler", 0)
-        .start(
-            () ->
-                runHandlerLoop(
-                    handoff, canceller, onNext, onError, onExpiration, onDelete, onComplete));
+    this.canceller = canceller;
+    this.handlerThread =
+        Thread.ofVirtual()
+            .name("substrate-callback-handler", 0)
+            .start(
+                () -> runHandlerLoop(handoff, onNext, onError, onExpiration, onDelete, onComplete));
   }
 
   private void runHandlerLoop(
       NextHandoff<T> handoff,
-      Runnable canceller,
       Consumer<T> onNext,
       Consumer<Throwable> onError,
       Runnable onExpiration,
       Runnable onDelete,
       Runnable onComplete) {
     while (!done.get()) {
-      NextResult<T> result = handoff.pull(HANDLER_POLL_INTERVAL);
+      if (Thread.currentThread().isInterrupted()) {
+        done.set(true);
+        return;
+      }
+
+      NextResult<T> result = handoff.pull(MAX_POLL_DURATION);
+
       switch (result) {
         case NextResult.Value<T>(T value) -> {
           try {
@@ -81,6 +88,10 @@ public class DefaultCallbackSubscription<T> implements CallbackSubscription {
           done.set(true);
           safeAccept(onError, cause);
         }
+      }
+
+      if (Thread.currentThread().isInterrupted()) {
+        done.set(true);
       }
     }
   }
@@ -111,5 +122,7 @@ public class DefaultCallbackSubscription<T> implements CallbackSubscription {
   @Override
   public void cancel() {
     done.set(true);
+    handlerThread.interrupt();
+    canceller.run();
   }
 }

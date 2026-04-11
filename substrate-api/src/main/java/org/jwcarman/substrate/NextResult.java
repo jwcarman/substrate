@@ -23,9 +23,29 @@ public sealed interface NextResult<T>
         NextResult.Deleted,
         NextResult.Errored {
 
-  record Value<T>(T value) implements NextResult<T> {}
+  /**
+   * Returns {@code true} if this result represents the end of the subscription — no more values
+   * will arrive. {@link Completed}, {@link Expired}, {@link Deleted}, and {@link Errored} are
+   * terminal. {@link Value} and {@link Timeout} are not — more values may still arrive on
+   * subsequent pulls.
+   */
+  default boolean isTerminal() {
+    return true;
+  }
 
-  record Timeout<T>() implements NextResult<T> {}
+  record Value<T>(T value) implements NextResult<T> {
+    @Override
+    public boolean isTerminal() {
+      return false;
+    }
+  }
+
+  record Timeout<T>() implements NextResult<T> {
+    @Override
+    public boolean isTerminal() {
+      return false;
+    }
+  }
 
   record Completed<T>() implements NextResult<T> {}
 
