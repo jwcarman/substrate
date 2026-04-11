@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-11T14:30:00Z
-ITERATION: 64
-SPEC_COMPLETED: shutdown-coordinator-prep-work
-WHAT_WAS_DONE: Landed ShutdownCoordinator (Spring SmartLifecycle at phase Integer.MAX_VALUE that cancels active subscriptions at context shutdown). Added NextResult.Cancelled<T> sealed variant. Added markCancelled() on NextHandoff + all impls. Refactored DefaultCallbackSubscription to wrap a DefaultBlockingSubscription (layered design — blocking owns all lifecycle state, callback is a thin pump thread). DefaultBlockingSubscription registers/unregisters with the coordinator on construction / terminal observation / cancel. Introduced LifecycleCallbacks record as an interim bundle (will be deleted in spec 063). Updated all three primitives and their factories to accept a ShutdownCoordinator bean. This was NOT spec-driven work — it was done ad-hoc to fix a 30-second shutdown hang in Odyssey. Committed separately from this spec-queue state.
-VERIFICATION: Full build green locally. All new ShutdownCoordinatorTest cases pass. Existing tests migrated to use DefaultCallbackSubscription's legacy 7-arg convenience constructor that delegates to the new layered form.
+LAST_RUN: 2026-04-11T15:05:00Z
+ITERATION: 65
+SPEC_COMPLETED: 062-subscriber-interface.md
+WHAT_WAS_DONE: Added Subscriber<T> and SubscriberConfig<T> interfaces to substrate-api, plus ConfiguredSubscriber<T> record and DefaultSubscriberBuilder<T> class to substrate-core. All pure additions — no existing types modified.
+VERIFICATION: ./mvnw -pl substrate-api,substrate-core verify — passed (no errors, no failures). ./mvnw spotless:check — passed.
 STATUS: MORE_WORK
-NEXT_SPEC: 062-subscriber-interface.md
-NOTES: Spec 062 introduces Subscriber<T> and SubscriberBuilder<T> as pure additions (no wiring). Spec 063 then migrates the primitives to the new API, merges CallbackSubscription into plain Subscription, and deletes CallbackSubscriberBuilder / LifecycleCallbacks / DefaultCallbackSubscriberBuilder. The previous 062 (postgres autoconfig line coverage) and 063 (SPI branch coverage push) were moved to specs/backlog/ — they are still valid but deferred until after the subscriber refactor lands, since 063 will rewrite large chunks of the test files those coverage specs target.
+NEXT_SPEC: 063-subscriber-primitive-api.md
+NOTES: Spec 063 will migrate the three primitives to use the new Subscriber/SubscriberConfig types and retire CallbackSubscriberBuilder, CallbackSubscription, LifecycleCallbacks, and DefaultCallbackSubscriberBuilder.
