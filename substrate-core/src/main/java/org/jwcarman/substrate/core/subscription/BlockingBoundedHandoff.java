@@ -78,4 +78,16 @@ public class BlockingBoundedHandoff<T> extends AbstractHandoff<T> {
       }
     }
   }
+
+  @Override
+  public void markCancelled() {
+    // Offer Cancelled to the tail of the queue so any blocked poll() wakes up
+    // with a terminal result. If the queue is already full, the offer is a
+    // best-effort signal — a blocked poll() will still see the existing head
+    // value and return from next(), after which the consumer's isActive()
+    // check will already be false and the loop will exit on the next turn.
+    if (marked.compareAndSet(false, true)) {
+      queue.offer(new NextResult.Cancelled<>());
+    }
+  }
 }

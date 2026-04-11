@@ -74,6 +74,24 @@ public abstract class AbstractSingleSlotHandoff<T> extends AbstractHandoff<T> {
     }
   }
 
+  @Override
+  public final void markCancelled() {
+    lock.lock();
+    try {
+      // Put Cancelled in the slot so the blocked pull loop exits with a
+      // terminal result. If the slot already holds a Value (coalescing) or is
+      // sealed with a different terminal, leave it — the consumer will observe
+      // that result first.
+      if (slot == null) {
+        slot = new NextResult.Cancelled<>();
+        sealed = true;
+      }
+      notEmpty.signalAll();
+    } finally {
+      lock.unlock();
+    }
+  }
+
   /**
    * Returns the value to place in the slot after a {@link NextResult.Value} has been consumed by
    * {@link #pull pull}.

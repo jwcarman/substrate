@@ -78,4 +78,20 @@ public interface CallbackSubscriberBuilder<T> {
    * @return this builder, for chaining
    */
   CallbackSubscriberBuilder<T> onComplete(Runnable runnable);
+
+  /**
+   * Registers a handler that is invoked when this subscription is cancelled — either via an
+   * explicit {@link Subscription#cancel() sub.cancel()} call or by the substrate shutdown
+   * coordinator during Spring context close. The underlying primitive is <em>not</em> affected —
+   * this is a local-only teardown signal. The subscription becomes inactive after the handler
+   * returns.
+   *
+   * <p>User-initiated cancel is already observable to the caller (they made the call), so this
+   * handler is most useful for coordinated shutdown — your app can react to being torn down by
+   * substrate's shutdown path even though your code never called {@code cancel()} directly.
+   *
+   * @param runnable the cancel handler
+   * @return this builder, for chaining
+   */
+  CallbackSubscriberBuilder<T> onCancel(Runnable runnable);
 }

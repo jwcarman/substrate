@@ -141,12 +141,12 @@ class JournalSubscriptionTest {
   }
 
   @Test
-  void nextReturnsTimeoutAfterCancel() {
+  void nextReturnsCancelledAfterCancel() {
     BlockingSubscription<JournalEntry<String>> sub = journal.subscribe();
     sub.cancel();
 
     NextResult<JournalEntry<String>> result = sub.next(Duration.ofMillis(50));
-    assertThat(result).isInstanceOf(NextResult.Timeout.class);
+    assertThat(result).isInstanceOf(NextResult.Cancelled.class);
     assertThat(sub.isActive()).isFalse();
   }
 

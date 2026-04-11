@@ -239,6 +239,11 @@ class DefaultCallbackSubscriptionTest {
           public void markDeleted() {
             handoff.markDeleted();
           }
+
+          @Override
+          public void markCancelled() {
+            handoff.markCancelled();
+          }
         };
 
     var sub =
@@ -303,6 +308,11 @@ class DefaultCallbackSubscriptionTest {
           @Override
           public void markDeleted() {
             handoff.markDeleted();
+          }
+
+          @Override
+          public void markCancelled() {
+            handoff.markCancelled();
           }
         };
 
@@ -369,6 +379,11 @@ class DefaultCallbackSubscriptionTest {
           @Override
           public void markDeleted() {
             handoff.markDeleted();
+          }
+
+          @Override
+          public void markCancelled() {
+            handoff.markCancelled();
           }
         };
 

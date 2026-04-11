@@ -24,6 +24,7 @@ import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.CallbackSubscriberBuilder;
 import org.jwcarman.substrate.CallbackSubscription;
+import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.subscription.BlockingBoundedHandoff;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
@@ -43,6 +44,7 @@ public class DefaultJournal<T> implements Journal<T> {
   private final int subscriptionQueueCapacity;
   private final Duration maxEntryTtl;
   private final Duration maxRetentionTtl;
+  private final ShutdownCoordinator shutdownCoordinator;
 
   public DefaultJournal(
       JournalSpi journalSpi,
@@ -51,7 +53,8 @@ public class DefaultJournal<T> implements Journal<T> {
       NotifierSpi notifier,
       int subscriptionQueueCapacity,
       Duration maxEntryTtl,
-      Duration maxRetentionTtl) {
+      Duration maxRetentionTtl,
+      ShutdownCoordinator shutdownCoordinator) {
     this.journalSpi = journalSpi;
     this.key = key;
     this.codec = codec;
@@ -59,6 +62,27 @@ public class DefaultJournal<T> implements Journal<T> {
     this.subscriptionQueueCapacity = subscriptionQueueCapacity;
     this.maxEntryTtl = maxEntryTtl;
     this.maxRetentionTtl = maxRetentionTtl;
+    this.shutdownCoordinator = shutdownCoordinator;
+  }
+
+  /** Test-friendly convenience constructor with a throwaway {@link ShutdownCoordinator}. */
+  public DefaultJournal(
+      JournalSpi journalSpi,
+      String key,
+      Codec<T> codec,
+      NotifierSpi notifier,
+      int subscriptionQueueCapacity,
+      Duration maxEntryTtl,
+      Duration maxRetentionTtl) {
+    this(
+        journalSpi,
+        key,
+        codec,
+        notifier,
+        subscriptionQueueCapacity,
+        maxEntryTtl,
+        maxRetentionTtl,
+        new ShutdownCoordinator());
   }
 
   @Override
@@ -167,7 +191,7 @@ public class DefaultJournal<T> implements Journal<T> {
     BlockingBoundedHandoff<JournalEntry<T>> handoff =
         new BlockingBoundedHandoff<>(subscriptionQueueCapacity);
     Runnable canceller = startFeeder(handoff, startingCheckpoint, preload);
-    return new DefaultBlockingSubscription<>(handoff, canceller);
+    return new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
   }
 
   private CallbackSubscription buildCallbackSubscription(
@@ -185,14 +209,9 @@ public class DefaultJournal<T> implements Journal<T> {
       customizer.accept(builder);
     }
 
-    return new DefaultCallbackSubscription<>(
-        handoff,
-        canceller,
-        onNext,
-        builder.errorHandler(),
-        builder.expirationHandler(),
-        builder.deleteHandler(),
-        builder.completeHandler());
+    DefaultBlockingSubscription<JournalEntry<T>> source =
+        new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
+    return new DefaultCallbackSubscription<>(source, onNext, builder.callbacks());
   }
 
   private Runnable startFeeder(

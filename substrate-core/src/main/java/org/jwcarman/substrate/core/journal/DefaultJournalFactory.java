@@ -18,6 +18,7 @@ package org.jwcarman.substrate.core.journal;
 import java.time.Duration;
 import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.codec.spi.TypeRef;
+import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.journal.Journal;
 import org.jwcarman.substrate.journal.JournalFactory;
@@ -31,6 +32,7 @@ public class DefaultJournalFactory implements JournalFactory {
   private final Duration maxInactivityTtl;
   private final Duration maxEntryTtl;
   private final Duration maxRetentionTtl;
+  private final ShutdownCoordinator shutdownCoordinator;
 
   public DefaultJournalFactory(
       JournalSpi journalSpi,
@@ -39,7 +41,8 @@ public class DefaultJournalFactory implements JournalFactory {
       int subscriptionQueueCapacity,
       Duration maxInactivityTtl,
       Duration maxEntryTtl,
-      Duration maxRetentionTtl) {
+      Duration maxRetentionTtl,
+      ShutdownCoordinator shutdownCoordinator) {
     this.journalSpi = journalSpi;
     this.codecFactory = codecFactory;
     this.notifier = notifier;
@@ -47,6 +50,27 @@ public class DefaultJournalFactory implements JournalFactory {
     this.maxInactivityTtl = maxInactivityTtl;
     this.maxEntryTtl = maxEntryTtl;
     this.maxRetentionTtl = maxRetentionTtl;
+    this.shutdownCoordinator = shutdownCoordinator;
+  }
+
+  /** Test-friendly convenience constructor with a throwaway {@link ShutdownCoordinator}. */
+  public DefaultJournalFactory(
+      JournalSpi journalSpi,
+      CodecFactory codecFactory,
+      NotifierSpi notifier,
+      int subscriptionQueueCapacity,
+      Duration maxInactivityTtl,
+      Duration maxEntryTtl,
+      Duration maxRetentionTtl) {
+    this(
+        journalSpi,
+        codecFactory,
+        notifier,
+        subscriptionQueueCapacity,
+        maxInactivityTtl,
+        maxEntryTtl,
+        maxRetentionTtl,
+        new ShutdownCoordinator());
   }
 
   @Override
@@ -61,7 +85,8 @@ public class DefaultJournalFactory implements JournalFactory {
         notifier,
         subscriptionQueueCapacity,
         maxEntryTtl,
-        maxRetentionTtl);
+        maxRetentionTtl,
+        shutdownCoordinator);
   }
 
   @Override
@@ -76,7 +101,8 @@ public class DefaultJournalFactory implements JournalFactory {
         notifier,
         subscriptionQueueCapacity,
         maxEntryTtl,
-        maxRetentionTtl);
+        maxRetentionTtl,
+        shutdownCoordinator);
   }
 
   @Override
@@ -89,7 +115,8 @@ public class DefaultJournalFactory implements JournalFactory {
         notifier,
         subscriptionQueueCapacity,
         maxEntryTtl,
-        maxRetentionTtl);
+        maxRetentionTtl,
+        shutdownCoordinator);
   }
 
   @Override
@@ -102,7 +129,8 @@ public class DefaultJournalFactory implements JournalFactory {
         notifier,
         subscriptionQueueCapacity,
         maxEntryTtl,
-        maxRetentionTtl);
+        maxRetentionTtl,
+        shutdownCoordinator);
   }
 
   private void validateInactivityTtl(Duration inactivityTtl) {

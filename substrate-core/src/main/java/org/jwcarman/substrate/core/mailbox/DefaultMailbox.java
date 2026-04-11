@@ -21,6 +21,7 @@ import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.CallbackSubscriberBuilder;
 import org.jwcarman.substrate.CallbackSubscription;
+import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultCallbackSubscriberBuilder;
@@ -36,12 +37,24 @@ public class DefaultMailbox<T> implements Mailbox<T> {
   private final String key;
   private final Codec<T> codec;
   private final NotifierSpi notifier;
+  private final ShutdownCoordinator shutdownCoordinator;
 
-  public DefaultMailbox(MailboxSpi mailboxSpi, String key, Codec<T> codec, NotifierSpi notifier) {
+  public DefaultMailbox(
+      MailboxSpi mailboxSpi,
+      String key,
+      Codec<T> codec,
+      NotifierSpi notifier,
+      ShutdownCoordinator shutdownCoordinator) {
     this.mailboxSpi = mailboxSpi;
     this.key = key;
     this.codec = codec;
     this.notifier = notifier;
+    this.shutdownCoordinator = shutdownCoordinator;
+  }
+
+  /** Test-friendly convenience constructor with a throwaway {@link ShutdownCoordinator}. */
+  public DefaultMailbox(MailboxSpi mailboxSpi, String key, Codec<T> codec, NotifierSpi notifier) {
+    this(mailboxSpi, key, codec, notifier, new ShutdownCoordinator());
   }
 
   @Override
@@ -60,7 +73,7 @@ public class DefaultMailbox<T> implements Mailbox<T> {
   public BlockingSubscription<T> subscribe() {
     SingleShotHandoff<T> handoff = new SingleShotHandoff<>();
     Runnable canceller = startFeeder(handoff);
-    return new DefaultBlockingSubscription<>(handoff, canceller);
+    return new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
   }
 
   @Override
@@ -79,14 +92,9 @@ public class DefaultMailbox<T> implements Mailbox<T> {
       customizer.accept(builder);
     }
 
-    return new DefaultCallbackSubscription<>(
-        handoff,
-        canceller,
-        onNext,
-        builder.errorHandler(),
-        builder.expirationHandler(),
-        builder.deleteHandler(),
-        builder.completeHandler());
+    DefaultBlockingSubscription<T> source =
+        new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
+    return new DefaultCallbackSubscription<>(source, onNext, builder.callbacks());
   }
 
   private Runnable startFeeder(SingleShotHandoff<T> handoff) {

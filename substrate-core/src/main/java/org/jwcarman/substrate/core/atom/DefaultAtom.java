@@ -29,6 +29,7 @@ import org.jwcarman.substrate.CallbackSubscription;
 import org.jwcarman.substrate.atom.Atom;
 import org.jwcarman.substrate.atom.AtomExpiredException;
 import org.jwcarman.substrate.atom.Snapshot;
+import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.subscription.CoalescingHandoff;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
@@ -43,14 +44,31 @@ public class DefaultAtom<T> implements Atom<T> {
   private final Codec<T> codec;
   private final NotifierSpi notifier;
   private final Duration maxTtl;
+  private final ShutdownCoordinator shutdownCoordinator;
 
   public DefaultAtom(
-      AtomSpi atomSpi, String key, Codec<T> codec, NotifierSpi notifier, Duration maxTtl) {
+      AtomSpi atomSpi,
+      String key,
+      Codec<T> codec,
+      NotifierSpi notifier,
+      Duration maxTtl,
+      ShutdownCoordinator shutdownCoordinator) {
     this.atomSpi = atomSpi;
     this.key = key;
     this.codec = codec;
     this.notifier = notifier;
     this.maxTtl = maxTtl;
+    this.shutdownCoordinator = shutdownCoordinator;
+  }
+
+  /**
+   * Test-friendly convenience constructor that creates a private, throwaway {@link
+   * ShutdownCoordinator}. Production code should always use the full constructor above with the
+   * Spring-managed coordinator bean.
+   */
+  public DefaultAtom(
+      AtomSpi atomSpi, String key, Codec<T> codec, NotifierSpi notifier, Duration maxTtl) {
+    this(atomSpi, key, codec, notifier, maxTtl, new ShutdownCoordinator());
   }
 
   @Override
@@ -125,7 +143,7 @@ public class DefaultAtom<T> implements Atom<T> {
   private BlockingSubscription<Snapshot<T>> buildBlockingSubscription(Snapshot<T> lastSeen) {
     CoalescingHandoff<Snapshot<T>> handoff = new CoalescingHandoff<>();
     Runnable canceller = startFeeder(handoff, lastSeen);
-    return new DefaultBlockingSubscription<>(handoff, canceller);
+    return new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
   }
 
   private CallbackSubscription buildCallbackSubscription(
@@ -141,14 +159,9 @@ public class DefaultAtom<T> implements Atom<T> {
       customizer.accept(builder);
     }
 
-    return new DefaultCallbackSubscription<>(
-        handoff,
-        canceller,
-        onNext,
-        builder.errorHandler(),
-        builder.expirationHandler(),
-        builder.deleteHandler(),
-        builder.completeHandler());
+    DefaultBlockingSubscription<Snapshot<T>> source =
+        new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
+    return new DefaultCallbackSubscription<>(source, onNext, builder.callbacks());
   }
 
   private Runnable startFeeder(CoalescingHandoff<Snapshot<T>> handoff, Snapshot<T> lastSeen) {

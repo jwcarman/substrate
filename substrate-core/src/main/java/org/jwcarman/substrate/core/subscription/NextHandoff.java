@@ -76,4 +76,18 @@ public interface NextHandoff<T> {
    * delivered after this signal is consumed.
    */
   void markDeleted();
+
+  /**
+   * Wakes any thread currently blocked in {@link #pull(Duration) pull} without signaling any
+   * primitive-level terminal state. Used by subscription cancellation and shutdown to unblock a
+   * local consumer when the primitive itself is still alive.
+   *
+   * <p>The woken {@code pull()} should return a {@link NextResult.Timeout Timeout} so the caller
+   * can loop back, observe {@link org.jwcarman.substrate.Subscription#isActive isActive()} as
+   * {@code false}, and exit cleanly.
+   *
+   * <p>Implementations must not overwrite a pending {@link NextResult.Value Value} — if the slot
+   * already holds a value, the consumer's next pull will still observe that value on its way out.
+   */
+  void markCancelled();
 }

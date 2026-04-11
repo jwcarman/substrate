@@ -18,6 +18,7 @@ package org.jwcarman.substrate.core.mailbox;
 import java.time.Duration;
 import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.codec.spi.TypeRef;
+import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.mailbox.Mailbox;
 import org.jwcarman.substrate.mailbox.MailboxFactory;
@@ -28,13 +29,25 @@ public class DefaultMailboxFactory implements MailboxFactory {
   private final CodecFactory codecFactory;
   private final NotifierSpi notifier;
   private final Duration maxTtl;
+  private final ShutdownCoordinator shutdownCoordinator;
 
   public DefaultMailboxFactory(
-      MailboxSpi mailboxSpi, CodecFactory codecFactory, NotifierSpi notifier, Duration maxTtl) {
+      MailboxSpi mailboxSpi,
+      CodecFactory codecFactory,
+      NotifierSpi notifier,
+      Duration maxTtl,
+      ShutdownCoordinator shutdownCoordinator) {
     this.mailboxSpi = mailboxSpi;
     this.codecFactory = codecFactory;
     this.notifier = notifier;
     this.maxTtl = maxTtl;
+    this.shutdownCoordinator = shutdownCoordinator;
+  }
+
+  /** Test-friendly convenience constructor with a throwaway {@link ShutdownCoordinator}. */
+  public DefaultMailboxFactory(
+      MailboxSpi mailboxSpi, CodecFactory codecFactory, NotifierSpi notifier, Duration maxTtl) {
+    this(mailboxSpi, codecFactory, notifier, maxTtl, new ShutdownCoordinator());
   }
 
   @Override
@@ -45,7 +58,8 @@ public class DefaultMailboxFactory implements MailboxFactory {
     }
     String key = mailboxSpi.mailboxKey(name);
     mailboxSpi.create(key, ttl);
-    return new DefaultMailbox<>(mailboxSpi, key, codecFactory.create(type), notifier);
+    return new DefaultMailbox<>(
+        mailboxSpi, key, codecFactory.create(type), notifier, shutdownCoordinator);
   }
 
   @Override
@@ -56,18 +70,21 @@ public class DefaultMailboxFactory implements MailboxFactory {
     }
     String key = mailboxSpi.mailboxKey(name);
     mailboxSpi.create(key, ttl);
-    return new DefaultMailbox<>(mailboxSpi, key, codecFactory.create(typeRef), notifier);
+    return new DefaultMailbox<>(
+        mailboxSpi, key, codecFactory.create(typeRef), notifier, shutdownCoordinator);
   }
 
   @Override
   public <T> Mailbox<T> connect(String name, Class<T> type) {
     String key = mailboxSpi.mailboxKey(name);
-    return new DefaultMailbox<>(mailboxSpi, key, codecFactory.create(type), notifier);
+    return new DefaultMailbox<>(
+        mailboxSpi, key, codecFactory.create(type), notifier, shutdownCoordinator);
   }
 
   @Override
   public <T> Mailbox<T> connect(String name, TypeRef<T> typeRef) {
     String key = mailboxSpi.mailboxKey(name);
-    return new DefaultMailbox<>(mailboxSpi, key, codecFactory.create(typeRef), notifier);
+    return new DefaultMailbox<>(
+        mailboxSpi, key, codecFactory.create(typeRef), notifier, shutdownCoordinator);
   }
 }

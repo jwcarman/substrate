@@ -24,6 +24,7 @@ import org.jwcarman.substrate.core.atom.AtomSpi;
 import org.jwcarman.substrate.core.atom.DefaultAtomFactory;
 import org.jwcarman.substrate.core.journal.DefaultJournalFactory;
 import org.jwcarman.substrate.core.journal.JournalSpi;
+import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.mailbox.DefaultMailboxFactory;
 import org.jwcarman.substrate.core.mailbox.MailboxSpi;
 import org.jwcarman.substrate.core.memory.atom.InMemoryAtomSpi;
@@ -88,13 +89,20 @@ public class SubstrateAutoConfiguration {
   }
 
   @Bean
+  public ShutdownCoordinator shutdownCoordinator() {
+    return new ShutdownCoordinator();
+  }
+
+  @Bean
   @ConditionalOnBean({AtomSpi.class, CodecFactory.class, NotifierSpi.class})
   public AtomFactory atomFactory(
       AtomSpi atomSpi,
       CodecFactory codecFactory,
       NotifierSpi notifier,
-      SubstrateProperties properties) {
-    return new DefaultAtomFactory(atomSpi, codecFactory, notifier, properties.atom().maxTtl());
+      SubstrateProperties properties,
+      ShutdownCoordinator shutdownCoordinator) {
+    return new DefaultAtomFactory(
+        atomSpi, codecFactory, notifier, properties.atom().maxTtl(), shutdownCoordinator);
   }
 
   @Bean
@@ -103,7 +111,8 @@ public class SubstrateAutoConfiguration {
       JournalSpi journalSpi,
       CodecFactory codecFactory,
       NotifierSpi notifier,
-      SubstrateProperties properties) {
+      SubstrateProperties properties,
+      ShutdownCoordinator shutdownCoordinator) {
     var jp = properties.journal();
     return new DefaultJournalFactory(
         journalSpi,
@@ -112,7 +121,8 @@ public class SubstrateAutoConfiguration {
         jp.subscription().queueCapacity(),
         jp.maxInactivityTtl(),
         jp.maxEntryTtl(),
-        jp.maxRetentionTtl());
+        jp.maxRetentionTtl(),
+        shutdownCoordinator);
   }
 
   @Bean
@@ -121,9 +131,10 @@ public class SubstrateAutoConfiguration {
       MailboxSpi mailboxSpi,
       CodecFactory codecFactory,
       NotifierSpi notifier,
-      SubstrateProperties properties) {
+      SubstrateProperties properties,
+      ShutdownCoordinator shutdownCoordinator) {
     return new DefaultMailboxFactory(
-        mailboxSpi, codecFactory, notifier, properties.mailbox().maxTtl());
+        mailboxSpi, codecFactory, notifier, properties.mailbox().maxTtl(), shutdownCoordinator);
   }
 
   @Bean(destroyMethod = "close")

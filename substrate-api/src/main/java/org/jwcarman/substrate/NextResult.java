@@ -17,7 +17,7 @@ package org.jwcarman.substrate;
 
 /**
  * Sealed outcome type returned by {@link BlockingSubscription#next(java.time.Duration)}. Each call
- * to {@code next()} returns exactly one of six variants:
+ * to {@code next()} returns exactly one of seven variants:
  *
  * <ul>
  *   <li>{@link Value} — a new value from the underlying primitive (non-terminal).
@@ -26,11 +26,13 @@ package org.jwcarman.substrate;
  *   <li>{@link Expired} — the primitive's TTL elapsed without renewal (terminal).
  *   <li>{@link Deleted} — the primitive was explicitly deleted (terminal).
  *   <li>{@link Errored} — an unexpected backend error occurred (terminal).
+ *   <li>{@link Cancelled} — this subscription was torn down locally; the underlying primitive may
+ *       still be alive and reachable by other subscribers (terminal).
  * </ul>
  *
  * <p>Callers should use pattern matching ({@code switch} expressions or {@code instanceof} checks)
  * to handle each variant. The {@link #isTerminal()} method provides a quick check: terminal results
- * indicate that no further values will arrive and the subscription is now inactive.
+ * indicate that no further values will arrive on this subscription.
  *
  * @param <T> the type of values carried by {@link Value} results
  * @see BlockingSubscription
@@ -41,7 +43,8 @@ public sealed interface NextResult<T>
         NextResult.Completed,
         NextResult.Expired,
         NextResult.Deleted,
-        NextResult.Errored {
+        NextResult.Errored,
+        NextResult.Cancelled {
 
   /**
    * Returns {@code true} if this result represents the end of the subscription — no more values
@@ -115,4 +118,17 @@ public sealed interface NextResult<T>
    * @param <T> the value type
    */
   record Errored<T>(Throwable cause) implements NextResult<T> {}
+
+  /**
+   * This subscription was torn down locally — via an explicit {@link Subscription#cancel()
+   * sub.cancel()} call or by the substrate shutdown coordinator during Spring context close. This
+   * is a terminal result.
+   *
+   * <p>The underlying primitive is <em>not</em> affected by this result — other subscribers on
+   * other handles or other nodes continue unaffected. Clients that see {@code Cancelled} should
+   * typically treat it as "reconnect and resume" rather than "the data source is done."
+   *
+   * @param <T> the value type
+   */
+  record Cancelled<T>() implements NextResult<T> {}
 }

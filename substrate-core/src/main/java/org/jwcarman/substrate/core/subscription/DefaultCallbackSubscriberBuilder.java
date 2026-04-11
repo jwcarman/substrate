@@ -24,6 +24,7 @@ public class DefaultCallbackSubscriberBuilder<T> implements CallbackSubscriberBu
   private Runnable onExpiration;
   private Runnable onDelete;
   private Runnable onComplete;
+  private Runnable onCancel;
 
   @Override
   public CallbackSubscriberBuilder<T> onError(Consumer<Throwable> consumer) {
@@ -49,6 +50,16 @@ public class DefaultCallbackSubscriberBuilder<T> implements CallbackSubscriberBu
     return this;
   }
 
+  @Override
+  public CallbackSubscriberBuilder<T> onCancel(Runnable runnable) {
+    this.onCancel = runnable;
+    return this;
+  }
+
+  public LifecycleCallbacks<T> callbacks() {
+    return new LifecycleCallbacks<>(onError, onExpiration, onDelete, onComplete, onCancel);
+  }
+
   public Consumer<Throwable> errorHandler() {
     return onError;
   }
@@ -63,5 +74,9 @@ public class DefaultCallbackSubscriberBuilder<T> implements CallbackSubscriberBu
 
   public Runnable completeHandler() {
     return onComplete;
+  }
+
+  public Runnable cancelHandler() {
+    return onCancel;
   }
 }
