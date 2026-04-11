@@ -53,15 +53,13 @@ class AtomEntryTest {
     byte[] b = new byte[] {10, 20, 30};
     AtomEntry first = new AtomEntry(a, "t");
     AtomEntry second = new AtomEntry(b, "t");
-    assertThat(first.hashCode()).isEqualTo(second.hashCode());
+    assertThat(first).hasSameHashCodeAs(second);
   }
 
   @Test
   void toStringIncludesValueAndToken() {
     AtomEntry entry = new AtomEntry(new byte[] {7, 8, 9}, "myToken");
     String result = entry.toString();
-    assertThat(result).contains("myToken");
-    assertThat(result).doesNotContain("[B@");
-    assertThat(result).contains("7").contains("8").contains("9");
+    assertThat(result).contains("myToken", "7", "8", "9").doesNotContain("[B@");
   }
 }

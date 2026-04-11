@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.core.journal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 
 import java.time.Duration;
 import java.util.List;
@@ -57,7 +58,7 @@ class AbstractJournalSpiTest {
   @Test
   void createIsNoOp() {
     StubJournalSpi spi = new StubJournalSpi("prefix:");
-    spi.create("key", Duration.ofHours(1));
+    assertThatNoException().isThrownBy(() -> spi.create("key", Duration.ofHours(1)));
   }
 
   @Test

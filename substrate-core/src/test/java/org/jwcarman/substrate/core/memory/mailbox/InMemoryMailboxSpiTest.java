@@ -84,13 +84,13 @@ class InMemoryMailboxSpiTest {
   void deliverThrowsAfterTtlExpires() {
     mailbox.create(KEY, Duration.ofMillis(50));
 
+    byte[] latePayload = "late".getBytes(UTF_8);
     await()
         .atMost(Duration.ofSeconds(2))
         .untilAsserted(
             () ->
                 assertThrows(
-                    MailboxExpiredException.class,
-                    () -> mailbox.deliver(KEY, "late".getBytes(UTF_8))));
+                    MailboxExpiredException.class, () -> mailbox.deliver(KEY, latePayload)));
   }
 
   @Test

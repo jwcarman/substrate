@@ -92,9 +92,9 @@ class InMemoryAtomSpiTest {
                   "token-" + index,
                   Duration.ofSeconds(10));
               successes.incrementAndGet();
-            } catch (AtomAlreadyExistsException _) {
+            } catch (AtomAlreadyExistsException expected) {
               failures.incrementAndGet();
-            } catch (InterruptedException _) {
+            } catch (InterruptedException interrupted) {
               Thread.currentThread().interrupt();
             }
           });

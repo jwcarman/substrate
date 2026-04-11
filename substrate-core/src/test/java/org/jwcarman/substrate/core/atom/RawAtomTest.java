@@ -53,15 +53,13 @@ class RawAtomTest {
     byte[] b = new byte[] {10, 20, 30};
     RawAtom first = new RawAtom(a, "t");
     RawAtom second = new RawAtom(b, "t");
-    assertThat(first.hashCode()).isEqualTo(second.hashCode());
+    assertThat(first).hasSameHashCodeAs(second);
   }
 
   @Test
   void toStringIncludesValueAndToken() {
     RawAtom atom = new RawAtom(new byte[] {7, 8, 9}, "myToken");
     String result = atom.toString();
-    assertThat(result).contains("myToken");
-    assertThat(result).doesNotContain("[B@");
-    assertThat(result).contains("7").contains("8").contains("9");
+    assertThat(result).contains("myToken", "7", "8", "9").doesNotContain("[B@");
   }
 }

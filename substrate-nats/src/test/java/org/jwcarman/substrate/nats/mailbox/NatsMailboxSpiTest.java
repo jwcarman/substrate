@@ -244,7 +244,8 @@ class NatsMailboxSpiTest {
     when(kv.put(anyString(), any(byte[].class))).thenThrow(new IOException("kv failed"));
 
     NatsMailboxSpi mailbox = createMailbox();
-    assertThatThrownBy(() -> mailbox.create("substrate:mailbox:test", Duration.ofMinutes(5)))
+    Duration timeout = Duration.ofMinutes(5);
+    assertThatThrownBy(() -> mailbox.create("substrate:mailbox:test", timeout))
         .isInstanceOf(UncheckedIOException.class)
         .hasMessageContaining("Failed to create mailbox in NATS KV");
   }
@@ -258,7 +259,8 @@ class NatsMailboxSpiTest {
     when(kv.put(anyString(), any(byte[].class))).thenThrow(apiException);
 
     NatsMailboxSpi mailbox = createMailbox();
-    assertThatThrownBy(() -> mailbox.create("substrate:mailbox:test", Duration.ofMinutes(5)))
+    Duration timeout = Duration.ofMinutes(5);
+    assertThatThrownBy(() -> mailbox.create("substrate:mailbox:test", timeout))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("Failed to create mailbox in NATS KV");
   }

@@ -246,10 +246,8 @@ class CassandraJournalSpiTest {
   void readLastTruncatesWhenMoreThanCount() {
     Instant now = Instant.now();
     List<Row> rows = new java.util.ArrayList<>();
-    List<UUID> ids = new java.util.ArrayList<>();
     for (int i = 0; i < 5; i++) {
       UUID id = Uuids.timeBased();
-      ids.add(id);
       Row row = org.mockito.Mockito.mock(Row.class);
       ByteBuffer data = ByteBuffer.wrap(("data-" + i).getBytes(StandardCharsets.UTF_8));
       when(row.getByteBuffer("data")).thenReturn(data);
