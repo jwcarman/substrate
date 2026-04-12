@@ -48,9 +48,11 @@ public sealed interface NextResult<T>
 
   /**
    * Returns {@code true} if this result represents the end of the subscription — no more values
-   * will arrive. {@link Completed}, {@link Expired}, {@link Deleted}, and {@link Errored} are
-   * terminal. {@link Value} and {@link Timeout} are not — more values may still arrive on
-   * subsequent pulls.
+   * will arrive. {@link Completed}, {@link Expired}, {@link Deleted}, {@link Errored}, and {@link
+   * Cancelled} are terminal. {@link Value} and {@link Timeout} are not — more values may still
+   * arrive on subsequent pulls.
+   *
+   * @return {@code true} if this result is a terminal outcome, {@code false} otherwise
    */
   default boolean isTerminal() {
     return true;

@@ -37,7 +37,7 @@ package org.jwcarman.substrate;
  *     .onError(err -> log.error("boom", err)));
  * }</pre>
  *
- * <h3>When each method fires</h3>
+ * <h2>When each method fires</h2>
  *
  * <ul>
  *   <li>{@link #onNext(Object)} — each time a new value is available

@@ -26,6 +26,12 @@ package org.jwcarman.substrate.journal;
  */
 public class JournalCompletedException extends RuntimeException {
 
+  /**
+   * Creates an exception indicating the journal with the given backend key has already been
+   * completed.
+   *
+   * @param key the backend key of the completed journal
+   */
   public JournalCompletedException(String key) {
     super("Journal has been completed: " + key);
   }

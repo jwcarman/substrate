@@ -133,23 +133,57 @@ public interface Journal<T> {
    */
   BlockingSubscription<JournalEntry<T>> subscribeLast(int count);
 
-  /** Callback subscribe from current tail with a ready-made {@link Subscriber}. */
+  /**
+   * Callback subscribe from current tail with a ready-made {@link Subscriber}.
+   *
+   * @param subscriber the subscriber to deliver journal entries to
+   * @return a cancellable subscription handle
+   */
   Subscription subscribe(Subscriber<JournalEntry<T>> subscriber);
 
-  /** Callback subscribe from current tail with a {@link SubscriberConfig} customizer. */
+  /**
+   * Callback subscribe from current tail with a {@link SubscriberConfig} customizer.
+   *
+   * @param customizer lambda that configures the subscriber's handlers
+   * @return a cancellable subscription handle
+   */
   Subscription subscribe(Consumer<SubscriberConfig<JournalEntry<T>>> customizer);
 
-  /** Callback subscribe from a checkpoint with a ready-made {@link Subscriber}. */
+  /**
+   * Callback subscribe from a checkpoint with a ready-made {@link Subscriber}.
+   *
+   * @param afterId the entry ID to resume after (exclusive)
+   * @param subscriber the subscriber to deliver journal entries to
+   * @return a cancellable subscription handle
+   */
   Subscription subscribeAfter(String afterId, Subscriber<JournalEntry<T>> subscriber);
 
-  /** Callback subscribe from a checkpoint with a {@link SubscriberConfig} customizer. */
+  /**
+   * Callback subscribe from a checkpoint with a {@link SubscriberConfig} customizer.
+   *
+   * @param afterId the entry ID to resume after (exclusive)
+   * @param customizer lambda that configures the subscriber's handlers
+   * @return a cancellable subscription handle
+   */
   Subscription subscribeAfter(
       String afterId, Consumer<SubscriberConfig<JournalEntry<T>>> customizer);
 
-  /** Callback subscribe from last N entries with a ready-made {@link Subscriber}. */
+  /**
+   * Callback subscribe from last N entries with a ready-made {@link Subscriber}.
+   *
+   * @param count the number of recent entries to replay before tailing
+   * @param subscriber the subscriber to deliver journal entries to
+   * @return a cancellable subscription handle
+   */
   Subscription subscribeLast(int count, Subscriber<JournalEntry<T>> subscriber);
 
-  /** Callback subscribe from last N entries with a {@link SubscriberConfig} customizer. */
+  /**
+   * Callback subscribe from last N entries with a {@link SubscriberConfig} customizer.
+   *
+   * @param count the number of recent entries to replay before tailing
+   * @param customizer lambda that configures the subscriber's handlers
+   * @return a cancellable subscription handle
+   */
   Subscription subscribeLast(int count, Consumer<SubscriberConfig<JournalEntry<T>>> customizer);
 
   /**

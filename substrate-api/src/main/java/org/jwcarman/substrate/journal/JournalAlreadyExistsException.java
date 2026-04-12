@@ -23,6 +23,11 @@ package org.jwcarman.substrate.journal;
  */
 public class JournalAlreadyExistsException extends RuntimeException {
 
+  /**
+   * Creates an exception indicating a journal with the given backend key already exists.
+   *
+   * @param key the backend key of the pre-existing journal
+   */
   public JournalAlreadyExistsException(String key) {
     super("Journal already exists: " + key);
   }

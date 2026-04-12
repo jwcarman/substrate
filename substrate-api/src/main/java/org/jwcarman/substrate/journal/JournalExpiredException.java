@@ -24,6 +24,12 @@ package org.jwcarman.substrate.journal;
  */
 public class JournalExpiredException extends RuntimeException {
 
+  /**
+   * Creates an exception indicating the journal with the given backend key has expired or been
+   * deleted.
+   *
+   * @param key the backend key of the expired or deleted journal
+   */
   public JournalExpiredException(String key) {
     super("Journal has expired or been deleted: " + key);
   }

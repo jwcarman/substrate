@@ -90,6 +90,8 @@ public interface Mailbox<T> {
    * first {@code next()} blocks waiting for delivery. After the single value has been consumed,
    * subsequent {@code next()} calls return {@code NextResult.Completed} (auto-transition from the
    * underlying {@code SingleShotHandoff}).
+   *
+   * @return a blocking subscription that yields the delivered value and then completes
    */
   BlockingSubscription<T> subscribe();
 
@@ -97,6 +99,9 @@ public interface Mailbox<T> {
    * Callback subscribe with a ready-made {@link Subscriber}. The subscriber's {@code onNext} is
    * invoked exactly once when the single delivery arrives. After the handler returns, the
    * subscription naturally terminates via {@code Completed} and the feeder exits.
+   *
+   * @param subscriber the subscriber to deliver the mailbox value to
+   * @return a cancellable subscription handle
    */
   Subscription subscribe(Subscriber<T> subscriber);
 
@@ -105,6 +110,9 @@ public interface Mailbox<T> {
    * the delivered value is consumed by the handler; {@code onExpiration} fires if the mailbox's TTL
    * elapses before delivery; {@code onDelete} fires if the mailbox is explicitly deleted before
    * delivery.
+   *
+   * @param customizer lambda that configures the subscriber's handlers
+   * @return a cancellable subscription handle
    */
   Subscription subscribe(Consumer<SubscriberConfig<T>> customizer);
 

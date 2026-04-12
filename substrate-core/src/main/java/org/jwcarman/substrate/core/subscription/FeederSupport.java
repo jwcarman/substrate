@@ -165,6 +165,8 @@ public final class FeederSupport {
      *     cleanly. Returning false is appropriate when the primitive has reached a terminal state
      *     (expired, deleted, single-delivery complete) and the step has already called the relevant
      *     {@code mark*} method on the handoff.
+     * @throws InterruptedException if the feeder thread is interrupted while the step is blocked
+     *     (for example, on a semaphore or SPI call); the feeder loop catches this and exits cleanly
      */
     boolean runOnce() throws InterruptedException;
   }
