@@ -32,6 +32,8 @@ import org.jwcarman.substrate.core.memory.atom.InMemoryAtomSpi;
 import org.jwcarman.substrate.core.memory.journal.InMemoryJournalSpi;
 import org.jwcarman.substrate.core.memory.mailbox.InMemoryMailboxSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
+import org.jwcarman.substrate.core.notifier.DefaultNotifier;
+import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.sweep.Sweeper;
 import org.jwcarman.substrate.journal.Journal;
@@ -77,7 +79,7 @@ public class SubstrateAutoConfiguration {
 
   @Bean
   @ConditionalOnMissingBean(NotifierSpi.class)
-  public InMemoryNotifier notifier() {
+  public InMemoryNotifier notifierSpi() {
     log.warn(fallbackWarning("Notifier"));
     return new InMemoryNotifier();
   }
@@ -95,11 +97,17 @@ public class SubstrateAutoConfiguration {
   }
 
   @Bean
-  @ConditionalOnBean({AtomSpi.class, CodecFactory.class, NotifierSpi.class})
+  @ConditionalOnBean({NotifierSpi.class, CodecFactory.class})
+  public Notifier notifier(NotifierSpi notifierSpi, CodecFactory codecFactory) {
+    return new DefaultNotifier(notifierSpi, codecFactory);
+  }
+
+  @Bean
+  @ConditionalOnBean({AtomSpi.class, CodecFactory.class, Notifier.class})
   public AtomFactory atomFactory(
       AtomSpi atomSpi,
       CodecFactory codecFactory,
-      NotifierSpi notifier,
+      Notifier notifier,
       SubstrateProperties properties,
       ShutdownCoordinator shutdownCoordinator) {
     return new DefaultAtomFactory(
@@ -107,11 +115,11 @@ public class SubstrateAutoConfiguration {
   }
 
   @Bean
-  @ConditionalOnBean({JournalSpi.class, CodecFactory.class, NotifierSpi.class})
+  @ConditionalOnBean({JournalSpi.class, CodecFactory.class, Notifier.class})
   public JournalFactory journalFactory(
       JournalSpi journalSpi,
       CodecFactory codecFactory,
-      NotifierSpi notifier,
+      Notifier notifier,
       SubstrateProperties properties,
       ShutdownCoordinator shutdownCoordinator) {
     var jp = properties.journal();
@@ -126,11 +134,11 @@ public class SubstrateAutoConfiguration {
   }
 
   @Bean
-  @ConditionalOnBean({MailboxSpi.class, CodecFactory.class, NotifierSpi.class})
+  @ConditionalOnBean({MailboxSpi.class, CodecFactory.class, Notifier.class})
   public MailboxFactory mailboxFactory(
       MailboxSpi mailboxSpi,
       CodecFactory codecFactory,
-      NotifierSpi notifier,
+      Notifier notifier,
       SubstrateProperties properties,
       ShutdownCoordinator shutdownCoordinator) {
     return new DefaultMailboxFactory(

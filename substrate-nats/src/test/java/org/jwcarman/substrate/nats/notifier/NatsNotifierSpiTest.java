@@ -15,6 +15,7 @@
  */
 package org.jwcarman.substrate.nats.notifier;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -29,12 +30,13 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class NatsNotifierSpiTest {
+
+  private static final String SUBJECT = "substrate.notifications";
 
   @Mock private Connection connection;
   @Mock private Dispatcher dispatcher;
@@ -43,34 +45,34 @@ class NatsNotifierSpiTest {
 
   @BeforeEach
   void setUp() {
-    notifier = new NatsNotifierSpi(connection, "substrate:notify:");
+    notifier = new NatsNotifierSpi(connection, SUBJECT);
   }
 
   @Test
-  void notifyPublishesToCorrectSubjectWithDotsInsteadOfColons() {
-    notifier.notify("my:key", "my-payload");
+  void notifyPublishesToCorrectSubject() {
+    byte[] payload = "my-payload".getBytes(UTF_8);
 
-    ArgumentCaptor<byte[]> dataCaptor = ArgumentCaptor.forClass(byte[].class);
-    verify(connection).publish(eq("substrate.notify.my.key"), dataCaptor.capture());
-    assertThat(new String(dataCaptor.getValue())).isEqualTo("my-payload");
+    notifier.notify(payload);
+
+    verify(connection).publish(eq(SUBJECT), eq(payload));
   }
 
   @Test
   void startCreatesDispatcherAndSubscribes() {
     when(connection.createDispatcher(any(MessageHandler.class))).thenReturn(dispatcher);
-    when(dispatcher.subscribe("substrate.notify.>")).thenReturn(dispatcher);
+    when(dispatcher.subscribe(SUBJECT)).thenReturn(dispatcher);
 
     notifier.start();
 
     verify(connection).createDispatcher(any(MessageHandler.class));
-    verify(dispatcher).subscribe("substrate.notify.>");
+    verify(dispatcher).subscribe(SUBJECT);
     assertThat(notifier.isRunning()).isTrue();
   }
 
   @Test
   void stopClosesDispatcherAndBecomesNotRunning() {
     when(connection.createDispatcher(any(MessageHandler.class))).thenReturn(dispatcher);
-    when(dispatcher.subscribe("substrate.notify.>")).thenReturn(dispatcher);
+    when(dispatcher.subscribe(SUBJECT)).thenReturn(dispatcher);
 
     notifier.start();
     notifier.stop();
@@ -87,11 +89,11 @@ class NatsNotifierSpiTest {
 
   @Test
   void multipleHandlersAreRegistered() {
-    List<String> handler1 = new ArrayList<>();
-    List<String> handler2 = new ArrayList<>();
+    List<byte[]> handler1 = new ArrayList<>();
+    List<byte[]> handler2 = new ArrayList<>();
 
-    notifier.subscribe((key, payload) -> handler1.add(payload));
-    notifier.subscribe((key, payload) -> handler2.add(payload));
+    notifier.subscribe(handler1::add);
+    notifier.subscribe(handler2::add);
 
     assertThat(handler1).isEmpty();
     assertThat(handler2).isEmpty();

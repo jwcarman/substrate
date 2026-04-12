@@ -15,32 +15,33 @@
  */
 package org.jwcarman.substrate.core.notifier;
 
+import java.util.function.Consumer;
+
 /**
- * Backend SPI for fire-and-forget notification broadcasting.
+ * Backend SPI for opaque byte[] notification broadcasting.
  *
- * <p>Notifications are delivered on a best-effort basis — they may be lost if no subscriber is
- * listening at the time of broadcast. Delivery is fan-out: every subscriber across all nodes
- * receives each notification. Key filtering is the responsibility of subscribers, not the backend.
+ * <p>The SPI is a single broadcast channel. All type-awareness, routing, and fan-out logic is
+ * handled by {@link DefaultNotifier}, which wraps this SPI. Backend implementations only need to
+ * transport opaque byte arrays.
  *
  * <p>Implementations must be thread-safe.
  */
 public interface NotifierSpi {
 
   /**
-   * Broadcasts a notification with the given key and payload to all current subscribers.
-   * Best-effort — there is no delivery guarantee.
+   * Broadcasts an opaque payload to all current subscribers. Best-effort — there is no delivery
+   * guarantee.
    *
-   * @param key the notification key (typically a primitive's backend key)
-   * @param payload a short signal payload
+   * @param payload the encoded notification bytes
    */
-  void notify(String key, String payload);
+  void notify(byte[] payload);
 
   /**
-   * Registers a handler to receive all notifications. Returns a {@link NotifierSubscription} that
-   * can be cancelled to stop receiving notifications.
+   * Registers a handler to receive all broadcast payloads. Returns a {@link NotifierSubscription}
+   * that can be cancelled to stop receiving notifications.
    *
-   * @param handler the handler to invoke for each notification
+   * @param handler the handler to invoke for each payload
    * @return a subscription handle that can be cancelled
    */
-  NotifierSubscription subscribe(NotificationHandler handler);
+  NotifierSubscription subscribe(Consumer<byte[]> handler);
 }

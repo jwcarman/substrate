@@ -34,5 +34,5 @@ public record NatsProperties(
   public record MailboxProperties(
       boolean enabled, String prefix, String bucketName, Duration defaultTtl) {}
 
-  public record NotifierProperties(boolean enabled, String subjectPrefix) {}
+  public record NotifierProperties(boolean enabled, String subject) {}
 }

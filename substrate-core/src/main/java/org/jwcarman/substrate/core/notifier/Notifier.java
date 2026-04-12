@@ -15,15 +15,27 @@
  */
 package org.jwcarman.substrate.core.notifier;
 
-/** Callback for receiving notifications from a {@link NotifierSpi}. */
-@FunctionalInterface
-public interface NotificationHandler {
+import java.util.function.Consumer;
 
-  /**
-   * Invoked when a notification is received.
-   *
-   * @param key the notification key (typically a primitive's backend key)
-   * @param payload the signal payload
-   */
-  void onNotification(String key, String payload);
+public interface Notifier {
+
+  void notifyAtomChanged(String key);
+
+  void notifyAtomDeleted(String key);
+
+  void notifyJournalChanged(String key);
+
+  void notifyJournalCompleted(String key);
+
+  void notifyJournalDeleted(String key);
+
+  void notifyMailboxChanged(String key);
+
+  void notifyMailboxDeleted(String key);
+
+  NotifierSubscription subscribeToAtom(String key, Consumer<Notification> handler);
+
+  NotifierSubscription subscribeToJournal(String key, Consumer<Notification> handler);
+
+  NotifierSubscription subscribeToMailbox(String key, Consumer<Notification> handler);
 }

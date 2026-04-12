@@ -19,7 +19,7 @@ import java.time.Duration;
 import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.codec.spi.TypeRef;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
-import org.jwcarman.substrate.core.notifier.NotifierSpi;
+import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.journal.Journal;
 import org.jwcarman.substrate.journal.JournalFactory;
 
@@ -27,14 +27,14 @@ public class DefaultJournalFactory implements JournalFactory {
 
   private final JournalSpi journalSpi;
   private final CodecFactory codecFactory;
-  private final NotifierSpi notifier;
+  private final Notifier notifier;
   private final JournalLimits limits;
   private final ShutdownCoordinator shutdownCoordinator;
 
   public DefaultJournalFactory(
       JournalSpi journalSpi,
       CodecFactory codecFactory,
-      NotifierSpi notifier,
+      Notifier notifier,
       JournalLimits limits,
       ShutdownCoordinator shutdownCoordinator) {
     this.journalSpi = journalSpi;

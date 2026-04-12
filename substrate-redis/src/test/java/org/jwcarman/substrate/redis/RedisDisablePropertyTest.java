@@ -22,6 +22,7 @@ import static org.mockito.Mockito.when;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.sync.RedisCommands;
+import io.lettuce.core.codec.ByteArrayCodec;
 import io.lettuce.core.codec.StringCodec;
 import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
 import io.lettuce.core.pubsub.api.sync.RedisPubSubCommands;
@@ -89,15 +90,19 @@ class RedisDisablePropertyTest {
     RedisConnectionFactory redisConnectionFactory() {
       LettuceConnectionFactory factory = mock(LettuceConnectionFactory.class);
       RedisClient client = mock(RedisClient.class);
-      StatefulRedisConnection<String, String> connection = mock();
-      RedisCommands<String, String> commands = mock();
-      StatefulRedisPubSubConnection<String, String> pubSubConnection = mock();
-      RedisPubSubCommands<String, String> pubSubCommands = mock();
+      StatefulRedisConnection<String, String> stringConnection = mock();
+      RedisCommands<String, String> stringCommands = mock();
+      StatefulRedisConnection<byte[], byte[]> byteConnection = mock();
+      RedisCommands<byte[], byte[]> byteCommands = mock();
+      StatefulRedisPubSubConnection<byte[], byte[]> pubSubConnection = mock();
+      RedisPubSubCommands<byte[], byte[]> pubSubCommands = mock();
 
       when(factory.getNativeClient()).thenReturn(client);
-      when(client.connect(StringCodec.UTF8)).thenReturn(connection);
-      when(connection.sync()).thenReturn(commands);
-      when(client.connectPubSub(StringCodec.UTF8)).thenReturn(pubSubConnection);
+      when(client.connect(StringCodec.UTF8)).thenReturn(stringConnection);
+      when(stringConnection.sync()).thenReturn(stringCommands);
+      when(client.connect(ByteArrayCodec.INSTANCE)).thenReturn(byteConnection);
+      when(byteConnection.sync()).thenReturn(byteCommands);
+      when(client.connectPubSub(ByteArrayCodec.INSTANCE)).thenReturn(pubSubConnection);
       when(pubSubConnection.sync()).thenReturn(pubSubCommands);
 
       return factory;

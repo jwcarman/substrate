@@ -26,7 +26,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.codec.jackson.JacksonCodecFactory;
 import org.jwcarman.codec.spi.Codec;
+import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.NextResult;
 import org.jwcarman.substrate.SubscriberConfig;
@@ -34,8 +36,11 @@ import org.jwcarman.substrate.Subscription;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.memory.mailbox.InMemoryMailboxSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
+import org.jwcarman.substrate.core.notifier.DefaultNotifier;
+import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 import org.jwcarman.substrate.mailbox.MailboxFullException;
+import tools.jackson.databind.json.JsonMapper;
 
 class DefaultMailboxTest {
 
@@ -54,15 +59,18 @@ class DefaultMailboxTest {
         }
       };
 
+  private static final CodecFactory CODEC_FACTORY =
+      new JacksonCodecFactory(JsonMapper.builder().build());
+
   private final ShutdownCoordinator coordinator = new ShutdownCoordinator();
   private InMemoryMailboxSpi spi;
-  private InMemoryNotifier notifier;
+  private Notifier notifier;
   private DefaultMailbox<String> mailbox;
 
   @BeforeEach
   void setUp() {
     spi = new InMemoryMailboxSpi();
-    notifier = new InMemoryNotifier();
+    notifier = new DefaultNotifier(new InMemoryNotifier(), CODEC_FACTORY);
     spi.create(KEY, Duration.ofMinutes(5));
     mailbox = new DefaultMailbox<>(spi, KEY, STRING_CODEC, notifier, coordinator);
   }
@@ -158,6 +166,7 @@ class DefaultMailboxTest {
   @Test
   void deleteBeforeDeliveryNotifiesSubscribers() {
     BlockingSubscription<String> sub = mailbox.subscribe();
+    await().atMost(Duration.ofSeconds(2)).until(sub::isActive);
     mailbox.delete();
 
     await()
@@ -193,7 +202,7 @@ class DefaultMailboxTest {
 
   @Test
   void notificationForDifferentKeyDoesNotTriggerDelivery() {
-    notifier.notify("some-other-key", "payload");
+    notifier.notifyMailboxChanged("some-other-key");
 
     BlockingSubscription<String> sub = mailbox.subscribe();
     NextResult<String> result = sub.next(Duration.ofMillis(200));
@@ -280,6 +289,7 @@ class DefaultMailboxTest {
         mailbox.subscribe(
             (SubscriberConfig<String> cfg) ->
                 cfg.onNext(value -> onNextFired.set(true)).onDeleted(deleteLatch::countDown));
+    await().atMost(Duration.ofSeconds(2)).until(sub::isActive);
     mailbox.delete();
     assertThat(deleteLatch.await(5, TimeUnit.SECONDS)).isTrue();
     assertThat(onNextFired.get()).isFalse();

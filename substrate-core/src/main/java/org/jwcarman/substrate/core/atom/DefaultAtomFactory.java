@@ -22,20 +22,20 @@ import org.jwcarman.codec.spi.TypeRef;
 import org.jwcarman.substrate.atom.Atom;
 import org.jwcarman.substrate.atom.AtomFactory;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
-import org.jwcarman.substrate.core.notifier.NotifierSpi;
+import org.jwcarman.substrate.core.notifier.Notifier;
 
 public class DefaultAtomFactory implements AtomFactory {
 
   private final AtomSpi atomSpi;
   private final CodecFactory codecFactory;
-  private final NotifierSpi notifier;
+  private final Notifier notifier;
   private final Duration maxTtl;
   private final ShutdownCoordinator shutdownCoordinator;
 
   public DefaultAtomFactory(
       AtomSpi atomSpi,
       CodecFactory codecFactory,
-      NotifierSpi notifier,
+      Notifier notifier,
       Duration maxTtl,
       ShutdownCoordinator shutdownCoordinator) {
     this.atomSpi = atomSpi;
@@ -53,7 +53,7 @@ public class DefaultAtomFactory implements AtomFactory {
     byte[] bytes = codec.encode(initialValue);
     String token = DefaultAtom.token(bytes);
     atomSpi.create(key, bytes, token, ttl);
-    notifier.notify(key, token);
+    notifier.notifyAtomChanged(key);
     return new DefaultAtom<>(atomSpi, key, codec, notifier, maxTtl, shutdownCoordinator);
   }
 
@@ -65,7 +65,7 @@ public class DefaultAtomFactory implements AtomFactory {
     byte[] bytes = codec.encode(initialValue);
     String token = DefaultAtom.token(bytes);
     atomSpi.create(key, bytes, token, ttl);
-    notifier.notify(key, token);
+    notifier.notifyAtomChanged(key);
     return new DefaultAtom<>(atomSpi, key, codec, notifier, maxTtl, shutdownCoordinator);
   }
 

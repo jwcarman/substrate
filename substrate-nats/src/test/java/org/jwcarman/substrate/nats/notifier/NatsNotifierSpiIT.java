@@ -15,6 +15,7 @@
  */
 package org.jwcarman.substrate.nats.notifier;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
@@ -28,11 +29,13 @@ import org.jwcarman.substrate.nats.AbstractNatsIT;
 
 class NatsNotifierSpiIT extends AbstractNatsIT {
 
+  private static final String SUBJECT = "substrate.notifications";
+
   private NatsNotifierSpi notifier;
 
   @BeforeEach
   void setUp() {
-    notifier = new NatsNotifierSpi(connection, "substrate:notify:");
+    notifier = new NatsNotifierSpi(connection, SUBJECT);
     notifier.start();
   }
 
@@ -45,59 +48,55 @@ class NatsNotifierSpiIT extends AbstractNatsIT {
 
   @Test
   void publishAndSubscribeFullLifecycle() {
-    List<String> received = new CopyOnWriteArrayList<>();
-    notifier.subscribe((key, payload) -> received.add(key + "=" + payload));
+    List<byte[]> received = new CopyOnWriteArrayList<>();
+    notifier.subscribe(received::add);
 
-    notifier.notify("test:key", "test-payload");
-
-    await()
-        .atMost(Duration.ofSeconds(5))
-        .untilAsserted(() -> assertThat(received).containsExactly("test:key=test-payload"));
-  }
-
-  @Test
-  void multipleNotificationsAreDelivered() {
-    List<String> received = new CopyOnWriteArrayList<>();
-    notifier.subscribe((key, payload) -> received.add(payload));
-
-    notifier.notify("key:1", "payload-1");
-    notifier.notify("key:2", "payload-2");
-    notifier.notify("key:3", "payload-3");
-
-    await()
-        .atMost(Duration.ofSeconds(5))
-        .untilAsserted(
-            () -> assertThat(received).containsExactly("payload-1", "payload-2", "payload-3"));
-  }
-
-  @Test
-  void multipleHandlersReceiveNotifications() {
-    List<String> handler1 = new CopyOnWriteArrayList<>();
-    List<String> handler2 = new CopyOnWriteArrayList<>();
-
-    notifier.subscribe((key, payload) -> handler1.add(payload));
-    notifier.subscribe((key, payload) -> handler2.add(payload));
-
-    notifier.notify("key", "value");
+    byte[] payload = "test-payload".getBytes(UTF_8);
+    notifier.notify(payload);
 
     await()
         .atMost(Duration.ofSeconds(5))
         .untilAsserted(
             () -> {
-              assertThat(handler1).containsExactly("value");
-              assertThat(handler2).containsExactly("value");
+              assertThat(received).hasSize(1);
+              assertThat(received.get(0)).isEqualTo(payload);
             });
   }
 
   @Test
-  void subjectTranslationConvertsColonsToDotsAndBack() {
-    List<String> keys = new CopyOnWriteArrayList<>();
-    notifier.subscribe((key, payload) -> keys.add(key));
+  void multipleNotificationsAreDelivered() {
+    List<byte[]> received = new CopyOnWriteArrayList<>();
+    notifier.subscribe(received::add);
 
-    notifier.notify("my:nested:key", "data");
+    byte[] p1 = "payload-1".getBytes(UTF_8);
+    byte[] p2 = "payload-2".getBytes(UTF_8);
+    byte[] p3 = "payload-3".getBytes(UTF_8);
+    notifier.notify(p1);
+    notifier.notify(p2);
+    notifier.notify(p3);
 
     await()
         .atMost(Duration.ofSeconds(5))
-        .untilAsserted(() -> assertThat(keys).containsExactly("my:nested:key"));
+        .untilAsserted(() -> assertThat(received).containsExactly(p1, p2, p3));
+  }
+
+  @Test
+  void multipleHandlersReceiveNotifications() {
+    List<byte[]> handler1 = new CopyOnWriteArrayList<>();
+    List<byte[]> handler2 = new CopyOnWriteArrayList<>();
+
+    notifier.subscribe(handler1::add);
+    notifier.subscribe(handler2::add);
+
+    byte[] payload = "value".getBytes(UTF_8);
+    notifier.notify(payload);
+
+    await()
+        .atMost(Duration.ofSeconds(5))
+        .untilAsserted(
+            () -> {
+              assertThat(handler1).containsExactly(payload);
+              assertThat(handler2).containsExactly(payload);
+            });
   }
 }

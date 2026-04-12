@@ -21,69 +21,61 @@ import io.lettuce.core.pubsub.api.sync.RedisPubSubCommands;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.jwcarman.substrate.core.notifier.NotificationHandler;
+import java.util.function.Consumer;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.notifier.NotifierSubscription;
 import org.springframework.context.SmartLifecycle;
 
-public class RedisNotifierSpi extends RedisPubSubAdapter<String, String>
+public class RedisNotifierSpi extends RedisPubSubAdapter<byte[], byte[]>
     implements NotifierSpi, SmartLifecycle {
 
-  private final StatefulRedisPubSubConnection<String, String> pubSubConnection;
-  private final RedisPubSubCommands<String, String> pubSubCommands;
-  private final io.lettuce.core.api.sync.RedisCommands<String, String> publishCommands;
-  private final String channelPrefix;
-  private final String subscribePattern;
-  private final List<NotificationHandler> handlers = new CopyOnWriteArrayList<>();
+  private final StatefulRedisPubSubConnection<byte[], byte[]> pubSubConnection;
+  private final RedisPubSubCommands<byte[], byte[]> pubSubCommands;
+  private final io.lettuce.core.api.sync.RedisCommands<byte[], byte[]> publishCommands;
+  private final byte[] channel;
+  private final List<Consumer<byte[]>> handlers = new CopyOnWriteArrayList<>();
 
   private final AtomicBoolean running = new AtomicBoolean(false);
 
   public RedisNotifierSpi(
-      StatefulRedisPubSubConnection<String, String> pubSubConnection,
-      io.lettuce.core.api.sync.RedisCommands<String, String> publishCommands,
-      String channelPrefix) {
+      StatefulRedisPubSubConnection<byte[], byte[]> pubSubConnection,
+      io.lettuce.core.api.sync.RedisCommands<byte[], byte[]> publishCommands,
+      byte[] channel) {
     this.pubSubConnection = pubSubConnection;
     this.pubSubCommands = pubSubConnection.sync();
     this.publishCommands = publishCommands;
-    this.channelPrefix = channelPrefix;
-    this.subscribePattern = channelPrefix + "*";
+    this.channel = channel;
   }
 
   @Override
-  public void notify(String key, String payload) {
-    publishCommands.publish(channelPrefix + key, payload);
+  public void notify(byte[] payload) {
+    publishCommands.publish(channel, payload);
   }
 
   @Override
-  public NotifierSubscription subscribe(NotificationHandler handler) {
+  public NotifierSubscription subscribe(Consumer<byte[]> handler) {
     handlers.add(handler);
     return () -> handlers.remove(handler);
   }
 
   @Override
-  public void message(String channel, String message) {
-    // Not used — we only use pattern subscriptions
-  }
-
-  @Override
-  public void message(String pattern, String channel, String message) {
-    String key = channel.substring(channelPrefix.length());
-    for (NotificationHandler handler : handlers) {
-      handler.onNotification(key, message);
+  public void message(byte[] channel, byte[] message) {
+    for (Consumer<byte[]> handler : handlers) {
+      handler.accept(message);
     }
   }
 
   @Override
   public void start() {
     pubSubConnection.addListener(this);
-    pubSubCommands.psubscribe(subscribePattern);
+    pubSubCommands.subscribe(channel);
     running.set(true);
   }
 
   @Override
   public void stop() {
     running.set(false);
-    pubSubCommands.punsubscribe(subscribePattern);
+    pubSubCommands.unsubscribe(channel);
     pubSubConnection.removeListener(this);
   }
 

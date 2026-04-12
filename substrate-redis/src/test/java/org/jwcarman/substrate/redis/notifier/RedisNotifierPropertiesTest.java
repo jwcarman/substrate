@@ -31,7 +31,7 @@ class RedisNotifierPropertiesTest {
 
   @Test
   void defaultsAreLoadedFromPropertiesFile() {
-    assertThat(properties.notifier().channelPrefix()).isEqualTo("substrate:notify:");
+    assertThat(properties.notifier().channel()).isEqualTo("substrate:notifications");
   }
 
   @EnableConfigurationProperties(RedisProperties.class)

@@ -21,32 +21,45 @@ import static org.awaitility.Awaitility.await;
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.codec.jackson.JacksonCodecFactory;
 import org.jwcarman.substrate.NextResult;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
+import org.jwcarman.substrate.core.notifier.DefaultNotifier;
+import org.jwcarman.substrate.core.notifier.Notifier;
+import tools.jackson.databind.json.JsonMapper;
 
 class FeederSupportTest {
 
   private static final Duration SHORT_TIMEOUT = Duration.ofMillis(100);
   private static final String KEY = "test-key";
 
+  private Notifier notifier;
+
+  @BeforeEach
+  void setUp() {
+    notifier =
+        new DefaultNotifier(
+            new InMemoryNotifier(), new JacksonCodecFactory(JsonMapper.builder().build()));
+  }
+
   @Test
   void stepReturningTrueContinuesLoop() {
-    var notifier = new InMemoryNotifier();
     var handoff = new CoalescingHandoff<String>();
     var invocations = new AtomicInteger(0);
 
     Runnable canceller =
         FeederSupport.start(
             KEY,
-            notifier,
+            notifier::subscribeToAtom,
             handoff,
             "test-feeder",
             () -> {
               int count = invocations.incrementAndGet();
               if (count <= 3) {
                 handoff.push("value-" + count);
-                notifier.notify(KEY, "nudge");
+                notifier.notifyAtomChanged(KEY);
               }
               return true;
             });
@@ -60,13 +73,12 @@ class FeederSupportTest {
 
   @Test
   void stepReturningFalseExitsCleanly() {
-    var notifier = new InMemoryNotifier();
     var handoff = new CoalescingHandoff<String>();
 
     Runnable canceller =
         FeederSupport.start(
             KEY,
-            notifier,
+            notifier::subscribeToAtom,
             handoff,
             "test-feeder",
             () -> {
@@ -76,7 +88,6 @@ class FeederSupportTest {
 
     assertThat(handoff.pull(Duration.ofSeconds(2))).isEqualTo(new NextResult.Value<>("only-once"));
 
-    // The feeder should have exited — no error or other terminal state
     assertThat(handoff.pull(SHORT_TIMEOUT)).isInstanceOf(NextResult.Timeout.class);
 
     canceller.run();
@@ -84,14 +95,13 @@ class FeederSupportTest {
 
   @Test
   void uncaughtRuntimeExceptionCallsHandoffError() {
-    var notifier = new InMemoryNotifier();
     var handoff = new CoalescingHandoff<String>();
     var cause = new RuntimeException("boom");
 
     Runnable canceller =
         FeederSupport.start(
             KEY,
-            notifier,
+            notifier::subscribeToAtom,
             handoff,
             "test-feeder",
             () -> {
@@ -107,14 +117,13 @@ class FeederSupportTest {
 
   @Test
   void deletedNotificationCallsMarkDeletedAndExits() {
-    var notifier = new InMemoryNotifier();
     var handoff = new CoalescingHandoff<String>();
     var stepEntered = new CountDownLatch(1);
 
     Runnable canceller =
         FeederSupport.start(
             KEY,
-            notifier,
+            notifier::subscribeToAtom,
             handoff,
             "test-feeder",
             () -> {
@@ -124,7 +133,7 @@ class FeederSupportTest {
 
     await().atMost(Duration.ofSeconds(2)).until(() -> stepEntered.getCount() == 0);
 
-    notifier.notify(KEY, "__DELETED__");
+    notifier.notifyAtomDeleted(KEY);
 
     NextResult<String> result = handoff.pull(Duration.ofSeconds(2));
     assertThat(result).isInstanceOf(NextResult.Deleted.class);
@@ -134,14 +143,13 @@ class FeederSupportTest {
 
   @Test
   void cancellerStopsFeederThread() {
-    var notifier = new InMemoryNotifier();
     var handoff = new CoalescingHandoff<String>();
     var invocations = new AtomicInteger(0);
 
     Runnable canceller =
         FeederSupport.start(
             KEY,
-            notifier,
+            notifier::subscribeToAtom,
             handoff,
             "test-feeder",
             () -> {
@@ -164,14 +172,13 @@ class FeederSupportTest {
 
   @Test
   void interruptExitsLoopWithoutFiringError() {
-    var notifier = new InMemoryNotifier();
     var handoff = new CoalescingHandoff<String>();
     var stepEntered = new CountDownLatch(1);
 
     Runnable canceller =
         FeederSupport.start(
             KEY,
-            notifier,
+            notifier::subscribeToAtom,
             handoff,
             "test-feeder",
             () -> {
@@ -183,20 +190,18 @@ class FeederSupportTest {
 
     canceller.run();
 
-    // Should not see an error — just a timeout since there's no terminal signal from error()
     assertThat(handoff.pull(SHORT_TIMEOUT)).isInstanceOf(NextResult.Timeout.class);
   }
 
   @Test
   void notificationForDifferentKeyIsIgnored() {
-    var notifier = new InMemoryNotifier();
     var handoff = new CoalescingHandoff<String>();
     var stepCount = new AtomicInteger(0);
 
     Runnable canceller =
         FeederSupport.start(
             KEY,
-            notifier,
+            notifier::subscribeToAtom,
             handoff,
             "test-feeder",
             () -> {
@@ -208,9 +213,8 @@ class FeederSupportTest {
         .atMost(Duration.ofSeconds(2))
         .untilAsserted(() -> assertThat(stepCount.get()).isPositive());
 
-    notifier.notify("other-key", "__DELETED__");
+    notifier.notifyAtomDeleted("other-key");
 
-    // Should not see deleted — wrong key
     assertThat(handoff.pull(SHORT_TIMEOUT)).isInstanceOf(NextResult.Timeout.class);
 
     canceller.run();

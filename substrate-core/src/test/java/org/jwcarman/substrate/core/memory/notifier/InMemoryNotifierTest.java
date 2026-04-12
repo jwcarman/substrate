@@ -33,23 +33,24 @@ class InMemoryNotifierTest {
 
   @Test
   void notifyCallsRegisteredHandler() {
-    List<String> received = new ArrayList<>();
-    notifier.subscribe((key, payload) -> received.add(key + ":" + payload));
+    List<byte[]> received = new ArrayList<>();
+    notifier.subscribe(received::add);
 
-    notifier.notify("substrate:test", "event-1");
+    byte[] payload = new byte[] {1, 2, 3};
+    notifier.notify(payload);
 
     assertEquals(1, received.size());
-    assertEquals("substrate:test:event-1", received.getFirst());
+    assertArrayEquals(payload, received.getFirst());
   }
 
   @Test
   void notifyCallsMultipleHandlers() {
-    List<String> handler1 = new ArrayList<>();
-    List<String> handler2 = new ArrayList<>();
-    notifier.subscribe((key, payload) -> handler1.add(payload));
-    notifier.subscribe((key, payload) -> handler2.add(payload));
+    List<byte[]> handler1 = new ArrayList<>();
+    List<byte[]> handler2 = new ArrayList<>();
+    notifier.subscribe(handler1::add);
+    notifier.subscribe(handler2::add);
 
-    notifier.notify("substrate:test", "event-1");
+    notifier.notify(new byte[] {1});
 
     assertEquals(1, handler1.size());
     assertEquals(1, handler2.size());
@@ -57,46 +58,60 @@ class InMemoryNotifierTest {
 
   @Test
   void notifyWithNoHandlersDoesNotThrow() {
-    assertDoesNotThrow(() -> notifier.notify("substrate:test", "event-1"));
+    assertDoesNotThrow(() -> notifier.notify(new byte[] {1, 2, 3}));
   }
 
   @Test
-  void handlersReceiveCorrectKeyAndPayload() {
-    List<String> keys = new ArrayList<>();
-    List<String> payloads = new ArrayList<>();
-    notifier.subscribe(
-        (key, payload) -> {
-          keys.add(key);
-          payloads.add(payload);
-        });
+  void handlersReceiveCorrectPayload() {
+    List<byte[]> payloads = new ArrayList<>();
+    notifier.subscribe(payloads::add);
 
-    notifier.notify("substrate:alpha", "payload-1");
-    notifier.notify("substrate:beta", "payload-2");
+    byte[] first = new byte[] {1};
+    byte[] second = new byte[] {2};
+    notifier.notify(first);
+    notifier.notify(second);
 
-    assertEquals(List.of("substrate:alpha", "substrate:beta"), keys);
-    assertEquals(List.of("payload-1", "payload-2"), payloads);
+    assertEquals(2, payloads.size());
+    assertArrayEquals(first, payloads.get(0));
+    assertArrayEquals(second, payloads.get(1));
   }
 
   @Test
   void multipleNotificationsDeliveredInOrder() {
-    List<String> received = new ArrayList<>();
-    notifier.subscribe((key, payload) -> received.add(payload));
+    List<byte[]> received = new ArrayList<>();
+    notifier.subscribe(received::add);
 
-    notifier.notify("substrate:test", "1");
-    notifier.notify("substrate:test", "2");
-    notifier.notify("substrate:test", "3");
+    notifier.notify(new byte[] {1});
+    notifier.notify(new byte[] {2});
+    notifier.notify(new byte[] {3});
 
-    assertEquals(List.of("1", "2", "3"), received);
+    assertEquals(3, received.size());
+    assertArrayEquals(new byte[] {1}, received.get(0));
+    assertArrayEquals(new byte[] {2}, received.get(1));
+    assertArrayEquals(new byte[] {3}, received.get(2));
   }
 
   @Test
   void notifyIsSynchronous() {
     List<String> order = new ArrayList<>();
-    notifier.subscribe((key, payload) -> order.add("handler-" + payload));
+    notifier.subscribe(payload -> order.add("handler"));
 
-    notifier.notify("substrate:test", "1");
+    notifier.notify(new byte[] {1});
     order.add("after-notify");
 
-    assertEquals(List.of("handler-1", "after-notify"), order);
+    assertEquals(List.of("handler", "after-notify"), order);
+  }
+
+  @Test
+  void cancelledSubscriptionStopsReceiving() {
+    List<byte[]> received = new ArrayList<>();
+    var sub = notifier.subscribe(received::add);
+
+    notifier.notify(new byte[] {1});
+    assertEquals(1, received.size());
+
+    sub.cancel();
+    notifier.notify(new byte[] {2});
+    assertEquals(1, received.size());
   }
 }

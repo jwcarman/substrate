@@ -36,6 +36,8 @@ import org.jwcarman.substrate.atom.AtomExpiredException;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.memory.atom.InMemoryAtomSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
+import org.jwcarman.substrate.core.notifier.DefaultNotifier;
+import org.jwcarman.substrate.core.notifier.Notifier;
 
 class DefaultAtomFactoryTest {
 
@@ -69,13 +71,17 @@ class DefaultAtomFactoryTest {
 
   private final ShutdownCoordinator coordinator = new ShutdownCoordinator();
   private InMemoryAtomSpi spi;
-  private InMemoryNotifier notifier;
+  private Notifier notifier;
   private DefaultAtomFactory factory;
 
   @BeforeEach
   void setUp() {
     spi = new InMemoryAtomSpi();
-    notifier = new InMemoryNotifier();
+    notifier =
+        new DefaultNotifier(
+            new InMemoryNotifier(),
+            new org.jwcarman.codec.jackson.JacksonCodecFactory(
+                tools.jackson.databind.json.JsonMapper.builder().build()));
     factory =
         new DefaultAtomFactory(spi, CODEC_FACTORY, notifier, Duration.ofHours(24), coordinator);
   }

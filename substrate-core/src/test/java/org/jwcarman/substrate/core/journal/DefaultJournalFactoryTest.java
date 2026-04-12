@@ -32,6 +32,8 @@ import org.jwcarman.codec.spi.TypeRef;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.memory.journal.InMemoryJournalSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
+import org.jwcarman.substrate.core.notifier.DefaultNotifier;
+import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.journal.Journal;
 import org.jwcarman.substrate.journal.JournalAlreadyExistsException;
 import org.jwcarman.substrate.journal.JournalExpiredException;
@@ -58,9 +60,14 @@ class DefaultJournalFactoryTest {
     lenient()
         .when(stringCodec.decode(any(byte[].class)))
         .thenAnswer(inv -> new String((byte[]) inv.getArgument(0), UTF_8));
+    Notifier notifier =
+        new DefaultNotifier(
+            new InMemoryNotifier(),
+            new org.jwcarman.codec.jackson.JacksonCodecFactory(
+                tools.jackson.databind.json.JsonMapper.builder().build()));
     factory =
         new DefaultJournalFactory(
-            spi, codecFactory, new InMemoryNotifier(), JournalLimits.defaults(), coordinator);
+            spi, codecFactory, notifier, JournalLimits.defaults(), coordinator);
   }
 
   @Test

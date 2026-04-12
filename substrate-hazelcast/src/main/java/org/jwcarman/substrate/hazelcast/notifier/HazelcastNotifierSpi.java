@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
-import org.jwcarman.substrate.core.notifier.NotificationHandler;
+import java.util.function.Consumer;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.notifier.NotifierSubscription;
 import org.springframework.context.SmartLifecycle;
@@ -30,7 +30,7 @@ public class HazelcastNotifierSpi implements NotifierSpi, SmartLifecycle {
 
   private final HazelcastInstance hazelcastInstance;
   private final String topicName;
-  private final List<NotificationHandler> handlers = new CopyOnWriteArrayList<>();
+  private final List<Consumer<byte[]>> handlers = new CopyOnWriteArrayList<>();
   private final AtomicReference<UUID> registrationId = new AtomicReference<>();
 
   public HazelcastNotifierSpi(HazelcastInstance hazelcastInstance, String topicName) {
@@ -39,29 +39,26 @@ public class HazelcastNotifierSpi implements NotifierSpi, SmartLifecycle {
   }
 
   @Override
-  public void notify(String key, String payload) {
-    ITopic<String> topic = hazelcastInstance.getTopic(topicName);
-    topic.publish(key + "|" + payload);
+  public void notify(byte[] payload) {
+    ITopic<byte[]> topic = hazelcastInstance.getTopic(topicName);
+    topic.publish(payload);
   }
 
   @Override
-  public NotifierSubscription subscribe(NotificationHandler handler) {
+  public NotifierSubscription subscribe(Consumer<byte[]> handler) {
     handlers.add(handler);
     return () -> handlers.remove(handler);
   }
 
   @Override
   public void start() {
-    ITopic<String> topic = hazelcastInstance.getTopic(topicName);
+    ITopic<byte[]> topic = hazelcastInstance.getTopic(topicName);
     UUID id =
         topic.addMessageListener(
             message -> {
-              String raw = message.getMessageObject();
-              int separatorIndex = raw.indexOf('|');
-              String key = raw.substring(0, separatorIndex);
-              String payload = raw.substring(separatorIndex + 1);
-              for (NotificationHandler handler : handlers) {
-                handler.onNotification(key, payload);
+              byte[] data = message.getMessageObject();
+              for (Consumer<byte[]> handler : handlers) {
+                handler.accept(data);
               }
             });
     registrationId.set(id);
@@ -71,7 +68,7 @@ public class HazelcastNotifierSpi implements NotifierSpi, SmartLifecycle {
   public void stop() {
     UUID id = registrationId.getAndSet(null);
     if (id != null) {
-      ITopic<String> topic = hazelcastInstance.getTopic(topicName);
+      ITopic<byte[]> topic = hazelcastInstance.getTopic(topicName);
       topic.removeMessageListener(id);
     }
   }

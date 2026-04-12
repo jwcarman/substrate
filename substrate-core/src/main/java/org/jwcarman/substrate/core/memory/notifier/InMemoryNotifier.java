@@ -17,23 +17,23 @@ package org.jwcarman.substrate.core.memory.notifier;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
-import org.jwcarman.substrate.core.notifier.NotificationHandler;
+import java.util.function.Consumer;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.notifier.NotifierSubscription;
 
 public class InMemoryNotifier implements NotifierSpi {
 
-  private final List<NotificationHandler> handlers = new CopyOnWriteArrayList<>();
+  private final List<Consumer<byte[]>> handlers = new CopyOnWriteArrayList<>();
 
   @Override
-  public void notify(String key, String payload) {
-    for (NotificationHandler handler : handlers) {
-      handler.onNotification(key, payload);
+  public void notify(byte[] payload) {
+    for (Consumer<byte[]> handler : handlers) {
+      handler.accept(payload);
     }
   }
 
   @Override
-  public NotifierSubscription subscribe(NotificationHandler handler) {
+  public NotifierSubscription subscribe(Consumer<byte[]> handler) {
     handlers.add(handler);
     return () -> handlers.remove(handler);
   }

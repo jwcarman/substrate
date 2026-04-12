@@ -15,10 +15,12 @@
  */
 package org.jwcarman.substrate.sns.notifier;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,43 +49,38 @@ class SnsNotifierSpiTest {
   }
 
   @Test
-  void notifyPublishesMessageWithCorrectFormat() {
-    notifier.notify("my:key", "my-payload");
+  void notifyPublishesBase64EncodedPayload() {
+    byte[] payload = "my-payload".getBytes(UTF_8);
+
+    notifier.notify(payload);
 
     ArgumentCaptor<PublishRequest> captor = ArgumentCaptor.forClass(PublishRequest.class);
     verify(snsClient).publish(captor.capture());
     PublishRequest request = captor.getValue();
     assertThat(request.topicArn()).isEqualTo("arn:aws:sns:us-east-1:123456789:test");
-    assertThat(request.message()).isEqualTo("my:key|my-payload");
+    assertThat(Base64.getDecoder().decode(request.message())).isEqualTo(payload);
   }
 
   @Test
-  void parseAndDispatchExtractsKeyAndPayload() {
-    List<String> receivedKeys = new ArrayList<>();
-    List<String> receivedPayloads = new ArrayList<>();
+  void parseAndDispatchDecodesBase64Payload() {
+    List<byte[]> received = new ArrayList<>();
+    notifier.subscribe(received::add);
 
-    notifier.subscribe(
-        (key, payload) -> {
-          receivedKeys.add(key);
-          receivedPayloads.add(payload);
-        });
+    byte[] original = "test-payload".getBytes(UTF_8);
+    String encoded = Base64.getEncoder().encodeToString(original);
+    notifier.parseAndDispatch(encoded);
 
-    notifier.parseAndDispatch("test:key|test-payload");
-
-    assertThat(receivedKeys).containsExactly("test:key");
-    assertThat(receivedPayloads).containsExactly("test-payload");
+    assertThat(received).hasSize(1);
+    assertThat(received.get(0)).isEqualTo(original);
   }
 
   @Test
   void parseAndDispatchHandlesSnsEnvelope() {
-    List<String> receivedKeys = new ArrayList<>();
-    List<String> receivedPayloads = new ArrayList<>();
+    List<byte[]> received = new ArrayList<>();
+    notifier.subscribe(received::add);
 
-    notifier.subscribe(
-        (key, payload) -> {
-          receivedKeys.add(key);
-          receivedPayloads.add(payload);
-        });
+    byte[] original = "my-payload".getBytes(UTF_8);
+    String encoded = Base64.getEncoder().encodeToString(original);
 
     String snsEnvelope =
         """
@@ -91,42 +88,40 @@ class SnsNotifierSpiTest {
           "Type": "Notification",
           "MessageId": "abc-123",
           "TopicArn": "arn:aws:sns:us-east-1:123456789:test",
-          "Message": "my:key|my-payload",
+          "Message": "%s",
           "Timestamp": "2026-01-01T00:00:00.000Z"
         }
-        """;
+        """
+            .formatted(encoded);
 
     notifier.parseAndDispatch(snsEnvelope);
 
-    assertThat(receivedKeys).containsExactly("my:key");
-    assertThat(receivedPayloads).containsExactly("my-payload");
+    assertThat(received).hasSize(1);
+    assertThat(received.get(0)).isEqualTo(original);
   }
 
   @Test
-  void parseAndDispatchIgnoresMessagesWithoutDelimiter() {
-    List<String> receivedKeys = new ArrayList<>();
+  void parseAndDispatchIgnoresInvalidBase64() {
+    List<byte[]> received = new ArrayList<>();
+    notifier.subscribe(received::add);
 
-    notifier.subscribe((key, payload) -> receivedKeys.add(key));
+    notifier.parseAndDispatch("not-valid-base64!!!");
 
-    notifier.parseAndDispatch("no-delimiter");
-
-    assertThat(receivedKeys).isEmpty();
+    assertThat(received).isEmpty();
   }
 
   @Test
   void extractSnsMessageHandlesEscapedCharacters() {
-    String envelope =
-        """
-        {"Message": "key\\|with\\\\pipe|payload"}
-        """;
+    String encoded = Base64.getEncoder().encodeToString("test".getBytes(UTF_8));
+    String envelope = "{\"Message\": \"" + encoded + "\"}";
 
     String result = notifier.extractSnsMessage(envelope);
-    assertThat(result).isEqualTo("key|with\\pipe|payload");
+    assertThat(result).isEqualTo(encoded);
   }
 
   @Test
   void extractSnsMessageReturnsRawBodyWhenNotEnvelope() {
-    String raw = "key|payload";
+    String raw = Base64.getEncoder().encodeToString("payload".getBytes(UTF_8));
     assertThat(notifier.extractSnsMessage(raw)).isEqualTo(raw);
   }
 
@@ -138,29 +133,37 @@ class SnsNotifierSpiTest {
 
   @Test
   void multipleHandlersAreRegistered() {
-    List<String> handler1 = new ArrayList<>();
-    List<String> handler2 = new ArrayList<>();
+    List<byte[]> handler1 = new ArrayList<>();
+    List<byte[]> handler2 = new ArrayList<>();
 
-    notifier.subscribe((key, payload) -> handler1.add(payload));
-    notifier.subscribe((key, payload) -> handler2.add(payload));
+    notifier.subscribe(handler1::add);
+    notifier.subscribe(handler2::add);
 
-    notifier.parseAndDispatch("key|value");
+    byte[] original = "value".getBytes(UTF_8);
+    String encoded = Base64.getEncoder().encodeToString(original);
+    notifier.parseAndDispatch(encoded);
 
-    assertThat(handler1).containsExactly("value");
-    assertThat(handler2).containsExactly("value");
+    assertThat(handler1).hasSize(1);
+    assertThat(handler1.get(0)).isEqualTo(original);
+    assertThat(handler2).hasSize(1);
+    assertThat(handler2.get(0)).isEqualTo(original);
   }
 
   @Test
   void subscribeCancelRemovesHandler() {
-    List<String> received = new ArrayList<>();
+    List<byte[]> received = new ArrayList<>();
 
-    var subscription = notifier.subscribe((key, payload) -> received.add(payload));
-    notifier.parseAndDispatch("key|first");
-    assertThat(received).containsExactly("first");
+    var subscription = notifier.subscribe(received::add);
+
+    byte[] first = "first".getBytes(UTF_8);
+    notifier.parseAndDispatch(Base64.getEncoder().encodeToString(first));
+    assertThat(received).hasSize(1);
 
     subscription.cancel();
-    notifier.parseAndDispatch("key|second");
-    assertThat(received).containsExactly("first");
+
+    byte[] second = "second".getBytes(UTF_8);
+    notifier.parseAndDispatch(Base64.getEncoder().encodeToString(second));
+    assertThat(received).hasSize(1);
   }
 
   @ParameterizedTest
@@ -176,7 +179,6 @@ class SnsNotifierSpiTest {
 
   @Test
   void unescapeWithTrailingBackslash() {
-    // A body where the Message value ends with a lone backslash
     String body = "{\"Message\": \"trailing\\\\\"}";
     String result = notifier.extractSnsMessage(body);
     assertThat(result).isEqualTo("trailing\\");
@@ -184,16 +186,8 @@ class SnsNotifierSpiTest {
 
   @Test
   void unescapeWithTrailingLoneBackslashInValue() {
-    // Construct a scenario where unescape encounters a trailing backslash.
-    // The extractSnsMessage unescapes the value between quotes.
-    // A JSON value like "abc\" would not have a closing quote, so we use
-    // a raw body where the extracted substring happens to end with a backslash.
-    // Since findClosingQuote skips \X pairs, "abc\\" is extracted as abc\ (the raw substring).
-    // Actually "abc\\" -> findClosingQuote sees \ at index 3, skips to 5 which is ", returns 5.
-    // Substring is abc\\, unescape produces abc\.
-    // Let's test a lone trailing backslash by directly testing parseAndDispatch with content.
-    String body = "{\"Message\": \"key|val\\\\\"}";
+    String body = "{\"Message\": \"abc\\\\\"}";
     String result = notifier.extractSnsMessage(body);
-    assertThat(result).isEqualTo("key|val\\");
+    assertThat(result).isEqualTo("abc\\");
   }
 }

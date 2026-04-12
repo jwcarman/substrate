@@ -16,13 +16,14 @@
 package org.jwcarman.substrate.sns.notifier;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import org.jwcarman.substrate.core.notifier.NotificationHandler;
+import java.util.function.Consumer;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.notifier.NotifierSubscription;
 import org.slf4j.Logger;
@@ -48,7 +49,6 @@ import software.amazon.awssdk.services.sqs.model.SetQueueAttributesRequest;
 public class SnsNotifierSpi implements NotifierSpi, SmartLifecycle {
 
   private static final Logger log = LoggerFactory.getLogger(SnsNotifierSpi.class);
-  private static final String DELIMITER = "|";
   private static final int SQS_MAX_MESSAGES_PER_POLL = 10;
 
   private final SnsClient snsClient;
@@ -56,7 +56,7 @@ public class SnsNotifierSpi implements NotifierSpi, SmartLifecycle {
   private final String topicArn;
   private final int sqsMessageRetentionSeconds;
   private final int sqsWaitTimeSeconds;
-  private final List<NotificationHandler> handlers = new CopyOnWriteArrayList<>();
+  private final List<Consumer<byte[]>> handlers = new CopyOnWriteArrayList<>();
 
   private final AtomicBoolean running = new AtomicBoolean(false);
   private volatile String queueUrl;
@@ -77,13 +77,13 @@ public class SnsNotifierSpi implements NotifierSpi, SmartLifecycle {
   }
 
   @Override
-  public void notify(String key, String payload) {
-    snsClient.publish(
-        PublishRequest.builder().topicArn(topicArn).message(key + DELIMITER + payload).build());
+  public void notify(byte[] payload) {
+    String encoded = Base64.getEncoder().encodeToString(payload);
+    snsClient.publish(PublishRequest.builder().topicArn(topicArn).message(encoded).build());
   }
 
   @Override
-  public NotifierSubscription subscribe(NotificationHandler handler) {
+  public NotifierSubscription subscribe(Consumer<byte[]> handler) {
     handlers.add(handler);
     return () -> handlers.remove(handler);
   }
@@ -113,7 +113,6 @@ public class SnsNotifierSpi implements NotifierSpi, SmartLifecycle {
             .attributes()
             .get(QueueAttributeName.QUEUE_ARN);
 
-    // Allow SNS to send messages to this SQS queue
     String policy =
         """
         {
@@ -231,21 +230,19 @@ public class SnsNotifierSpi implements NotifierSpi, SmartLifecycle {
   }
 
   void parseAndDispatch(String body) {
-    String payload = extractSnsMessage(body);
-    int delimiterIndex = payload.indexOf(DELIMITER);
-    if (delimiterIndex < 0) {
+    String encoded = extractSnsMessage(body);
+    byte[] payload;
+    try {
+      payload = Base64.getDecoder().decode(encoded);
+    } catch (IllegalArgumentException e) {
       return;
     }
-    String key = payload.substring(0, delimiterIndex);
-    String value = payload.substring(delimiterIndex + 1);
-    for (NotificationHandler handler : handlers) {
-      handler.onNotification(key, value);
+    for (Consumer<byte[]> handler : handlers) {
+      handler.accept(payload);
     }
   }
 
   String extractSnsMessage(String body) {
-    // SNS wraps the original message in a JSON envelope when delivering to SQS.
-    // Extract the "Message" field value using simple string parsing to avoid a JSON dependency.
     String marker = "\"Message\"";
     int keyIndex = body.indexOf(marker);
     if (keyIndex < 0) {

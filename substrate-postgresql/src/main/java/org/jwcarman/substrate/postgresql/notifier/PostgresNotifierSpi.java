@@ -19,13 +19,14 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Base64;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import javax.sql.DataSource;
-import org.jwcarman.substrate.core.notifier.NotificationHandler;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.notifier.NotifierSubscription;
 import org.postgresql.PGConnection;
@@ -39,14 +40,13 @@ public class PostgresNotifierSpi implements NotifierSpi, SmartLifecycle {
 
   private static final Logger log = LoggerFactory.getLogger(PostgresNotifierSpi.class);
 
-  private static final String PAYLOAD_DELIMITER = "|";
   private static final Pattern VALID_CHANNEL = Pattern.compile("^[a-zA-Z_]\\w*$");
 
   private final JdbcTemplate jdbcTemplate;
   private final DataSource dataSource;
   private final String channel;
   private final int pollTimeoutMillis;
-  private final List<NotificationHandler> handlers = new CopyOnWriteArrayList<>();
+  private final List<Consumer<byte[]>> handlers = new CopyOnWriteArrayList<>();
 
   private final AtomicBoolean running = new AtomicBoolean(false);
   private final AtomicBoolean listening = new AtomicBoolean(false);
@@ -66,13 +66,13 @@ public class PostgresNotifierSpi implements NotifierSpi, SmartLifecycle {
   }
 
   @Override
-  public void notify(String key, String payload) {
-    String message = key + PAYLOAD_DELIMITER + payload;
+  public void notify(byte[] payload) {
+    String encoded = Base64.getEncoder().encodeToString(payload);
     jdbcTemplate.execute(
         (Connection conn) -> {
           try (PreparedStatement ps = conn.prepareStatement("SELECT pg_notify(?, ?)")) {
             ps.setString(1, channel);
-            ps.setString(2, message);
+            ps.setString(2, encoded);
             ps.execute();
             return null;
           }
@@ -80,7 +80,7 @@ public class PostgresNotifierSpi implements NotifierSpi, SmartLifecycle {
   }
 
   @Override
-  public NotifierSubscription subscribe(NotificationHandler handler) {
+  public NotifierSubscription subscribe(Consumer<byte[]> handler) {
     handlers.add(handler);
     return () -> handlers.remove(handler);
   }
@@ -154,16 +154,16 @@ public class PostgresNotifierSpi implements NotifierSpi, SmartLifecycle {
     }
   }
 
-  void dispatchNotification(String payload) {
-    int delimiterIndex = payload.indexOf(PAYLOAD_DELIMITER);
-    if (delimiterIndex < 0) {
-      log.warn("Ignoring malformed notification payload: {}", payload);
+  void dispatchNotification(String encoded) {
+    byte[] payload;
+    try {
+      payload = Base64.getDecoder().decode(encoded);
+    } catch (IllegalArgumentException e) {
+      log.warn("Ignoring malformed Base64 notification payload: {}", encoded);
       return;
     }
-    String key = payload.substring(0, delimiterIndex);
-    String value = payload.substring(delimiterIndex + 1);
-    for (NotificationHandler handler : handlers) {
-      handler.onNotification(key, value);
+    for (Consumer<byte[]> handler : handlers) {
+      handler.accept(payload);
     }
   }
 

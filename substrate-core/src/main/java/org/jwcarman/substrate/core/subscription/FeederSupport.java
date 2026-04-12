@@ -18,9 +18,11 @@ package org.jwcarman.substrate.core.subscription;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.jwcarman.substrate.core.notifier.NotifierSpi;
+import org.jwcarman.substrate.core.notifier.Notification;
 import org.jwcarman.substrate.core.notifier.NotifierSubscription;
 
 /**
@@ -36,23 +38,21 @@ public final class FeederSupport {
 
   private static final Log log = LogFactory.getLog(FeederSupport.class);
 
-  private static final String DELETED_PAYLOAD = "__DELETED__";
-
   private FeederSupport() {}
 
   /**
    * Start a feeder virtual thread that drives {@code step} in a loop until the step returns {@code
    * false}, the thread is interrupted, or a terminal condition fires.
    *
-   * <p>The feeder thread subscribes to the {@code notifier} for the given {@code key} and uses a
-   * semaphore to wake up on notifications. On a {@code "__DELETED__"} payload, the feeder calls
-   * {@code handoff.markDeleted()} and exits its loop. On any uncaught {@link RuntimeException} from
-   * the step, the feeder calls {@code handoff.error(cause)} and exits. The notifier subscription is
-   * always cancelled in a {@code finally} block.
+   * <p>The feeder subscribes to typed notifications via the provided {@code subscribeFn}. On a
+   * {@link Notification.Deleted} event, the feeder calls {@code handoff.markDeleted()} and exits.
+   * On any uncaught {@link RuntimeException} from the step, the feeder calls {@code
+   * handoff.error(cause)} and exits. The notifier subscription is always cancelled in a {@code
+   * finally} block.
    *
-   * @param key the backend-qualified key this feeder is associated with — used to filter
-   *     notifications
-   * @param notifier the notifier SPI to subscribe to
+   * @param key the backend-qualified key this feeder is associated with
+   * @param subscribeFn a subscribe function already bound to the correct primitive type (e.g.
+   *     {@code notifier::subscribeToAtom})
    * @param handoff the handoff that the step will push values into; also the target of {@code
    *     markDeleted} and {@code error} when those events fire
    * @param threadName the virtual thread name prefix (e.g., {@code "substrate-atom-feeder"})
@@ -62,7 +62,7 @@ public final class FeederSupport {
    */
   public static Runnable start(
       String key,
-      NotifierSpi notifier,
+      BiFunction<String, Consumer<Notification>, NotifierSubscription> subscribeFn,
       NextHandoff<?> handoff,
       String threadName,
       FeederStep step) {
@@ -71,9 +71,20 @@ public final class FeederSupport {
     Semaphore semaphore = new Semaphore(0);
 
     NotifierSubscription notifierSub =
-        notifier.subscribe(
-            (notifiedKey, payload) ->
-                handleNotification(key, notifiedKey, payload, handoff, running, semaphore));
+        subscribeFn.apply(
+            key,
+            n -> {
+              switch (n) {
+                case Notification.Deleted _ -> {
+                  handoff.markDeleted();
+                  running.set(false);
+                }
+                case Notification.Changed _, Notification.Completed _ -> {
+                  // wake the pump
+                }
+              }
+              semaphore.release();
+            });
 
     Thread feederThread =
         Thread.ofVirtual()
@@ -85,23 +96,6 @@ public final class FeederSupport {
       feederThread.interrupt();
       notifierSub.cancel();
     };
-  }
-
-  private static void handleNotification(
-      String expectedKey,
-      String notifiedKey,
-      String payload,
-      NextHandoff<?> handoff,
-      AtomicBoolean running,
-      Semaphore semaphore) {
-    if (!expectedKey.equals(notifiedKey)) {
-      return;
-    }
-    if (DELETED_PAYLOAD.equals(payload)) {
-      handoff.markDeleted();
-      running.set(false);
-    }
-    semaphore.release();
   }
 
   private static void runLoop(

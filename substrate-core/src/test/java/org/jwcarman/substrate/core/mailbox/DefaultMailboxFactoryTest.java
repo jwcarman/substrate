@@ -33,10 +33,13 @@ import org.jwcarman.substrate.NextResult;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.memory.mailbox.InMemoryMailboxSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
+import org.jwcarman.substrate.core.notifier.DefaultNotifier;
+import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.mailbox.Mailbox;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
 class DefaultMailboxFactoryTest {
@@ -55,7 +58,7 @@ class DefaultMailboxFactoryTest {
 
     DefaultMailboxFactory factory =
         new DefaultMailboxFactory(
-            spi, codecFactory, new InMemoryNotifier(), Duration.ofMinutes(30), coordinator);
+            spi, codecFactory, newNotifier(), Duration.ofMinutes(30), coordinator);
 
     Mailbox<String> mailbox = factory.connect("test", String.class);
 
@@ -72,7 +75,7 @@ class DefaultMailboxFactoryTest {
     InMemoryMailboxSpi spi = new InMemoryMailboxSpi();
     DefaultMailboxFactory factory =
         new DefaultMailboxFactory(
-            spi, codecFactory, new InMemoryNotifier(), Duration.ofMinutes(30), coordinator);
+            spi, codecFactory, newNotifier(), Duration.ofMinutes(30), coordinator);
 
     Mailbox<String> mailbox = factory.connect("nonexistent", String.class);
 
@@ -85,7 +88,7 @@ class DefaultMailboxFactoryTest {
         new DefaultMailboxFactory(
             mock(MailboxSpi.class),
             codecFactory,
-            new InMemoryNotifier(),
+            newNotifier(),
             Duration.ofMinutes(30),
             coordinator);
 
@@ -100,7 +103,7 @@ class DefaultMailboxFactoryTest {
         new DefaultMailboxFactory(
             mock(MailboxSpi.class),
             codecFactory,
-            new InMemoryNotifier(),
+            newNotifier(),
             Duration.ofMinutes(30),
             coordinator);
 
@@ -119,7 +122,7 @@ class DefaultMailboxFactoryTest {
 
     DefaultMailboxFactory factory =
         new DefaultMailboxFactory(
-            spi, codecFactory, new InMemoryNotifier(), Duration.ofMinutes(30), coordinator);
+            spi, codecFactory, newNotifier(), Duration.ofMinutes(30), coordinator);
 
     Mailbox<String> mailbox = factory.connect("test", typeRef);
     assertThat(mailbox.key()).isEqualTo("substrate:mailbox:test");
@@ -135,7 +138,7 @@ class DefaultMailboxFactoryTest {
         .thenAnswer(inv -> new String((byte[]) inv.getArgument(0), UTF_8));
 
     InMemoryMailboxSpi spi = new InMemoryMailboxSpi();
-    InMemoryNotifier notifier = new InMemoryNotifier();
+    Notifier notifier = newNotifier();
     DefaultMailboxFactory factory =
         new DefaultMailboxFactory(spi, codecFactory, notifier, Duration.ofMinutes(30), coordinator);
 
@@ -148,5 +151,11 @@ class DefaultMailboxFactoryTest {
     NextResult<String> result = sub.next(Duration.ofSeconds(5));
     assertThat(result).isInstanceOf(NextResult.Value.class);
     assertThat(((NextResult.Value<String>) result).value()).isEqualTo("hello");
+  }
+
+  private static Notifier newNotifier() {
+    return new DefaultNotifier(
+        new InMemoryNotifier(),
+        new org.jwcarman.codec.jackson.JacksonCodecFactory(JsonMapper.builder().build()));
   }
 }

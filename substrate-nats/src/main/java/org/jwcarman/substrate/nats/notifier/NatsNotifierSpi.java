@@ -17,13 +17,11 @@ package org.jwcarman.substrate.nats.notifier;
 
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
-import io.nats.client.Message;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import org.jwcarman.substrate.core.notifier.NotificationHandler;
+import java.util.function.Consumer;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.notifier.NotifierSubscription;
 import org.springframework.context.SmartLifecycle;
@@ -31,33 +29,39 @@ import org.springframework.context.SmartLifecycle;
 public class NatsNotifierSpi implements NotifierSpi, SmartLifecycle {
 
   private final Connection connection;
-  private final String subjectPrefix;
-  private final List<NotificationHandler> handlers = new CopyOnWriteArrayList<>();
+  private final String subject;
+  private final List<Consumer<byte[]>> handlers = new CopyOnWriteArrayList<>();
 
   private final AtomicBoolean running = new AtomicBoolean(false);
   private final AtomicReference<Dispatcher> dispatcher = new AtomicReference<>();
 
-  public NatsNotifierSpi(Connection connection, String subjectPrefix) {
+  public NatsNotifierSpi(Connection connection, String subject) {
     this.connection = connection;
-    this.subjectPrefix = toSubjectPrefix(subjectPrefix);
+    this.subject = subject;
   }
 
   @Override
-  public void notify(String key, String payload) {
-    String subject = toSubject(key);
-    connection.publish(subject, payload.getBytes(StandardCharsets.UTF_8));
+  public void notify(byte[] payload) {
+    connection.publish(subject, payload);
   }
 
   @Override
-  public NotifierSubscription subscribe(NotificationHandler handler) {
+  public NotifierSubscription subscribe(Consumer<byte[]> handler) {
     handlers.add(handler);
     return () -> handlers.remove(handler);
   }
 
   @Override
   public void start() {
-    Dispatcher d = connection.createDispatcher(this::handleMessage);
-    d.subscribe(subjectPrefix + ">");
+    Dispatcher d =
+        connection.createDispatcher(
+            message -> {
+              byte[] data = message.getData();
+              for (Consumer<byte[]> handler : handlers) {
+                handler.accept(data);
+              }
+            });
+    d.subscribe(subject);
     dispatcher.set(d);
     running.set(true);
   }
@@ -74,26 +78,5 @@ public class NatsNotifierSpi implements NotifierSpi, SmartLifecycle {
   @Override
   public boolean isRunning() {
     return running.get();
-  }
-
-  private void handleMessage(Message message) {
-    String key = toKey(message.getSubject());
-    String payload = new String(message.getData(), StandardCharsets.UTF_8);
-    for (NotificationHandler handler : handlers) {
-      handler.onNotification(key, payload);
-    }
-  }
-
-  private String toSubject(String key) {
-    return subjectPrefix + key.replace(':', '.');
-  }
-
-  private String toKey(String subject) {
-    return subject.substring(subjectPrefix.length()).replace('.', ':');
-  }
-
-  // Ensures the subject prefix uses dots (NATS convention) even if configured with colons
-  private static String toSubjectPrefix(String prefix) {
-    return prefix.replace(':', '.');
   }
 }

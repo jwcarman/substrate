@@ -15,6 +15,7 @@
  */
 package org.jwcarman.substrate.sns.notifier;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
@@ -88,52 +89,52 @@ class SnsNotifierIT {
   @Test
   void notifyAndSubscribeRoundTrip() throws Exception {
     CountDownLatch latch = new CountDownLatch(1);
-    List<String> receivedKeys = new CopyOnWriteArrayList<>();
-    List<String> receivedPayloads = new CopyOnWriteArrayList<>();
+    List<byte[]> received = new CopyOnWriteArrayList<>();
 
     notifier.subscribe(
-        (key, payload) -> {
-          receivedKeys.add(key);
-          receivedPayloads.add(payload);
+        payload -> {
+          received.add(payload);
           latch.countDown();
         });
     notifier.start();
 
-    notifier.notify("test:key", "test-payload");
+    byte[] payload = "test-payload".getBytes(UTF_8);
+    notifier.notify(payload);
 
     assertThat(latch.await(30, TimeUnit.SECONDS)).isTrue();
-    assertThat(receivedKeys).containsExactly("test:key");
-    assertThat(receivedPayloads).containsExactly("test-payload");
+    assertThat(received).hasSize(1);
+    assertThat(received.get(0)).isEqualTo(payload);
   }
 
   @Test
   void multipleHandlersAllReceiveNotifications() throws Exception {
     CountDownLatch latch = new CountDownLatch(2);
-    List<String> handler1Received = new CopyOnWriteArrayList<>();
-    List<String> handler2Received = new CopyOnWriteArrayList<>();
+    List<byte[]> handler1Received = new CopyOnWriteArrayList<>();
+    List<byte[]> handler2Received = new CopyOnWriteArrayList<>();
 
     notifier.subscribe(
-        (key, payload) -> {
+        payload -> {
           handler1Received.add(payload);
           latch.countDown();
         });
     notifier.subscribe(
-        (key, payload) -> {
+        payload -> {
           handler2Received.add(payload);
           latch.countDown();
         });
     notifier.start();
 
-    notifier.notify("key", "value");
+    byte[] payload = "value".getBytes(UTF_8);
+    notifier.notify(payload);
 
     assertThat(latch.await(30, TimeUnit.SECONDS)).isTrue();
-    assertThat(handler1Received).containsExactly("value");
-    assertThat(handler2Received).containsExactly("value");
+    assertThat(handler1Received).containsExactly(payload);
+    assertThat(handler2Received).containsExactly(payload);
   }
 
   @Test
   void lifecycleStartAndStopWithCleanup() {
-    notifier.subscribe((key, payload) -> {});
+    notifier.subscribe(payload -> {});
     notifier.start();
     assertThat(notifier.isRunning()).isTrue();
 

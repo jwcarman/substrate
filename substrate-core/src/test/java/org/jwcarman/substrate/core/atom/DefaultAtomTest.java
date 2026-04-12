@@ -29,7 +29,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.codec.jackson.JacksonCodecFactory;
 import org.jwcarman.codec.spi.Codec;
+import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.NextResult;
 import org.jwcarman.substrate.SubscriberConfig;
@@ -39,6 +41,9 @@ import org.jwcarman.substrate.atom.Snapshot;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.memory.atom.InMemoryAtomSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
+import org.jwcarman.substrate.core.notifier.DefaultNotifier;
+import org.jwcarman.substrate.core.notifier.Notifier;
+import tools.jackson.databind.json.JsonMapper;
 
 class DefaultAtomTest {
 
@@ -58,15 +63,18 @@ class DefaultAtomTest {
         }
       };
 
+  private static final CodecFactory CODEC_FACTORY =
+      new JacksonCodecFactory(JsonMapper.builder().build());
+
   private final ShutdownCoordinator coordinator = new ShutdownCoordinator();
   private InMemoryAtomSpi spi;
-  private InMemoryNotifier notifier;
+  private Notifier notifier;
   private DefaultAtom<String> atom;
 
   @BeforeEach
   void setUp() {
     spi = new InMemoryAtomSpi();
-    notifier = new InMemoryNotifier();
+    notifier = new DefaultNotifier(new InMemoryNotifier(), CODEC_FACTORY);
 
     byte[] bytes = STRING_CODEC.encode("initial");
     String token = DefaultAtom.token(bytes);
@@ -107,24 +115,6 @@ class DefaultAtomTest {
   }
 
   @Test
-  void setPublishesNotification() {
-    AtomicBoolean notified = new AtomicBoolean(false);
-    AtomicReference<String> notifiedPayload = new AtomicReference<>();
-    notifier.subscribe(
-        (key, payload) -> {
-          if (KEY.equals(key)) {
-            notified.set(true);
-            notifiedPayload.set(payload);
-          }
-        });
-
-    atom.set("updated", TTL);
-
-    assertThat(notified.get()).isTrue();
-    assertThat(notifiedPayload.get()).isEqualTo(atom.get().token());
-  }
-
-  @Test
   void setThrowsOnDeadAtom() {
     atom.delete();
 
@@ -132,21 +122,13 @@ class DefaultAtomTest {
   }
 
   @Test
-  void touchDoesNotBumpTokenOrPublishNotification() {
+  void touchDoesNotBumpToken() {
     String originalToken = atom.get().token();
-    AtomicBoolean notified = new AtomicBoolean(false);
-    notifier.subscribe(
-        (key, payload) -> {
-          if (KEY.equals(key)) {
-            notified.set(true);
-          }
-        });
 
     boolean result = atom.touch(TTL);
 
     assertThat(result).isTrue();
     assertThat(atom.get().token()).isEqualTo(originalToken);
-    assertThat(notified.get()).isFalse();
   }
 
   @Test
@@ -154,21 +136,6 @@ class DefaultAtomTest {
     atom.delete();
 
     assertThat(atom.touch(TTL)).isFalse();
-  }
-
-  @Test
-  void deletePublishesDeletedNotification() {
-    AtomicReference<String> notifiedPayload = new AtomicReference<>();
-    notifier.subscribe(
-        (key, payload) -> {
-          if (KEY.equals(key)) {
-            notifiedPayload.set(payload);
-          }
-        });
-
-    atom.delete();
-
-    assertThat(notifiedPayload.get()).isEqualTo("__DELETED__");
   }
 
   // ═══════════════ blocking subscribe tests ═══════════════
@@ -281,7 +248,6 @@ class DefaultAtomTest {
   @Test
   void subscribeDeliversExpiredWhenAtomTtlElapses() {
     InMemoryAtomSpi shortSpi = new InMemoryAtomSpi();
-    InMemoryNotifier shortNotifier = new InMemoryNotifier();
 
     byte[] bytes = STRING_CODEC.encode("ephemeral");
     String token = DefaultAtom.token(bytes);
@@ -289,8 +255,7 @@ class DefaultAtomTest {
     shortSpi.create(KEY, bytes, token, shortTtl);
 
     DefaultAtom<String> shortAtom =
-        new DefaultAtom<>(
-            shortSpi, KEY, STRING_CODEC, shortNotifier, Duration.ofHours(24), coordinator);
+        new DefaultAtom<>(shortSpi, KEY, STRING_CODEC, notifier, Duration.ofHours(24), coordinator);
 
     Snapshot<String> current = shortAtom.get();
 
@@ -374,6 +339,7 @@ class DefaultAtomTest {
             (SubscriberConfig<Snapshot<String>> cfg) ->
                 cfg.onNext(snap -> {}).onDeleted(() -> deleteFired.set(true)));
     try {
+      await().atMost(Duration.ofSeconds(2)).until(sub::isActive);
       atom.delete();
 
       await()
@@ -387,7 +353,6 @@ class DefaultAtomTest {
   @Test
   void callbackSubscribeFiresOnExpirationWhenAtomExpires() {
     InMemoryAtomSpi shortSpi = new InMemoryAtomSpi();
-    InMemoryNotifier shortNotifier = new InMemoryNotifier();
 
     byte[] bytes = STRING_CODEC.encode("ephemeral");
     String token = DefaultAtom.token(bytes);
@@ -395,8 +360,7 @@ class DefaultAtomTest {
     shortSpi.create(KEY, bytes, token, shortTtl);
 
     DefaultAtom<String> shortAtom =
-        new DefaultAtom<>(
-            shortSpi, KEY, STRING_CODEC, shortNotifier, Duration.ofHours(24), coordinator);
+        new DefaultAtom<>(shortSpi, KEY, STRING_CODEC, notifier, Duration.ofHours(24), coordinator);
 
     Snapshot<String> current = shortAtom.get();
     AtomicBoolean expirationFired = new AtomicBoolean(false);

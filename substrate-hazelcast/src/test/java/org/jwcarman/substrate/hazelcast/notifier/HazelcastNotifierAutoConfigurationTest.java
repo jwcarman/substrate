@@ -72,7 +72,7 @@ class HazelcastNotifierAutoConfigurationTest {
     @Bean
     HazelcastInstance hazelcastInstance() {
       HazelcastInstance hazelcast = mock(HazelcastInstance.class);
-      ITopic<String> topic = mock();
+      ITopic<byte[]> topic = mock();
       doReturn(topic).when(hazelcast).getTopic(anyString());
       return hazelcast;
     }

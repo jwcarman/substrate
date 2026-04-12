@@ -15,6 +15,7 @@
  */
 package org.jwcarman.substrate.hazelcast.notifier;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -35,7 +36,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class HazelcastNotifierSpiTest {
 
   @Mock private HazelcastInstance hazelcastInstance;
-  @Mock private ITopic<String> topic;
+  @Mock private ITopic<byte[]> topic;
 
   private HazelcastNotifierSpi notifier;
 
@@ -45,16 +46,17 @@ class HazelcastNotifierSpiTest {
   }
 
   private void stubGetTopic() {
-    when(hazelcastInstance.<String>getTopic("substrate-notify")).thenReturn(topic);
+    when(hazelcastInstance.<byte[]>getTopic("substrate-notify")).thenReturn(topic);
   }
 
   @Test
-  void notifyPublishesKeyAndPayloadToTopic() {
+  void notifyPublishesPayloadToTopic() {
     stubGetTopic();
+    byte[] payload = "my-payload".getBytes(UTF_8);
 
-    notifier.notify("my-key", "my-payload");
+    notifier.notify(payload);
 
-    verify(topic).publish("my-key|my-payload");
+    verify(topic).publish(payload);
   }
 
   @Test
@@ -89,11 +91,11 @@ class HazelcastNotifierSpiTest {
 
   @Test
   void multipleHandlersAreRegistered() {
-    List<String> handler1 = new ArrayList<>();
-    List<String> handler2 = new ArrayList<>();
+    List<byte[]> handler1 = new ArrayList<>();
+    List<byte[]> handler2 = new ArrayList<>();
 
-    notifier.subscribe((key, payload) -> handler1.add(payload));
-    notifier.subscribe((key, payload) -> handler2.add(payload));
+    notifier.subscribe(handler1::add);
+    notifier.subscribe(handler2::add);
 
     assertThat(handler1).isEmpty();
     assertThat(handler2).isEmpty();

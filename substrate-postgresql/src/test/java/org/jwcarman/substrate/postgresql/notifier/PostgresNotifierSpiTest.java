@@ -15,10 +15,12 @@
  */
 package org.jwcarman.substrate.postgresql.notifier;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
+import java.util.Base64;
 import java.util.concurrent.CopyOnWriteArrayList;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
@@ -45,13 +47,13 @@ class PostgresNotifierSpiTest {
   }
 
   @Test
-  void dispatchNotificationIgnoresMalformedPayload() {
+  void dispatchNotificationIgnoresMalformedBase64() {
     PostgresNotifierSpi spi =
         new PostgresNotifierSpi(jdbcTemplate, dataSource, "substrate_notify", 100);
-    var received = new CopyOnWriteArrayList<String>();
-    spi.subscribe((key, value) -> received.add(key + "=" + value));
+    var received = new CopyOnWriteArrayList<byte[]>();
+    spi.subscribe(received::add);
 
-    spi.dispatchNotification("no-delimiter-here");
+    spi.dispatchNotification("not-valid-base64!!!");
 
     assertThat(received).isEmpty();
   }
@@ -60,29 +62,36 @@ class PostgresNotifierSpiTest {
   void dispatchNotificationDispatchesToAllHandlers() {
     PostgresNotifierSpi spi =
         new PostgresNotifierSpi(jdbcTemplate, dataSource, "substrate_notify", 100);
-    var received1 = new CopyOnWriteArrayList<String>();
-    var received2 = new CopyOnWriteArrayList<String>();
-    spi.subscribe((key, value) -> received1.add(key + "=" + value));
-    spi.subscribe((key, value) -> received2.add(key + "=" + value));
+    var received1 = new CopyOnWriteArrayList<byte[]>();
+    var received2 = new CopyOnWriteArrayList<byte[]>();
+    spi.subscribe(received1::add);
+    spi.subscribe(received2::add);
 
-    spi.dispatchNotification("my-key|my-value");
+    byte[] original = "my-value".getBytes(UTF_8);
+    String encoded = Base64.getEncoder().encodeToString(original);
+    spi.dispatchNotification(encoded);
 
-    assertThat(received1).containsExactly("my-key=my-value");
-    assertThat(received2).containsExactly("my-key=my-value");
+    assertThat(received1).hasSize(1);
+    assertThat(received1.get(0)).isEqualTo(original);
+    assertThat(received2).hasSize(1);
+    assertThat(received2.get(0)).isEqualTo(original);
   }
 
   @Test
   void subscribeReturnsCancellerThatRemovesHandler() {
     PostgresNotifierSpi spi =
         new PostgresNotifierSpi(jdbcTemplate, dataSource, "substrate_notify", 100);
-    var received = new CopyOnWriteArrayList<String>();
-    var subscription = spi.subscribe((key, value) -> received.add(key));
+    var received = new CopyOnWriteArrayList<byte[]>();
+    var subscription = spi.subscribe(received::add);
 
-    spi.dispatchNotification("key1|value1");
+    byte[] first = "value1".getBytes(UTF_8);
+    spi.dispatchNotification(Base64.getEncoder().encodeToString(first));
     assertThat(received).hasSize(1);
 
     subscription.cancel();
-    spi.dispatchNotification("key2|value2");
+
+    byte[] second = "value2".getBytes(UTF_8);
+    spi.dispatchNotification(Base64.getEncoder().encodeToString(second));
     assertThat(received).hasSize(1);
   }
 

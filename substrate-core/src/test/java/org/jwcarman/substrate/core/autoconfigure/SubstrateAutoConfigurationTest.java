@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.codec.jackson.JacksonCodecFactory;
@@ -30,7 +31,7 @@ import org.jwcarman.substrate.core.mailbox.MailboxSpi;
 import org.jwcarman.substrate.core.memory.journal.InMemoryJournalSpi;
 import org.jwcarman.substrate.core.memory.mailbox.InMemoryMailboxSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
-import org.jwcarman.substrate.core.notifier.NotificationHandler;
+import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.notifier.NotifierSubscription;
 import org.jwcarman.substrate.core.sweep.Sweeper;
@@ -150,6 +151,13 @@ class SubstrateAutoConfigurationTest {
         .doesNotContain("No Journal implementation found; using in-memory fallback")
         .doesNotContain("No Mailbox implementation found; using in-memory fallback")
         .doesNotContain("No Notifier implementation found; using in-memory fallback");
+  }
+
+  @Test
+  void createsNotifierWhenNotifierSpiAndCodecFactoryBeansExist() {
+    contextRunner
+        .withUserConfiguration(CodecFactoryConfiguration.class)
+        .run(context -> assertThat(context).hasSingleBean(Notifier.class));
   }
 
   @Test
@@ -361,12 +369,12 @@ class SubstrateAutoConfigurationTest {
   static class StubNotifierSpi implements NotifierSpi {
 
     @Override
-    public void notify(String key, String payload) {
+    public void notify(byte[] payload) {
       // no-op stub for testing
     }
 
     @Override
-    public NotifierSubscription subscribe(NotificationHandler handler) {
+    public NotifierSubscription subscribe(Consumer<byte[]> handler) {
       return () -> {
         // no-op stub for testing
       };

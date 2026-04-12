@@ -31,7 +31,7 @@ import org.jwcarman.substrate.atom.Atom;
 import org.jwcarman.substrate.atom.AtomExpiredException;
 import org.jwcarman.substrate.atom.Snapshot;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
-import org.jwcarman.substrate.core.notifier.NotifierSpi;
+import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.core.subscription.CallbackPumpSubscription;
 import org.jwcarman.substrate.core.subscription.CoalescingHandoff;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
@@ -43,7 +43,7 @@ public class DefaultAtom<T> implements Atom<T> {
   private final AtomSpi atomSpi;
   private final String key;
   private final Codec<T> codec;
-  private final NotifierSpi notifier;
+  private final Notifier notifier;
   private final Duration maxTtl;
   private final ShutdownCoordinator shutdownCoordinator;
 
@@ -51,7 +51,7 @@ public class DefaultAtom<T> implements Atom<T> {
       AtomSpi atomSpi,
       String key,
       Codec<T> codec,
-      NotifierSpi notifier,
+      Notifier notifier,
       Duration maxTtl,
       ShutdownCoordinator shutdownCoordinator) {
     this.atomSpi = atomSpi;
@@ -71,7 +71,7 @@ public class DefaultAtom<T> implements Atom<T> {
     if (!alive) {
       throw new AtomExpiredException(key);
     }
-    notifier.notify(key, newToken);
+    notifier.notifyAtomChanged(key);
   }
 
   @Override
@@ -89,7 +89,7 @@ public class DefaultAtom<T> implements Atom<T> {
   @Override
   public void delete() {
     atomSpi.delete(key);
-    notifier.notify(key, "__DELETED__");
+    notifier.notifyAtomDeleted(key);
   }
 
   @Override
@@ -148,7 +148,7 @@ public class DefaultAtom<T> implements Atom<T> {
 
     return FeederSupport.start(
         key,
-        notifier,
+        notifier::subscribeToAtom,
         handoff,
         "substrate-atom-feeder",
         () -> {

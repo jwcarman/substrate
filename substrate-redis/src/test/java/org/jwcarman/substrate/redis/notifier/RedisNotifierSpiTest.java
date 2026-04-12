@@ -15,6 +15,7 @@
  */
 package org.jwcarman.substrate.redis.notifier;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,51 +34,46 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class RedisNotifierSpiTest {
 
-  @Mock private StatefulRedisPubSubConnection<String, String> pubSubConnection;
-  @Mock private RedisPubSubCommands<String, String> pubSubCommands;
-  @Mock private RedisCommands<String, String> publishCommands;
+  private static final byte[] CHANNEL = "substrate:notifications".getBytes(UTF_8);
+
+  @Mock private StatefulRedisPubSubConnection<byte[], byte[]> pubSubConnection;
+  @Mock private RedisPubSubCommands<byte[], byte[]> pubSubCommands;
+  @Mock private RedisCommands<byte[], byte[]> publishCommands;
 
   private RedisNotifierSpi notifier;
 
   @BeforeEach
   void setUp() {
     when(pubSubConnection.sync()).thenReturn(pubSubCommands);
-    notifier = new RedisNotifierSpi(pubSubConnection, publishCommands, "substrate:notify:");
+    notifier = new RedisNotifierSpi(pubSubConnection, publishCommands, CHANNEL);
   }
 
   @Test
   void notifyPublishesPayloadToChannel() {
-    notifier.notify("my-key", "my-payload");
+    byte[] payload = "my-payload".getBytes(UTF_8);
 
-    verify(publishCommands).publish("substrate:notify:my-key", "my-payload");
+    notifier.notify(payload);
+
+    verify(publishCommands).publish(CHANNEL, payload);
   }
 
   @Test
   void subscribeDispatchesIncomingMessagesToHandler() {
-    List<String> received = new ArrayList<>();
-    notifier.subscribe((key, payload) -> received.add(key + "=" + payload));
+    List<byte[]> received = new ArrayList<>();
+    notifier.subscribe(received::add);
 
-    notifier.message("substrate:notify:*", "substrate:notify:test-key", "data-42");
+    notifier.message(CHANNEL, "data-42".getBytes(UTF_8));
 
-    assertThat(received).containsExactly("test-key=data-42");
+    assertThat(received).hasSize(1);
+    assertThat(new String(received.get(0), UTF_8)).isEqualTo("data-42");
   }
 
   @Test
-  void keyIsExtractedByStrippingChannelPrefix() {
-    List<String> keys = new ArrayList<>();
-    notifier.subscribe((key, payload) -> keys.add(key));
-
-    notifier.message("substrate:notify:*", "substrate:notify:substrate:mailbox:abc-123", "value");
-
-    assertThat(keys).containsExactly("substrate:mailbox:abc-123");
-  }
-
-  @Test
-  void startIssuesPsubscribeOnDedicatedConnection() {
+  void startIssuesSubscribeOnDedicatedConnection() {
     notifier.start();
 
     verify(pubSubConnection).addListener(notifier);
-    verify(pubSubCommands).psubscribe("substrate:notify:*");
+    verify(pubSubCommands).subscribe(CHANNEL);
     assertThat(notifier.isRunning()).isTrue();
   }
 
@@ -86,30 +82,25 @@ class RedisNotifierSpiTest {
     notifier.start();
     notifier.stop();
 
-    verify(pubSubCommands).punsubscribe("substrate:notify:*");
+    verify(pubSubCommands).unsubscribe(CHANNEL);
     verify(pubSubConnection).removeListener(notifier);
     assertThat(notifier.isRunning()).isFalse();
   }
 
   @Test
-  void nonPatternMessageIsIgnored() {
-    List<String> received = new ArrayList<>();
-    notifier.subscribe((key, payload) -> received.add(payload));
-    notifier.message("substrate:notify:test-key", "data");
-    assertThat(received).isEmpty();
-  }
-
-  @Test
   void multipleHandlersAllReceiveNotifications() {
-    List<String> handler1 = new ArrayList<>();
-    List<String> handler2 = new ArrayList<>();
+    List<byte[]> handler1 = new ArrayList<>();
+    List<byte[]> handler2 = new ArrayList<>();
 
-    notifier.subscribe((key, payload) -> handler1.add(payload));
-    notifier.subscribe((key, payload) -> handler2.add(payload));
+    notifier.subscribe(handler1::add);
+    notifier.subscribe(handler2::add);
 
-    notifier.message("substrate:notify:*", "substrate:notify:key", "value");
+    byte[] payload = "value".getBytes(UTF_8);
+    notifier.message(CHANNEL, payload);
 
-    assertThat(handler1).containsExactly("value");
-    assertThat(handler2).containsExactly("value");
+    assertThat(handler1).hasSize(1);
+    assertThat(new String(handler1.get(0), UTF_8)).isEqualTo("value");
+    assertThat(handler2).hasSize(1);
+    assertThat(new String(handler2.get(0), UTF_8)).isEqualTo("value");
   }
 }

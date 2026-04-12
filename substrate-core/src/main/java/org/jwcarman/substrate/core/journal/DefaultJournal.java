@@ -26,7 +26,7 @@ import org.jwcarman.substrate.Subscriber;
 import org.jwcarman.substrate.SubscriberConfig;
 import org.jwcarman.substrate.Subscription;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
-import org.jwcarman.substrate.core.notifier.NotifierSpi;
+import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.core.subscription.BlockingBoundedHandoff;
 import org.jwcarman.substrate.core.subscription.CallbackPumpSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
@@ -41,7 +41,7 @@ public class DefaultJournal<T> implements Journal<T> {
   private final JournalSpi journalSpi;
   private final String key;
   private final Codec<T> codec;
-  private final NotifierSpi notifier;
+  private final Notifier notifier;
   private final JournalLimits limits;
   private final ShutdownCoordinator shutdownCoordinator;
 
@@ -49,7 +49,7 @@ public class DefaultJournal<T> implements Journal<T> {
       JournalSpi journalSpi,
       String key,
       Codec<T> codec,
-      NotifierSpi notifier,
+      Notifier notifier,
       JournalLimits limits,
       ShutdownCoordinator shutdownCoordinator) {
     this.journalSpi = journalSpi;
@@ -68,7 +68,7 @@ public class DefaultJournal<T> implements Journal<T> {
     }
     byte[] bytes = codec.encode(data);
     String entryId = journalSpi.append(key, bytes, ttl);
-    notifier.notify(key, entryId);
+    notifier.notifyJournalChanged(key);
     return entryId;
   }
 
@@ -82,13 +82,13 @@ public class DefaultJournal<T> implements Journal<T> {
               + limits.maxRetentionTtl());
     }
     journalSpi.complete(key, retentionTtl);
-    notifier.notify(key, "__COMPLETED__");
+    notifier.notifyJournalCompleted(key);
   }
 
   @Override
   public void delete() {
     journalSpi.delete(key);
-    notifier.notify(key, "__DELETED__");
+    notifier.notifyJournalDeleted(key);
   }
 
   @Override
@@ -179,7 +179,7 @@ public class DefaultJournal<T> implements Journal<T> {
 
     return FeederSupport.start(
         key,
-        notifier,
+        notifier::subscribeToJournal,
         handoff,
         "substrate-journal-feeder",
         () -> runOneIteration(handoff, checkpoint, preloaded, preload));

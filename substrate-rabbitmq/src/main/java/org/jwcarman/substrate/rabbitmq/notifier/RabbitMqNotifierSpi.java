@@ -15,12 +15,11 @@
  */
 package org.jwcarman.substrate.rabbitmq.notifier;
 
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import org.jwcarman.substrate.core.notifier.NotificationHandler;
+import java.util.function.Consumer;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.notifier.NotifierSubscription;
 import org.springframework.amqp.core.BindingBuilder;
@@ -36,12 +35,10 @@ import org.springframework.context.SmartLifecycle;
 
 public class RabbitMqNotifierSpi implements NotifierSpi, SmartLifecycle {
 
-  private static final String DELIMITER = "|";
-
   private final RabbitTemplate rabbitTemplate;
   private final ConnectionFactory connectionFactory;
   private final String exchangeName;
-  private final List<NotificationHandler> handlers = new CopyOnWriteArrayList<>();
+  private final List<Consumer<byte[]>> handlers = new CopyOnWriteArrayList<>();
 
   private final AtomicBoolean running = new AtomicBoolean(false);
   private final AtomicReference<SimpleMessageListenerContainer> listenerContainer =
@@ -55,13 +52,12 @@ public class RabbitMqNotifierSpi implements NotifierSpi, SmartLifecycle {
   }
 
   @Override
-  public void notify(String key, String payload) {
-    byte[] body = (key + DELIMITER + payload).getBytes(StandardCharsets.UTF_8);
-    rabbitTemplate.send(exchangeName, "", new Message(body));
+  public void notify(byte[] payload) {
+    rabbitTemplate.send(exchangeName, "", new Message(payload));
   }
 
   @Override
-  public NotifierSubscription subscribe(NotificationHandler handler) {
+  public NotifierSubscription subscribe(Consumer<byte[]> handler) {
     handlers.add(handler);
     return () -> handlers.remove(handler);
   }
@@ -103,15 +99,9 @@ public class RabbitMqNotifierSpi implements NotifierSpi, SmartLifecycle {
   }
 
   private void handleMessage(Message message) {
-    String body = new String(message.getBody(), StandardCharsets.UTF_8);
-    int delimiterIndex = body.indexOf(DELIMITER);
-    if (delimiterIndex < 0) {
-      return;
-    }
-    String key = body.substring(0, delimiterIndex);
-    String payload = body.substring(delimiterIndex + 1);
-    for (NotificationHandler handler : handlers) {
-      handler.onNotification(key, payload);
+    byte[] body = message.getBody();
+    for (Consumer<byte[]> handler : handlers) {
+      handler.accept(body);
     }
   }
 }

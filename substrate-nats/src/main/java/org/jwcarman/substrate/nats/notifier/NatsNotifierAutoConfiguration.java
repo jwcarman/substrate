@@ -36,6 +36,6 @@ public class NatsNotifierAutoConfiguration {
   @Bean
   @ConditionalOnMissingBean(NotifierSpi.class)
   public NatsNotifierSpi natsNotifier(Connection connection, NatsProperties properties) {
-    return new NatsNotifierSpi(connection, properties.notifier().subjectPrefix());
+    return new NatsNotifierSpi(connection, properties.notifier().subject());
   }
 }

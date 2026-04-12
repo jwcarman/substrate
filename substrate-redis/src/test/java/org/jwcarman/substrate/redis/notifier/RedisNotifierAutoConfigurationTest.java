@@ -22,7 +22,7 @@ import static org.mockito.Mockito.when;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.sync.RedisCommands;
-import io.lettuce.core.codec.StringCodec;
+import io.lettuce.core.codec.ByteArrayCodec;
 import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
 import io.lettuce.core.pubsub.api.sync.RedisPubSubCommands;
 import org.junit.jupiter.api.Test;
@@ -42,15 +42,15 @@ class RedisNotifierAutoConfigurationTest {
   private static LettuceConnectionFactory createMockConnectionFactory() {
     LettuceConnectionFactory factory = mock(LettuceConnectionFactory.class);
     RedisClient client = mock(RedisClient.class);
-    StatefulRedisConnection<String, String> connection = mock();
-    RedisCommands<String, String> commands = mock();
-    StatefulRedisPubSubConnection<String, String> pubSubConnection = mock();
-    RedisPubSubCommands<String, String> pubSubCommands = mock();
+    StatefulRedisConnection<byte[], byte[]> connection = mock();
+    RedisCommands<byte[], byte[]> commands = mock();
+    StatefulRedisPubSubConnection<byte[], byte[]> pubSubConnection = mock();
+    RedisPubSubCommands<byte[], byte[]> pubSubCommands = mock();
 
     when(factory.getNativeClient()).thenReturn(client);
-    when(client.connect(StringCodec.UTF8)).thenReturn(connection);
+    when(client.connect(ByteArrayCodec.INSTANCE)).thenReturn(connection);
     when(connection.sync()).thenReturn(commands);
-    when(client.connectPubSub(StringCodec.UTF8)).thenReturn(pubSubConnection);
+    when(client.connectPubSub(ByteArrayCodec.INSTANCE)).thenReturn(pubSubConnection);
     when(pubSubConnection.sync()).thenReturn(pubSubCommands);
 
     return factory;

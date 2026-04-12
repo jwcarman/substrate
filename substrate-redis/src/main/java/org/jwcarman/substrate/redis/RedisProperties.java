@@ -29,7 +29,7 @@ public record RedisProperties(
 
   public record MailboxProperties(boolean enabled, String prefix) {}
 
-  public record NotifierProperties(boolean enabled, String channelPrefix) {}
+  public record NotifierProperties(boolean enabled, String channel) {}
 
   public record AtomProperties(boolean enabled, String prefix) {}
 }

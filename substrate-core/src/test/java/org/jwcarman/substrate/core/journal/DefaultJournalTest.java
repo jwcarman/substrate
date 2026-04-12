@@ -32,7 +32,7 @@ import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.SubscriberConfig;
 import org.jwcarman.substrate.Subscription;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
-import org.jwcarman.substrate.core.notifier.NotifierSpi;
+import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.journal.JournalEntry;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -44,7 +44,7 @@ class DefaultJournalTest {
 
   @Mock private JournalSpi spi;
   @Mock private Codec<String> codec;
-  @Mock private NotifierSpi notifier;
+  @Mock private Notifier notifier;
 
   private final ShutdownCoordinator coordinator = new ShutdownCoordinator();
   private DefaultJournal<String> journal;
@@ -57,7 +57,7 @@ class DefaultJournalTest {
     lenient()
         .when(codec.decode(any(byte[].class)))
         .thenAnswer(inv -> new String((byte[]) inv.getArgument(0), UTF_8));
-    lenient().when(notifier.subscribe(any())).thenReturn(() -> {});
+    lenient().when(notifier.subscribeToJournal(anyString(), any())).thenReturn(() -> {});
     journal =
         new DefaultJournal<>(spi, KEY, codec, notifier, JournalLimits.defaults(), coordinator);
   }
@@ -76,7 +76,7 @@ class DefaultJournalTest {
 
     assertEquals("entry-2", id);
     verify(spi).append(KEY, "data".getBytes(UTF_8), ttl);
-    verify(notifier).notify(KEY, "entry-2");
+    verify(notifier).notifyJournalChanged(KEY);
   }
 
   @Test
@@ -91,7 +91,7 @@ class DefaultJournalTest {
     journal.complete(retentionTtl);
 
     verify(spi).complete(KEY, retentionTtl);
-    verify(notifier).notify(KEY, "__COMPLETED__");
+    verify(notifier).notifyJournalCompleted(KEY);
   }
 
   @Test
@@ -105,7 +105,7 @@ class DefaultJournalTest {
     journal.delete();
 
     verify(spi).delete(KEY);
-    verify(notifier).notify(KEY, "__DELETED__");
+    verify(notifier).notifyJournalDeleted(KEY);
   }
 
   @Test

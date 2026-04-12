@@ -27,6 +27,7 @@ import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.jwcarman.codec.jackson.JacksonCodecFactory;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.codec.spi.TypeRef;
@@ -35,10 +36,13 @@ import org.jwcarman.substrate.NextResult;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.memory.mailbox.InMemoryMailboxSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
+import org.jwcarman.substrate.core.notifier.DefaultNotifier;
+import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.mailbox.Mailbox;
 import org.jwcarman.substrate.mailbox.MailboxFactory;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
 class MailboxFactoryTest {
@@ -52,7 +56,9 @@ class MailboxFactoryTest {
   @Test
   void createReturnsBoundMailboxWithPrefixedKey() {
     InMemoryMailboxSpi spi = new InMemoryMailboxSpi();
-    InMemoryNotifier notifier = new InMemoryNotifier();
+    Notifier notifier =
+        new DefaultNotifier(
+            new InMemoryNotifier(), new JacksonCodecFactory(JsonMapper.builder().build()));
     when(codecFactory.create(String.class)).thenReturn(stringCodec);
     MailboxFactory factory =
         new DefaultMailboxFactory(spi, codecFactory, notifier, Duration.ofMinutes(30), coordinator);
@@ -65,7 +71,9 @@ class MailboxFactoryTest {
   @Test
   void createdMailboxDelegatesToSpi() {
     InMemoryMailboxSpi spi = new InMemoryMailboxSpi();
-    InMemoryNotifier notifier = new InMemoryNotifier();
+    Notifier notifier =
+        new DefaultNotifier(
+            new InMemoryNotifier(), new JacksonCodecFactory(JsonMapper.builder().build()));
     when(codecFactory.create(String.class)).thenReturn(stringCodec);
     when(stringCodec.encode(anyString()))
         .thenAnswer(inv -> ((String) inv.getArgument(0)).getBytes(UTF_8));
@@ -86,7 +94,9 @@ class MailboxFactoryTest {
   @Test
   void createWithTypeRefReturnsBoundMailbox() {
     InMemoryMailboxSpi spi = new InMemoryMailboxSpi();
-    InMemoryNotifier notifier = new InMemoryNotifier();
+    Notifier notifier =
+        new DefaultNotifier(
+            new InMemoryNotifier(), new JacksonCodecFactory(JsonMapper.builder().build()));
     TypeRef<List<String>> typeRef = new TypeRef<>() {};
     when(codecFactory.create(typeRef)).thenReturn(listCodec);
     lenient()

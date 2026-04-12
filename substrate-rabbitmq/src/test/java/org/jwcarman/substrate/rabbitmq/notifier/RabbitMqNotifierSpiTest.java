@@ -15,6 +15,7 @@
  */
 package org.jwcarman.substrate.rabbitmq.notifier;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -46,11 +47,13 @@ class RabbitMqNotifierSpiTest {
 
   @Test
   void notifySendsMessageToFanoutExchange() {
-    notifier.notify("my:key", "my-payload");
+    byte[] payload = "my-payload".getBytes(UTF_8);
+
+    notifier.notify(payload);
 
     ArgumentCaptor<Message> messageCaptor = ArgumentCaptor.forClass(Message.class);
     verify(rabbitTemplate).send(eq("substrate-notify"), eq(""), messageCaptor.capture());
-    assertThat(new String(messageCaptor.getValue().getBody())).isEqualTo("my:key|my-payload");
+    assertThat(messageCaptor.getValue().getBody()).isEqualTo(payload);
   }
 
   @Test
@@ -61,11 +64,11 @@ class RabbitMqNotifierSpiTest {
 
   @Test
   void multipleHandlersAreRegistered() {
-    List<String> handler1 = new ArrayList<>();
-    List<String> handler2 = new ArrayList<>();
+    List<byte[]> handler1 = new ArrayList<>();
+    List<byte[]> handler2 = new ArrayList<>();
 
-    notifier.subscribe((key, payload) -> handler1.add(payload));
-    notifier.subscribe((key, payload) -> handler2.add(payload));
+    notifier.subscribe(handler1::add);
+    notifier.subscribe(handler2::add);
 
     assertThat(handler1).isEmpty();
     assertThat(handler2).isEmpty();

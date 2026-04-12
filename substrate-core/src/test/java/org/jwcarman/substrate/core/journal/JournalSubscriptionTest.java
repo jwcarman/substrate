@@ -27,7 +27,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.codec.jackson.JacksonCodecFactory;
 import org.jwcarman.codec.spi.Codec;
+import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.NextResult;
 import org.jwcarman.substrate.SubscriberConfig;
@@ -35,7 +37,10 @@ import org.jwcarman.substrate.Subscription;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.memory.journal.InMemoryJournalSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
+import org.jwcarman.substrate.core.notifier.DefaultNotifier;
+import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.journal.JournalEntry;
+import tools.jackson.databind.json.JsonMapper;
 
 class JournalSubscriptionTest {
 
@@ -52,16 +57,19 @@ class JournalSubscriptionTest {
         }
       };
 
+  private static final CodecFactory CODEC_FACTORY =
+      new JacksonCodecFactory(JsonMapper.builder().build());
+
   private final ShutdownCoordinator coordinator = new ShutdownCoordinator();
   private final JournalLimits limits = JournalLimits.defaults();
   private InMemoryJournalSpi journalSpi;
-  private InMemoryNotifier notifier;
+  private Notifier notifier;
   private DefaultJournal<String> journal;
 
   @BeforeEach
   void setUp() {
     journalSpi = new InMemoryJournalSpi();
-    notifier = new InMemoryNotifier();
+    notifier = new DefaultNotifier(new InMemoryNotifier(), CODEC_FACTORY);
     journalSpi.create("substrate:journal:test", Duration.ofHours(24));
     journal =
         new DefaultJournal<>(

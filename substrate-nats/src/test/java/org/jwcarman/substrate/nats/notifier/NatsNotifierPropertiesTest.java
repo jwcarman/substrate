@@ -31,7 +31,7 @@ class NatsNotifierPropertiesTest {
 
   @Test
   void defaultsAreLoadedFromPropertiesFile() {
-    assertThat(properties.notifier().subjectPrefix()).isEqualTo("substrate:notify:");
+    assertThat(properties.notifier().subject()).isEqualTo("substrate.notifications");
   }
 
   @EnableConfigurationProperties(NatsProperties.class)

@@ -23,7 +23,7 @@ import org.jwcarman.substrate.Subscriber;
 import org.jwcarman.substrate.SubscriberConfig;
 import org.jwcarman.substrate.Subscription;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
-import org.jwcarman.substrate.core.notifier.NotifierSpi;
+import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.core.subscription.CallbackPumpSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultSubscriberBuilder;
@@ -37,14 +37,14 @@ public class DefaultMailbox<T> implements Mailbox<T> {
   private final MailboxSpi mailboxSpi;
   private final String key;
   private final Codec<T> codec;
-  private final NotifierSpi notifier;
+  private final Notifier notifier;
   private final ShutdownCoordinator shutdownCoordinator;
 
   public DefaultMailbox(
       MailboxSpi mailboxSpi,
       String key,
       Codec<T> codec,
-      NotifierSpi notifier,
+      Notifier notifier,
       ShutdownCoordinator shutdownCoordinator) {
     this.mailboxSpi = mailboxSpi;
     this.key = key;
@@ -56,13 +56,13 @@ public class DefaultMailbox<T> implements Mailbox<T> {
   @Override
   public void deliver(T value) {
     mailboxSpi.deliver(key, codec.encode(value));
-    notifier.notify(key, "delivered");
+    notifier.notifyMailboxChanged(key);
   }
 
   @Override
   public void delete() {
     mailboxSpi.delete(key);
-    notifier.notify(key, "__DELETED__");
+    notifier.notifyMailboxDeleted(key);
   }
 
   @Override
@@ -88,7 +88,7 @@ public class DefaultMailbox<T> implements Mailbox<T> {
   private Runnable startFeeder(SingleShotHandoff<T> handoff) {
     return FeederSupport.start(
         key,
-        notifier,
+        notifier::subscribeToMailbox,
         handoff,
         "substrate-mailbox-feeder",
         () -> {

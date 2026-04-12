@@ -23,13 +23,18 @@ import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.codec.jackson.JacksonCodecFactory;
 import org.jwcarman.codec.spi.Codec;
+import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.NextResult;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.memory.journal.InMemoryJournalSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
+import org.jwcarman.substrate.core.notifier.DefaultNotifier;
+import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.journal.JournalEntry;
+import tools.jackson.databind.json.JsonMapper;
 
 class ConsumerEscapeHatchTest {
 
@@ -46,10 +51,13 @@ class ConsumerEscapeHatchTest {
         }
       };
 
+  private static final CodecFactory CODEC_FACTORY =
+      new JacksonCodecFactory(JsonMapper.builder().build());
+
   @Test
   void consumerEscapesAbandonedJournalViaExpired() {
     InMemoryJournalSpi spi = new InMemoryJournalSpi();
-    InMemoryNotifier notifier = new InMemoryNotifier();
+    Notifier notifier = new DefaultNotifier(new InMemoryNotifier(), CODEC_FACTORY);
     String key = spi.journalKey("escape-test");
 
     spi.create(key, Duration.ofMillis(200));

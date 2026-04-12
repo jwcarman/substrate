@@ -19,7 +19,7 @@ import java.time.Duration;
 import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.codec.spi.TypeRef;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
-import org.jwcarman.substrate.core.notifier.NotifierSpi;
+import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.mailbox.Mailbox;
 import org.jwcarman.substrate.mailbox.MailboxFactory;
 
@@ -27,14 +27,14 @@ public class DefaultMailboxFactory implements MailboxFactory {
 
   private final MailboxSpi mailboxSpi;
   private final CodecFactory codecFactory;
-  private final NotifierSpi notifier;
+  private final Notifier notifier;
   private final Duration maxTtl;
   private final ShutdownCoordinator shutdownCoordinator;
 
   public DefaultMailboxFactory(
       MailboxSpi mailboxSpi,
       CodecFactory codecFactory,
-      NotifierSpi notifier,
+      Notifier notifier,
       Duration maxTtl,
       ShutdownCoordinator shutdownCoordinator) {
     this.mailboxSpi = mailboxSpi;

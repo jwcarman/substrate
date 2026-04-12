@@ -15,6 +15,7 @@
  */
 package org.jwcarman.substrate.rabbitmq.notifier;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,91 +62,95 @@ class RabbitMqNotifierSpiIT {
   @Test
   void notifyAndSubscribeRoundTrip() throws Exception {
     CountDownLatch latch = new CountDownLatch(1);
-    List<String> receivedKeys = new CopyOnWriteArrayList<>();
-    List<String> receivedPayloads = new CopyOnWriteArrayList<>();
+    List<byte[]> received = new CopyOnWriteArrayList<>();
 
     notifier.subscribe(
-        (key, payload) -> {
-          receivedKeys.add(key);
-          receivedPayloads.add(payload);
+        payload -> {
+          received.add(payload);
           latch.countDown();
         });
     notifier.start();
 
-    notifier.notify("test:key", "test-payload");
+    byte[] payload = "test-payload".getBytes(UTF_8);
+    notifier.notify(payload);
 
     assertThat(latch.await(5, TimeUnit.SECONDS)).isTrue();
-    assertThat(receivedKeys).containsExactly("test:key");
-    assertThat(receivedPayloads).containsExactly("test-payload");
+    assertThat(received).hasSize(1);
+    assertThat(received.get(0)).isEqualTo(payload);
   }
 
   @Test
   void multipleHandlersAllReceiveNotifications() throws Exception {
     CountDownLatch latch = new CountDownLatch(2);
-    List<String> handler1Received = new CopyOnWriteArrayList<>();
-    List<String> handler2Received = new CopyOnWriteArrayList<>();
+    List<byte[]> handler1Received = new CopyOnWriteArrayList<>();
+    List<byte[]> handler2Received = new CopyOnWriteArrayList<>();
 
     notifier.subscribe(
-        (key, payload) -> {
+        payload -> {
           handler1Received.add(payload);
           latch.countDown();
         });
     notifier.subscribe(
-        (key, payload) -> {
+        payload -> {
           handler2Received.add(payload);
           latch.countDown();
         });
     notifier.start();
 
-    notifier.notify("key", "value");
+    byte[] payload = "value".getBytes(UTF_8);
+    notifier.notify(payload);
 
     assertThat(latch.await(5, TimeUnit.SECONDS)).isTrue();
-    assertThat(handler1Received).containsExactly("value");
-    assertThat(handler2Received).containsExactly("value");
+    assertThat(handler1Received).containsExactly(payload);
+    assertThat(handler2Received).containsExactly(payload);
   }
 
   @Test
   void multipleNotificationsAreDelivered() throws Exception {
     CountDownLatch latch = new CountDownLatch(3);
-    List<String> receivedPayloads = new CopyOnWriteArrayList<>();
+    List<byte[]> received = new CopyOnWriteArrayList<>();
 
     notifier.subscribe(
-        (key, payload) -> {
-          receivedPayloads.add(payload);
+        payload -> {
+          received.add(payload);
           latch.countDown();
         });
     notifier.start();
 
-    notifier.notify("key:1", "payload-1");
-    notifier.notify("key:2", "payload-2");
-    notifier.notify("key:3", "payload-3");
+    byte[] p1 = "payload-1".getBytes(UTF_8);
+    byte[] p2 = "payload-2".getBytes(UTF_8);
+    byte[] p3 = "payload-3".getBytes(UTF_8);
+    notifier.notify(p1);
+    notifier.notify(p2);
+    notifier.notify(p3);
 
     assertThat(latch.await(5, TimeUnit.SECONDS)).isTrue();
-    assertThat(receivedPayloads).containsExactly("payload-1", "payload-2", "payload-3");
+    assertThat(received).containsExactly(p1, p2, p3);
   }
 
   @Test
   void stopPreventsNewNotifications() throws Exception {
     CountDownLatch latch = new CountDownLatch(1);
-    List<String> receivedPayloads = new CopyOnWriteArrayList<>();
+    List<byte[]> received = new CopyOnWriteArrayList<>();
 
     notifier.subscribe(
-        (key, payload) -> {
-          receivedPayloads.add(payload);
+        payload -> {
+          received.add(payload);
           latch.countDown();
         });
     notifier.start();
 
-    notifier.notify("key", "first");
+    byte[] first = "first".getBytes(UTF_8);
+    notifier.notify(first);
     assertThat(latch.await(5, TimeUnit.SECONDS)).isTrue();
 
     notifier.stop();
-    notifier.notify("key", "second");
+    notifier.notify("second".getBytes(UTF_8));
 
     await()
         .during(500, MILLISECONDS)
         .atMost(2, SECONDS)
-        .untilAsserted(() -> assertThat(receivedPayloads).containsExactly("first"));
+        .untilAsserted(() -> assertThat(received).containsExactly(first));
   }
 
   @Test
@@ -155,16 +160,16 @@ class RabbitMqNotifierSpiIT {
         new RabbitMqNotifierSpi(rabbitTemplate2, connectionFactory, "substrate-notify");
 
     CountDownLatch latch = new CountDownLatch(2);
-    List<String> notifier1Received = new CopyOnWriteArrayList<>();
-    List<String> notifier2Received = new CopyOnWriteArrayList<>();
+    List<byte[]> notifier1Received = new CopyOnWriteArrayList<>();
+    List<byte[]> notifier2Received = new CopyOnWriteArrayList<>();
 
     notifier.subscribe(
-        (key, payload) -> {
+        payload -> {
           notifier1Received.add(payload);
           latch.countDown();
         });
     notifier2.subscribe(
-        (key, payload) -> {
+        payload -> {
           notifier2Received.add(payload);
           latch.countDown();
         });
@@ -173,11 +178,12 @@ class RabbitMqNotifierSpiIT {
     notifier2.start();
 
     try {
-      notifier.notify("key", "value");
+      byte[] payload = "value".getBytes(UTF_8);
+      notifier.notify(payload);
 
       assertThat(latch.await(5, TimeUnit.SECONDS)).isTrue();
-      assertThat(notifier1Received).containsExactly("value");
-      assertThat(notifier2Received).containsExactly("value");
+      assertThat(notifier1Received).containsExactly(payload);
+      assertThat(notifier2Received).containsExactly(payload);
     } finally {
       notifier2.stop();
     }
