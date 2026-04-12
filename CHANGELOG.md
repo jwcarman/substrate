@@ -10,6 +10,8 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-04-11
+
 ### Breaking changes
 
 #### Subscriber-based callback API
@@ -52,6 +54,146 @@ atom.subscribe(cfg -> cfg
     .onExpired(() -> reconnect())
     .onError(err -> log.error("boom", err)));
 ```
+
+#### `NotifierSpi` is now byte-oriented (internal SPI)
+
+The notifier backend SPI collapsed from `(String key, String payload)` to
+opaque `byte[]` broadcast. This is an internal SPI change that only affects
+custom `NotifierSpi` implementations — the public `Atom`/`Journal`/`Mailbox`
+subscribe API is unchanged.
+
+```java
+// Before
+public interface NotifierSpi {
+  void notify(String key, String payload);
+  NotifierSubscription subscribe(NotificationHandler handler);
+}
+
+// After
+public interface NotifierSpi {
+  void notify(byte[] payload);
+  NotifierSubscription subscribe(Consumer<byte[]> handler);
+}
+```
+
+Backends become dumb opaque-bytes transports: one channel/topic/subject
+per node, no magic string sentinels, no type awareness. All the routing
+and type discrimination moved up into the new `DefaultNotifier` layer in
+`substrate-core`.
+
+Two backend-config renames came with this: `substrate.redis.channelPrefix`
+→ `substrate.redis.channel`, and `substrate.nats.subjectPrefix` →
+`substrate.nats.subject`. Both now hold a single channel/subject name
+instead of a prefix for fan-out.
+
+### Added
+
+#### Graceful shutdown coordinator
+
+New `ShutdownCoordinator` bean registered as a Spring `SmartLifecycle` at
+phase `Integer.MAX_VALUE`. It runs **before** the web server's graceful
+shutdown phase and cancels every active substrate subscription, releasing
+the feeder threads that back them. This fixes a 30-second hang at
+`ApplicationContext` close when an SSE-style application holds long-lived
+substrate subscriptions — Tomcat's graceful shutdown was waiting for
+in-flight async requests whose `SseEmitter`s were parked inside
+`BlockingSubscription.next(...)`.
+
+Subscriptions auto-register on construction and unregister on cancel or
+terminal state. Late registration after `stop()` cancels immediately.
+Fan-out cancellation runs one virtual thread per subscription joined with
+a bounded 5-second deadline.
+
+#### New `NextResult.Cancelled<T>` variant
+
+A new sealed variant on `NextResult<T>` distinct from `Completed` /
+`Expired` / `Deleted`. Fires when the **local subscription** was torn
+down via `cancel()` or the shutdown coordinator — the underlying
+primitive is unaffected and other subscribers on other nodes keep
+working. Clients that observe `Cancelled` should typically treat it as
+"reconnect and resume" rather than "the data source is done."
+
+This is a **breaking change** for exhaustive switch expressions over
+`NextResult<T>` — add a `case NextResult.Cancelled<T> ignored -> ...`
+branch.
+
+#### Typed notifier routing layer (`DefaultNotifier`)
+
+A new typed `Notifier` interface and `DefaultNotifier` implementation in
+`substrate-core` replace direct `NotifierSpi` usage everywhere inside
+core. Notifications are now delivered as a sealed `Notification`
+hierarchy (`Changed` / `Completed` / `Deleted`), and `DefaultNotifier`
+owns a per-`(PrimitiveType, key)` routing map that only delivers events
+to the handlers that asked for them. No more client-side key filtering
+in `FeederSupport`, no more magic `"__DELETED__"` / `"__COMPLETED__"`
+sentinel strings on the wire.
+
+The `Notifier` interface has seven typed producer methods and three
+typed consumer methods:
+
+```java
+void notifyAtomChanged(String key);
+void notifyAtomDeleted(String key);
+void notifyJournalChanged(String key);
+void notifyJournalCompleted(String key);
+void notifyJournalDeleted(String key);
+void notifyMailboxChanged(String key);
+void notifyMailboxDeleted(String key);
+
+NotifierSubscription subscribeToAtom(String key, Consumer<Notification> handler);
+NotifierSubscription subscribeToJournal(String key, Consumer<Notification> handler);
+NotifierSubscription subscribeToMailbox(String key, Consumer<Notification> handler);
+```
+
+`PrimitiveType` and `EventType` enums are package-private to the notifier
+package — they're serialization implementation details that never appear
+in public signatures.
+
+### Changed
+
+- **`DefaultCallbackSubscription` removed, replaced by
+  `CallbackPumpSubscription`.** The push-style subscriber is now a thin
+  wrapper around a `BlockingSubscription`: a dedicated virtual thread
+  pumps values from the blocking source and dispatches each `NextResult`
+  to the appropriate `Subscriber<T>` method. The pump loop is a
+  `static` method that takes `(source, subscriber)` as locals, which
+  means the `Thread.ofVirtual().start(...)` lambda captures locals
+  instead of `this` — no `this`-escape from the constructor.
+- **`DefaultJournal` / `DefaultJournalFactory` now take a `JournalLimits`
+  record** bundling `(subscriptionQueueCapacity, maxInactivityTtl,
+  maxEntryTtl, maxRetentionTtl)`. Dropped both constructors from 8
+  parameters to 5.
+- **`FeederSupport.start(...)` takes a `BiFunction<String,
+  Consumer<Notification>, NotifierSubscription>` subscribe binding**
+  instead of a `NotifierSpi` + type. Each primitive passes its own
+  `notifier::subscribeToAtom` / `subscribeToJournal` / `subscribeToMailbox`
+  method reference. The feeder never needs to mention `PrimitiveType`.
+
+### Fixed
+
+- **Spring context shutdown no longer hangs** when the application holds
+  active substrate subscriptions (see ShutdownCoordinator above).
+- **`NotifierSpi.markCancelled()` idempotency** fix in
+  `BlockingBoundedHandoff` — the second call no longer tries to add a
+  second `Cancelled` marker to the handoff queue.
+- **`BlockingSubscription` default `close()`** now has test coverage
+  demonstrating the `try-with-resources` → `cancel()` delegation in
+  `substrate-api`.
+
+### Internal
+
+- Removed seven test-only "convenience constructors" from `DefaultAtom`,
+  `DefaultJournal`, `DefaultMailbox`, their factories, and
+  `DefaultBlockingSubscription`. They existed only to let tests skip
+  passing a `ShutdownCoordinator`. Tests now declare a `private final
+  ShutdownCoordinator coordinator = new ShutdownCoordinator()` field
+  and pass it explicitly.
+- Full Sonar pass: 1 bug and 29 code smells cleared, three new-code
+  coverage gaps closed. Quality gate back to green.
+- Dead `substrate.journal.max-ttl=7d` key removed from
+  `substrate-defaults.properties` (the schema split into
+  `max-inactivity-ttl` / `max-entry-ttl` / `max-retention-ttl` long ago;
+  the defaults file never caught up).
 
 ## [0.2.1] - 2026-04-11
 
@@ -289,5 +431,7 @@ abstractions:
 
 - **BOM** (`substrate-bom`) for version alignment across all modules
 
+[0.3.0]: https://github.com/jwcarman/substrate/releases/tag/0.3.0
+[0.2.1]: https://github.com/jwcarman/substrate/releases/tag/0.2.1
 [0.2.0]: https://github.com/jwcarman/substrate/releases/tag/0.2.0
 [0.1.0]: https://github.com/jwcarman/substrate/releases/tag/0.1.0
