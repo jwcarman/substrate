@@ -17,6 +17,18 @@ currently says `X.Y.Z-SNAPSHOT`.
 1. **Verify main is green** — `./mvnw verify` passes, `spotless:check`
    passes, all commits pushed.
 
+   **Also run the release-profile javadoc build explicitly:**
+   ```
+   ./mvnw -P release javadoc:jar -DskipTests
+   ```
+   The `release` profile's `maven-javadoc-plugin` has `failOnError=true`
+   by default, which means doclint errors (out-of-sequence headings
+   like `<h3>` under an implicit `<h1>`, missing `@param` / `@return`
+   on public methods, missing class doc comments, etc.) will fail the
+   Maven Central publish workflow. These errors do **not** show up in
+   a plain `./mvnw verify` — they only surface in the release profile.
+   Catch them locally before cutting the tag.
+
 2. **Update `CHANGELOG.md`:**
    - Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` (use today's
      date in ISO format).
