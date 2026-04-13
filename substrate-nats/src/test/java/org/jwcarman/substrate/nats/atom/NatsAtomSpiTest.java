@@ -18,7 +18,6 @@ package org.jwcarman.substrate.nats.atom;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -179,7 +178,7 @@ class NatsAtomSpiTest {
   }
 
   @Test
-  void setUpdatesWithRevision() throws Exception {
+  void setPutsNewValue() throws Exception {
     wireConnectionForConstruction();
     var kv = mockKeyValue();
     byte[] payload = NatsAtomSpi.encode("old".getBytes(StandardCharsets.UTF_8), "tok1");
@@ -195,7 +194,7 @@ class NatsAtomSpiTest {
             Duration.ofMinutes(5));
 
     assertThat(result).isTrue();
-    verify(kv).update(anyString(), any(byte[].class), anyLong());
+    verify(kv).put(anyString(), any(byte[].class));
   }
 
   @Test
@@ -215,23 +214,21 @@ class NatsAtomSpiTest {
   }
 
   @Test
-  void setReturnsFalseOnRevisionConflict() throws Exception {
+  void setThrowsIllegalStateOnApiError() throws Exception {
     wireConnectionForConstruction();
-    JetStreamApiException apiException = mockApiException(10071);
+    JetStreamApiException apiException = mockApiException(500);
     var kv = mockKeyValue();
     byte[] payload = NatsAtomSpi.encode("old".getBytes(StandardCharsets.UTF_8), "tok1");
     KeyValueEntry entry = mockEntry(payload, KeyValueOperation.PUT, 5L);
     when(kv.get(anyString())).thenReturn(entry);
-    when(kv.update(anyString(), any(byte[].class), anyLong())).thenThrow(apiException);
+    when(kv.put(anyString(), any(byte[].class))).thenThrow(apiException);
 
     NatsAtomSpi atom = createAtom();
-    assertThat(
-            atom.set(
-                "substrate:atom:test",
-                "new".getBytes(StandardCharsets.UTF_8),
-                "tok2",
-                Duration.ofMinutes(5)))
-        .isFalse();
+    byte[] value = "new".getBytes(StandardCharsets.UTF_8);
+    Duration ttl = Duration.ofMinutes(5);
+    assertThatThrownBy(() -> atom.set("substrate:atom:test", value, "tok2", ttl))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Failed to set atom in NATS KV");
   }
 
   @Test
@@ -241,8 +238,7 @@ class NatsAtomSpiTest {
     byte[] payload = NatsAtomSpi.encode("old".getBytes(StandardCharsets.UTF_8), "tok1");
     KeyValueEntry entry = mockEntry(payload, KeyValueOperation.PUT, 5L);
     when(kv.get(anyString())).thenReturn(entry);
-    when(kv.update(anyString(), any(byte[].class), anyLong()))
-        .thenThrow(new IOException("write failed"));
+    when(kv.put(anyString(), any(byte[].class))).thenThrow(new IOException("write failed"));
 
     NatsAtomSpi atom = createAtom();
     byte[] value = "new".getBytes(StandardCharsets.UTF_8);
@@ -262,7 +258,7 @@ class NatsAtomSpiTest {
 
     NatsAtomSpi atom = createAtom();
     assertThat(atom.touch("substrate:atom:test", Duration.ofMinutes(10))).isTrue();
-    verify(kv).update(anyString(), any(byte[].class), anyLong());
+    verify(kv).put(anyString(), any(byte[].class));
   }
 
   @Test
@@ -276,17 +272,20 @@ class NatsAtomSpiTest {
   }
 
   @Test
-  void touchReturnsFalseOnRevisionConflict() throws Exception {
+  void touchThrowsIllegalStateOnApiError() throws Exception {
     wireConnectionForConstruction();
-    JetStreamApiException apiException = mockApiException(10071);
+    JetStreamApiException apiException = mockApiException(500);
     var kv = mockKeyValue();
     byte[] payload = NatsAtomSpi.encode("hello".getBytes(StandardCharsets.UTF_8), "tok1");
     KeyValueEntry entry = mockEntry(payload, KeyValueOperation.PUT, 3L);
     when(kv.get(anyString())).thenReturn(entry);
-    when(kv.update(anyString(), any(byte[].class), anyLong())).thenThrow(apiException);
+    when(kv.put(anyString(), any(byte[].class))).thenThrow(apiException);
 
     NatsAtomSpi atom = createAtom();
-    assertThat(atom.touch("substrate:atom:test", Duration.ofMinutes(10))).isFalse();
+    Duration ttl = Duration.ofMinutes(10);
+    assertThatThrownBy(() -> atom.touch("substrate:atom:test", ttl))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Failed to touch atom in NATS KV");
   }
 
   @Test
@@ -296,8 +295,7 @@ class NatsAtomSpiTest {
     byte[] payload = NatsAtomSpi.encode("hello".getBytes(StandardCharsets.UTF_8), "tok1");
     KeyValueEntry entry = mockEntry(payload, KeyValueOperation.PUT, 3L);
     when(kv.get(anyString())).thenReturn(entry);
-    when(kv.update(anyString(), any(byte[].class), anyLong()))
-        .thenThrow(new IOException("write failed"));
+    when(kv.put(anyString(), any(byte[].class))).thenThrow(new IOException("write failed"));
 
     NatsAtomSpi atom = createAtom();
     Duration ttl = Duration.ofMinutes(10);
