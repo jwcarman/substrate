@@ -421,6 +421,12 @@ Consumer Code
 Atom<T> / Journal<T> / Mailbox<T>      <-- Typed, key-bound, blocking API
      |        |        |
      v        v        v
+       [Codec]                          <-- value <-> byte[] (your schema)
+          |
+          v
+  [PayloadTransformer]                  <-- byte[] <-> byte[] (encryption, etc.)
+          |
+          v
 AtomSpi / JournalSpi / MailboxSpi      <-- Pure storage (byte[]-based)
      |
      v
@@ -430,6 +436,10 @@ AtomSpi / JournalSpi / MailboxSpi      <-- Pure storage (byte[]-based)
 - **Primitives** are typed, key-bound, blocking APIs designed for virtual
   threads. They handle serialization (via Codec), subscription orchestration,
   and TTL management.
+- **`PayloadTransformer`** is an optional SPI that rewrites the byte stream
+  on its way to and from the backend — encryption-at-rest, compression,
+  integrity signing, whatever. Defaults to pass-through (`IDENTITY`). The
+  primitives always apply it; it's a no-op unless you wire in a real one.
 - **SPIs** are pure storage — read/write bytes, no threading, no callbacks.
 - **Backends** are independently deployable. Internally, each backend module
   also supplies a `NotifierSpi` that the primitives use to wake subscribers
@@ -464,19 +474,9 @@ module per backend, not per primitive.
 ## Encryption at Rest
 
 Add `substrate-crypto` for transparent AES-GCM encryption of all payload
-bytes stored by Atom, Journal, and Mailbox primitives.
-
-**Quick start** — set a single property:
-
-```yaml
-substrate:
-  crypto:
-    shared-key: "base64-encoded-AES-key"   # 16 bytes (AES-128) or 32 bytes (AES-256)
-```
-
-**Production** — provide your own `SecretKeyResolver` bean backed by a KMS,
-Vault, or keystore for key rotation. The resolver serves historical kids so
-old ciphertext remains readable while new writes use the current key.
+bytes stored by Atom, Journal, and Mailbox primitives. Encryption happens
+in-process before the bytes reach any backend, so backends store opaque
+ciphertext and never see plaintext.
 
 ```xml
 <dependency>
@@ -484,6 +484,77 @@ old ciphertext remains readable while new writes use the current key.
     <artifactId>substrate-crypto</artifactId>
 </dependency>
 ```
+
+### Quick start — shared key
+
+For simple deployments where a single key is enough (no rotation), set one
+property:
+
+```yaml
+substrate:
+  crypto:
+    shared-key: "${SUBSTRATE_CRYPTO_KEY}"   # base64-encoded, 16 or 32 raw bytes
+```
+
+Every stored payload is now AES-GCM encrypted. You get AES-128 if the key
+decodes to 16 bytes, AES-256 if it decodes to 32.
+
+### Production — `SecretKeyResolver` with key rotation
+
+For deployments that need key rotation, register your own `SecretKeyResolver`
+bean. The resolver's `currentKid()` tells the transformer which key to use
+for new encryptions; `lookup(kid)` is called to decrypt existing ciphertext
+under whichever kid is embedded in its prefix.
+
+```java
+@Bean
+public SecretKeyResolver kmsSecretKeyResolver(KmsClient kms) {
+  // A resolver that caches key material from AWS KMS, Vault, or a keystore.
+  // Must be thread-safe. lookup() is called on the read hot path — cache!
+  return new CachingKmsKeyResolver(kms);
+}
+```
+
+Rotation story:
+
+1. Add a new key to your keyring / KMS (e.g., kid 8).
+2. Bump `currentKid()` to 8 — new writes encrypt under the new key.
+3. Old reads still work because the resolver can still return kid 7 when
+   asked. Existing ciphertext stays readable.
+4. **Never retire a kid that still appears in storage.** The wire format
+   embeds the kid in the first 4 bytes of every ciphertext. Removing a kid
+   from the resolver makes every blob encrypted under it permanently
+   unreadable.
+
+### Wire format
+
+```
+[ kid (4 bytes) | nonce (12 bytes) | ciphertext + GCM tag ]
+```
+
+Shared-key mode uses kid 0 (overridable via `substrate.crypto.shared-kid`).
+Resolver mode uses whatever kid the resolver returns from `currentKid()`.
+The format is identical in both cases — switching from shared-key to
+resolver-based mode is just a configuration change; old ciphertext stays
+readable as long as the resolver can serve kid 0.
+
+### Need a different algorithm?
+
+`substrate-crypto` ships AES-GCM only. If you need ChaCha20-Poly1305,
+AES-GCM-SIV, a FIPS-certified provider, compression, integrity signing,
+or anything else, implement `PayloadTransformer` directly and register it
+as a bean. Your transformer wins over the autoconfig via
+`@ConditionalOnMissingBean`. The interface is just two methods:
+
+```java
+public interface PayloadTransformer {
+  byte[] encode(byte[] plaintext);
+  byte[] decode(byte[] ciphertext);
+}
+```
+
+You don't need `substrate-crypto` on the classpath for this — the
+`PayloadTransformer` SPI lives in `substrate-core`.
 
 ## Configuration
 
