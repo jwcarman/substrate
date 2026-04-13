@@ -29,7 +29,12 @@ public record NatsProperties(
       boolean enabled, String prefix, String bucketName, Duration defaultTtl) {}
 
   public record JournalProperties(
-      boolean enabled, String prefix, String streamName, Duration maxAge, long maxMessages) {}
+      boolean enabled,
+      String prefix,
+      String streamName,
+      Duration maxAge,
+      long maxMessages,
+      Duration fetchTimeout) {}
 
   public record MailboxProperties(
       boolean enabled, String prefix, String bucketName, Duration defaultTtl) {}

@@ -33,7 +33,12 @@ class NatsJournalSpiIT extends AbstractNatsIT {
   void setUp() {
     journal =
         new NatsJournalSpi(
-            connection, "substrate:journal:", "substrate-journal", Duration.ofHours(1), 100000);
+            connection,
+            "substrate:journal:",
+            "substrate-journal",
+            Duration.ofHours(1),
+            100000,
+            Duration.ofMillis(50));
   }
 
   @Test

@@ -45,19 +45,25 @@ import org.jwcarman.substrate.core.journal.RawJournalEntry;
 public class NatsJournalSpi extends AbstractJournalSpi {
 
   private static final String SUBJECT_PREFIX = "substrate.journal.";
-  private static final Duration FETCH_TIMEOUT = Duration.ofMillis(500);
   private static final String COMPLETED_BUCKET = "substrate-journal-completed";
 
   private final JetStream jetStream;
   private final JetStreamManagement jsm;
   private final Connection connection;
   private final String streamName;
+  private final Duration fetchTimeout;
 
   public NatsJournalSpi(
-      Connection connection, String prefix, String streamName, Duration maxAge, long maxMessages) {
+      Connection connection,
+      String prefix,
+      String streamName,
+      Duration maxAge,
+      long maxMessages,
+      Duration fetchTimeout) {
     super(prefix);
     this.connection = connection;
     this.streamName = streamName;
+    this.fetchTimeout = fetchTimeout;
     try {
       this.jetStream = connection.jetStream();
       this.jsm = connection.jetStreamManagement();
@@ -222,7 +228,7 @@ public class NatsJournalSpi extends AbstractJournalSpi {
 
       List<RawJournalEntry> entries = new ArrayList<>();
       try {
-        List<Message> batch = sub.fetch(1000, FETCH_TIMEOUT);
+        List<Message> batch = sub.fetch(1000, fetchTimeout);
         for (Message msg : batch) {
           entries.add(toJournalEntry(msg, key));
         }
@@ -250,7 +256,7 @@ public class NatsJournalSpi extends AbstractJournalSpi {
 
     List<RawJournalEntry> entries = new ArrayList<>();
     try {
-      List<Message> batch = sub.fetch(1000, FETCH_TIMEOUT);
+      List<Message> batch = sub.fetch(1000, fetchTimeout);
       for (Message msg : batch) {
         entries.add(toJournalEntry(msg, key));
       }

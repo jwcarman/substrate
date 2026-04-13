@@ -337,7 +337,12 @@ class NatsJournalSpiTest {
 
   private NatsJournalSpi createJournal() {
     return new NatsJournalSpi(
-        connection, "substrate:journal:", "substrate-journal", Duration.ofHours(24), 100000);
+        connection,
+        "substrate:journal:",
+        "substrate-journal",
+        Duration.ofHours(24),
+        100000,
+        Duration.ofMillis(50));
   }
 
   private JetStreamApiException mockApiException(int apiErrorCode) {
