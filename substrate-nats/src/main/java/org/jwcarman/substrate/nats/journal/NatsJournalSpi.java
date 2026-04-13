@@ -231,10 +231,13 @@ public class NatsJournalSpi extends AbstractJournalSpi {
 
       List<RawJournalEntry> entries = new ArrayList<>();
       try {
-        List<Message> batch = sub.fetch(tailBatchSize, fetchTimeout);
-        for (Message msg : batch) {
-          entries.add(toJournalEntry(msg, key));
-        }
+        List<Message> batch;
+        do {
+          batch = sub.fetch(tailBatchSize, fetchTimeout);
+          for (Message msg : batch) {
+            entries.add(toJournalEntry(msg, key));
+          }
+        } while (batch.size() == tailBatchSize);
       } finally {
         sub.unsubscribe();
       }
