@@ -414,24 +414,9 @@ substrate API.
 
 ## Architecture
 
-```
-Consumer Code
-     |
-     v
-Atom<T> / Journal<T> / Mailbox<T>      <-- Typed, key-bound, blocking API
-     |        |        |
-     v        v        v
-       [Codec]                          <-- value <-> byte[] (your schema)
-          |
-          v
-  [PayloadTransformer]                  <-- byte[] <-> byte[] (encryption, etc.)
-          |
-          v
-AtomSpi / JournalSpi / MailboxSpi      <-- Pure storage (byte[]-based)
-     |
-     v
- Backend Module                         <-- Redis, PostgreSQL, NATS, etc.
-```
+<p align="center">
+  <img alt="Substrate architecture: Application → Atom/Journal/Mailbox → Codec → PayloadTransformer → AtomSpi/JournalSpi/MailboxSpi → Backend Module" src="docs/architecture.svg" width="760">
+</p>
 
 - **Primitives** are typed, key-bound, blocking APIs designed for virtual
   threads. They handle serialization (via Codec), subscription orchestration,

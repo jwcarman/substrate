@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 720" role="img" aria-labelledby="title desc">
+  <title id="title">Substrate architecture</title>
+  <desc id="desc">Diagram showing the layering from user application through typed primitives, Codec, PayloadTransformer, storage SPIs, and backend modules.</desc>
+
+  <style>
+    .bg      { fill: #ffffff; }
+    .app     { fill: #FFE474; stroke: #360D2D; stroke-width: 2; }
+    .box     { fill: #ffffff; stroke: #360D2D; stroke-width: 2; }
+    .layer   { fill: #F3E9F0; stroke: #360D2D; stroke-width: 2; }
+    .spi     { fill: #D9AFD0; stroke: #360D2D; stroke-width: 2; }
+    .backend { fill: #C793BC; stroke: #360D2D; stroke-width: 2; }
+    .note    { fill: transparent; stroke: #7C6A76; stroke-width: 1; stroke-dasharray: 4 3; }
+    .label       { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; font-size: 15px; font-weight: 600; fill: #360D2D; }
+    .label-small { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; font-size: 12px; fill: #5C4356; }
+    .label-tag   { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; font-size: 11px; font-style: italic; fill: #7C6A76; }
+    .arrow       { stroke: #360D2D; stroke-width: 1.8; fill: none; }
+    .arrowhead   { fill: #360D2D; }
+
+    @media (prefers-color-scheme: dark) {
+      .bg      { fill: #0D1117; }
+      .app     { fill: #3D2F1A; stroke: #FFCD00; }
+      .box     { fill: #161B22; stroke: #D9AFD0; }
+      .layer   { fill: #1F1A22; stroke: #D9AFD0; }
+      .spi     { fill: #2D1F2A; stroke: #D9AFD0; }
+      .backend { fill: #3D2A38; stroke: #D9AFD0; }
+      .note    { stroke: #8B949E; }
+      .label       { fill: #F0E6EC; }
+      .label-small { fill: #C9D1D9; }
+      .label-tag   { fill: #8B949E; }
+      .arrow       { stroke: #D9AFD0; }
+      .arrowhead   { fill: #D9AFD0; }
+    }
+  </style>
+
+  <rect class="bg" width="820" height="720"/>
+
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 8 5 L 0 10 z" class="arrowhead"/>
+    </marker>
+  </defs>
+
+  <!-- Layer 1: Your Application -->
+  <rect class="app" x="180" y="30" width="460" height="50" rx="8"/>
+  <text class="label" x="410" y="60" text-anchor="middle">Your Application</text>
+
+  <!-- Arrow 1 -->
+  <path class="arrow" d="M 410 80 L 410 110" marker-end="url(#arrowhead)"/>
+
+  <!-- Layer 2: Primitives (3 boxes) -->
+  <rect class="box" x="120" y="120" width="180" height="60" rx="6"/>
+  <text class="label"       x="210" y="145" text-anchor="middle">Atom&lt;T&gt;</text>
+  <text class="label-small" x="210" y="165" text-anchor="middle">distributed AtomicReference</text>
+
+  <rect class="box" x="320" y="120" width="180" height="60" rx="6"/>
+  <text class="label"       x="410" y="145" text-anchor="middle">Journal&lt;T&gt;</text>
+  <text class="label-small" x="410" y="165" text-anchor="middle">append-only stream</text>
+
+  <rect class="box" x="520" y="120" width="180" height="60" rx="6"/>
+  <text class="label"       x="610" y="145" text-anchor="middle">Mailbox&lt;T&gt;</text>
+  <text class="label-small" x="610" y="165" text-anchor="middle">single-shot delivery</text>
+
+  <text class="label-tag" x="760" y="155" text-anchor="start">Typed API</text>
+
+  <!-- Arrows from primitives to codec -->
+  <path class="arrow" d="M 210 180 L 210 210 L 410 210 L 410 235" marker-end="url(#arrowhead)"/>
+  <path class="arrow" d="M 410 180 L 410 235" marker-end="url(#arrowhead)"/>
+  <path class="arrow" d="M 610 180 L 610 210 L 410 210 L 410 235" marker-end="url(#arrowhead)"/>
+
+  <!-- Layer 3: Codec -->
+  <rect class="layer" x="260" y="245" width="300" height="55" rx="6"/>
+  <text class="label"       x="410" y="270" text-anchor="middle">Codec&lt;T&gt;</text>
+  <text class="label-small" x="410" y="290" text-anchor="middle">value ⇄ byte[]   (your schema)</text>
+
+  <!-- Arrow 2 -->
+  <path class="arrow" d="M 410 300 L 410 335" marker-end="url(#arrowhead)"/>
+
+  <!-- Layer 4: PayloadTransformer -->
+  <rect class="layer" x="220" y="345" width="380" height="65" rx="6"/>
+  <text class="label"       x="410" y="370" text-anchor="middle">PayloadTransformer</text>
+  <text class="label-small" x="410" y="390" text-anchor="middle">byte[] ⇄ byte[]   (encryption, compression, ...)</text>
+  <text class="label-tag"   x="410" y="404" text-anchor="middle">defaults to IDENTITY pass-through</text>
+
+  <text class="label-tag" x="760" y="380" text-anchor="start">SPI hook</text>
+
+  <!-- Arrow 3 -->
+  <path class="arrow" d="M 410 410 L 410 445" marker-end="url(#arrowhead)"/>
+
+  <!-- Layer 5: SPIs (3 boxes) -->
+  <rect class="spi" x="120" y="455" width="180" height="55" rx="6"/>
+  <text class="label"       x="210" y="478" text-anchor="middle">AtomSpi</text>
+  <text class="label-small" x="210" y="497" text-anchor="middle">opaque byte[] storage</text>
+
+  <rect class="spi" x="320" y="455" width="180" height="55" rx="6"/>
+  <text class="label"       x="410" y="478" text-anchor="middle">JournalSpi</text>
+  <text class="label-small" x="410" y="497" text-anchor="middle">opaque byte[] storage</text>
+
+  <rect class="spi" x="520" y="455" width="180" height="55" rx="6"/>
+  <text class="label"       x="610" y="478" text-anchor="middle">MailboxSpi</text>
+  <text class="label-small" x="610" y="497" text-anchor="middle">opaque byte[] storage</text>
+
+  <text class="label-tag" x="760" y="485" text-anchor="start">Storage SPI</text>
+
+  <!-- Arrow 4 -->
+  <path class="arrow" d="M 210 510 L 210 540 L 410 540 L 410 565" marker-end="url(#arrowhead)"/>
+  <path class="arrow" d="M 410 510 L 410 565" marker-end="url(#arrowhead)"/>
+  <path class="arrow" d="M 610 510 L 610 540 L 410 540 L 410 565" marker-end="url(#arrowhead)"/>
+
+  <!-- Layer 6: Backend -->
+  <rect class="backend" x="180" y="575" width="460" height="100" rx="8"/>
+  <text class="label"       x="410" y="600" text-anchor="middle">Backend Module</text>
+  <text class="label-small" x="410" y="625" text-anchor="middle">Redis  ·  PostgreSQL  ·  NATS  ·  MongoDB</text>
+  <text class="label-small" x="410" y="645" text-anchor="middle">DynamoDB  ·  Cassandra  ·  Hazelcast  ·  RabbitMQ  ·  SNS</text>
+  <text class="label-tag"   x="410" y="663" text-anchor="middle">+ cross-node wake-up via NotifierSpi</text>
+
+  <!-- Optional: hint about substrate-crypto -->
+  <rect class="note" x="610" y="345" width="180" height="65" rx="4"/>
+  <text class="label-small" x="700" y="370" text-anchor="middle">substrate-crypto</text>
+  <text class="label-tag"   x="700" y="387" text-anchor="middle">AES-GCM impl of</text>
+  <text class="label-tag"   x="700" y="402" text-anchor="middle">PayloadTransformer</text>
+
+  <line x1="605" y1="378" x2="615" y2="378" class="arrow" stroke-dasharray="0"/>
+</svg>

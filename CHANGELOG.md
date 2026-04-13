@@ -12,10 +12,36 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ### Added
 
-- `substrate-crypto` module — optional AES-GCM encryption-at-rest via the
-  `PayloadTransformer` SPI. Set `substrate.crypto.shared-key` to a base64 AES
-  key for zero-code encryption, or provide a custom `SecretKeyResolver` bean
-  for key rotation backed by KMS / Vault / keystore.
+- **`PayloadTransformer` SPI** in `substrate-core` — a hook that sits between
+  the `Codec` and the backend `*Spi` on every primitive's read/write path.
+  Identity pass-through is the default (zero behavior change for existing
+  users); users who register a `@Bean PayloadTransformer` can rewrite the
+  raw byte stream on its way to and from storage. Primary intended use is
+  encryption-at-rest; secondary uses include compression, integrity signing,
+  and custom framing. Staleness tokens are still computed from plaintext, so
+  non-deterministic transformers (e.g. AES-GCM with a random nonce) do not
+  break change detection.
+- **`substrate-crypto` module** — optional AES-GCM encryption-at-rest built
+  on the `PayloadTransformer` SPI. Set `substrate.crypto.shared-key` to a
+  base64 AES key for zero-code encryption, or register a custom
+  `SecretKeyResolver` bean for key rotation backed by KMS / Vault / keystore.
+  Wire format is `[kid(4) | nonce(12) | ciphertext+tag]`, so rotation is
+  supported from day one — old ciphertext stays readable as long as the
+  resolver can serve historical kids. AES-GCM is the only algorithm shipped
+  by this module; anyone needing ChaCha20-Poly1305, AES-GCM-SIV, or anything
+  else can write their own `PayloadTransformer` implementation and register
+  it directly.
+
+### Changed
+
+- **Atom staleness token truncated to 128 bits.** `Snapshot<T>.token()` now
+  returns a 22-character Base64URL string (first 128 bits of SHA-256) instead
+  of the full 43-character 256-bit digest. Truncation preserves cryptographic
+  distribution across the retained bits; 128-bit pairwise collision odds are
+  ~1 in 3.4 × 10³⁸, which is essentially never for atom change-detection and
+  CAS semantics. The `token()` return value is opaque to callers, so code that
+  compared tokens for equality (the only supported operation) keeps working
+  without changes.
 
 ## [0.3.0] - 2026-04-11
 
