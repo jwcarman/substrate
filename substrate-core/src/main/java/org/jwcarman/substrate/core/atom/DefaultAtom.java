@@ -18,6 +18,7 @@ package org.jwcarman.substrate.core.atom;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -167,10 +168,20 @@ public class DefaultAtom<T> implements Atom<T> {
         });
   }
 
+  private static final int TOKEN_BYTES = 16;
+
+  /**
+   * Hashes the encoded atom value into a compact staleness token for change detection. Uses the
+   * first 128 bits of SHA-256 — plenty for pairwise collision resistance when comparing "last
+   * observed value" against "current value," and the truncation halves the token length over the
+   * full digest (22 chars of Base64URL instead of 43).
+   */
   static String token(byte[] encodedBytes) {
     try {
       byte[] digest = MessageDigest.getInstance("SHA-256").digest(encodedBytes);
-      return Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
+      return Base64.getUrlEncoder()
+          .withoutPadding()
+          .encodeToString(Arrays.copyOf(digest, TOKEN_BYTES));
     } catch (NoSuchAlgorithmException e) {
       throw new IllegalStateException("SHA-256 unavailable", e);
     }

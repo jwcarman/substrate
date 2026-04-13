@@ -22,6 +22,7 @@ import static org.awaitility.Awaitility.await;
 
 import java.security.MessageDigest;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -426,13 +427,12 @@ class DefaultAtomTest {
   @Test
   void tokenIsContentDerived() throws Exception {
     byte[] bytes = "hello".getBytes(UTF_8);
+    byte[] digest = MessageDigest.getInstance("SHA-256").digest(bytes);
     String expected =
-        Base64.getUrlEncoder()
-            .withoutPadding()
-            .encodeToString(MessageDigest.getInstance("SHA-256").digest(bytes));
+        Base64.getUrlEncoder().withoutPadding().encodeToString(Arrays.copyOf(digest, 16));
 
     assertThat(DefaultAtom.token(bytes)).isEqualTo(expected);
-    assertThat(expected).hasSize(43);
+    assertThat(expected).hasSize(22);
   }
 
   @Test
