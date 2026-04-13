@@ -52,6 +52,7 @@ public class NatsJournalSpi extends AbstractJournalSpi {
   private final Connection connection;
   private final String streamName;
   private final Duration fetchTimeout;
+  private final int tailBatchSize;
 
   public NatsJournalSpi(
       Connection connection,
@@ -59,11 +60,13 @@ public class NatsJournalSpi extends AbstractJournalSpi {
       String streamName,
       Duration maxAge,
       long maxMessages,
-      Duration fetchTimeout) {
+      Duration fetchTimeout,
+      int tailBatchSize) {
     super(prefix);
     this.connection = connection;
     this.streamName = streamName;
     this.fetchTimeout = fetchTimeout;
+    this.tailBatchSize = tailBatchSize;
     try {
       this.jetStream = connection.jetStream();
       this.jsm = connection.jetStreamManagement();
@@ -228,7 +231,7 @@ public class NatsJournalSpi extends AbstractJournalSpi {
 
       List<RawJournalEntry> entries = new ArrayList<>();
       try {
-        List<Message> batch = sub.fetch(1000, fetchTimeout);
+        List<Message> batch = sub.fetch(tailBatchSize, fetchTimeout);
         for (Message msg : batch) {
           entries.add(toJournalEntry(msg, key));
         }

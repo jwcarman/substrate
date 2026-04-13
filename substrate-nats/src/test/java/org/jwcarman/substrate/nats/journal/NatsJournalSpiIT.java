@@ -38,7 +38,8 @@ class NatsJournalSpiIT extends AbstractNatsIT {
             "substrate-journal",
             Duration.ofHours(1),
             100000,
-            Duration.ofMillis(50));
+            Duration.ofMillis(50),
+            10);
   }
 
   @Test

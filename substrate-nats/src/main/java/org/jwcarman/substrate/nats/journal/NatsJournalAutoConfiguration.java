@@ -43,6 +43,7 @@ public class NatsJournalAutoConfiguration {
         journal.streamName(),
         journal.maxAge(),
         journal.maxMessages(),
-        journal.fetchTimeout());
+        journal.fetchTimeout(),
+        journal.tailBatchSize());
   }
 }

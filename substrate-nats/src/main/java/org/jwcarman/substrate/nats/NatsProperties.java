@@ -34,7 +34,8 @@ public record NatsProperties(
       String streamName,
       Duration maxAge,
       long maxMessages,
-      Duration fetchTimeout) {}
+      Duration fetchTimeout,
+      int tailBatchSize) {}
 
   public record MailboxProperties(
       boolean enabled, String prefix, String bucketName, Duration defaultTtl) {}
