@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-13T17:36:00Z
-ITERATION: 71
-SPEC_COMPLETED: 066-payload-transformer-hook.md
-WHAT_WAS_DONE: Added PayloadTransformer SPI interface to substrate-core with IDENTITY constant, wired into DefaultAtom/DefaultJournal/DefaultMailbox (encode on write, decode on read), threaded through all three Default*Factory classes, added @ConditionalOnMissingBean identity bean in SubstrateAutoConfiguration, and wrote PayloadTransformerTest (identity round-trip) plus PayloadTransformerRoundTripTest (XOR transformer across all three primitives including staleness token verification).
-VERIFICATION: ./mvnw verify — BUILD SUCCESS (all 13 modules). ./mvnw -P release javadoc:jar -DskipTests — BUILD SUCCESS (no new doclint errors). No new @SuppressWarnings annotations.
-STATUS: MORE_WORK
-NEXT_SPEC: 067-substrate-crypto-module.md
-NOTES: PayloadTransformer lives in org.jwcarman.substrate.core.transform package alongside the other SPI types. Staleness tokens are computed from plaintext (pre-transform) bytes — verified by test. All existing tests updated to pass PayloadTransformer.IDENTITY through the new constructor parameter. Spec 067 (substrate-crypto with AES-GCM) depends on this hook and is next.
+LAST_RUN: 2026-04-13T17:51:00Z
+ITERATION: 72
+SPEC_COMPLETED: 067-substrate-crypto-module.md
+WHAT_WAS_DONE: Created substrate-crypto Maven module with AesGcmPayloadTransformer, SecretKeyResolver SPI, SubstrateCryptoProperties record, and SubstrateCryptoAutoConfiguration. Added module to root pom.xml and substrate-bom. Wrote comprehensive tests: SecretKeyResolverTest (shared resolver, unknown kid), AesGcmPayloadTransformerTest (round-trip at 0/1/1024/10240 bytes, nonce randomness, unknown kid, truncated ciphertext, tampered ciphertext, key rotation), SubstrateCryptoAutoConfigurationTest (activation matrix: no-config→IDENTITY, shared-key→AES-GCM, user-resolver→AES-GCM, user-transformer-wins, invalid-key-size, AES-128 accepted). Updated CHANGELOG.md and README.md.
+VERIFICATION: ./mvnw verify — BUILD SUCCESS (all 14 modules, 19 new tests in substrate-crypto all pass). ./mvnw -P release javadoc:jar -DskipTests -pl substrate-crypto — BUILD SUCCESS (no doclint errors). No new @SuppressWarnings annotations.
+STATUS: DONE
+NEXT_SPEC: none
+NOTES: Used @AutoConfigureBefore(SubstrateAutoConfiguration.class) instead of @AutoConfigureAfter — crypto must register its AesGcmPayloadTransformer bean BEFORE substrate-core's @ConditionalOnMissingBean(PayloadTransformer.class) fires, otherwise the IDENTITY bean wins and crypto's @ConditionalOnMissingBean backs off. The spec's implementation notes suggested @AutoConfigureAfter but acknowledged either ordering could work; @AutoConfigureBefore is the correct choice for the desired behavior.

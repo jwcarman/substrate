@@ -10,6 +10,13 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+### Added
+
+- `substrate-crypto` module — optional AES-GCM encryption-at-rest via the
+  `PayloadTransformer` SPI. Set `substrate.crypto.shared-key` to a base64 AES
+  key for zero-code encryption, or provide a custom `SecretKeyResolver` bean
+  for key rotation backed by KMS / Vault / keystore.
+
 ## [0.3.0] - 2026-04-11
 
 ### Breaking changes

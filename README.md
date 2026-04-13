@@ -461,6 +461,30 @@ module per backend, not per primitive.
 > transport. `substrate-sns` is notification-only — it doesn't provide any
 > of the three primitives, just an SNS/SQS-backed `NotifierSpi`.
 
+## Encryption at Rest
+
+Add `substrate-crypto` for transparent AES-GCM encryption of all payload
+bytes stored by Atom, Journal, and Mailbox primitives.
+
+**Quick start** — set a single property:
+
+```yaml
+substrate:
+  crypto:
+    shared-key: "base64-encoded-AES-key"   # 16 bytes (AES-128) or 32 bytes (AES-256)
+```
+
+**Production** — provide your own `SecretKeyResolver` bean backed by a KMS,
+Vault, or keystore for key rotation. The resolver serves historical kids so
+old ciphertext remains readable while new writes use the current key.
+
+```xml
+<dependency>
+    <groupId>org.jwcarman.substrate</groupId>
+    <artifactId>substrate-crypto</artifactId>
+</dependency>
+```
+
 ## Configuration
 
 Each backend has its own configuration properties under

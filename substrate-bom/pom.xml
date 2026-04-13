@@ -89,6 +89,11 @@
                 <artifactId>substrate-sns</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>org.jwcarman.substrate</groupId>
+                <artifactId>substrate-crypto</artifactId>
+                <version>${project.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 </project>

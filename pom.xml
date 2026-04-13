@@ -114,6 +114,7 @@
         <module>substrate-rabbitmq</module>
         <module>substrate-cassandra</module>
         <module>substrate-sns</module>
+        <module>substrate-crypto</module>
     </modules>
 
     <dependencies>
