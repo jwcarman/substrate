@@ -28,11 +28,22 @@ The transformer runs **after** serialization (the user's schema concerns
 are already handled by `Codec`) and **before** storage (the backend is
 schema-agnostic and just stores opaque bytes).
 
+### Placement: substrate-core SPI, not substrate-api
+
+`PayloadTransformer` is an SPI (users implement it, substrate-core calls
+it), not a user-facing API type (users don't reference it in their app
+code). That puts it alongside the other SPI types — `AtomSpi`,
+`JournalSpi`, `MailboxSpi`, `NotifierSpi` — in **substrate-core**, NOT
+in substrate-api. A user who never plugs in a transformer never imports
+it. Only someone writing a custom transformer (or the future
+`substrate-crypto` module in spec 067) imports it, and they're already
+pulling in substrate-core to see the rest of the plumbing.
+
 ### Interface
 
 ```java
-// substrate-api
-package org.jwcarman.substrate;
+// substrate-core (SPI layer, sibling to AtomSpi / JournalSpi / MailboxSpi / NotifierSpi)
+package org.jwcarman.substrate.core.transform;
 
 /**
  * Transforms payload bytes on their way to and from the backend SPI. The primary use case is
@@ -129,12 +140,12 @@ below that layer. Adding a javadoc note to the method to lock this in.
 
 ## Acceptance criteria
 
-- [ ] `substrate-api/src/main/java/org/jwcarman/substrate/PayloadTransformer.java` exists as a public interface with `encode(byte[])`, `decode(byte[])`, and a static `IDENTITY` constant that round-trips unchanged.
+- [ ] `substrate-core/src/main/java/org/jwcarman/substrate/core/transform/PayloadTransformer.java` exists as a public interface with `encode(byte[])`, `decode(byte[])`, and a static `IDENTITY` constant that round-trips unchanged. Lives in substrate-core alongside the other SPI types (`AtomSpi`, `JournalSpi`, `MailboxSpi`, `NotifierSpi`) — it is an SPI-shaped extension point, not part of the public user-facing API surface in substrate-api.
 - [ ] `DefaultAtom`, `DefaultJournal`, `DefaultMailbox` take a `PayloadTransformer` via constructor, store it as a field, and apply `encode` on the write path and `decode` on every read path (`get()`, feeder step, `subscribe()` initial read, etc.).
 - [ ] `DefaultAtomFactory`, `DefaultJournalFactory`, `DefaultMailboxFactory` take a `PayloadTransformer` parameter and thread it into the primitives they construct.
 - [ ] `SubstrateAutoConfiguration` has a `@Bean @ConditionalOnMissingBean(PayloadTransformer.class)` that returns `PayloadTransformer.IDENTITY`. The factory `@Bean` methods take a `PayloadTransformer` parameter.
 - [ ] Staleness tokens are still computed from codec-encoded plaintext, not from post-transform ciphertext. A non-deterministic transformer (e.g. hypothetical `RandomNoisePayloadTransformer` in a test) must produce identical tokens for identical input values.
-- [ ] Tests: new `PayloadTransformerTest` in `substrate-api` covers the `IDENTITY` round-trip.
+- [ ] Tests: new `PayloadTransformerTest` in substrate-core covers the `IDENTITY` round-trip.
 - [ ] Tests: new round-trip test in `substrate-core` that uses a simple deterministic transformer (e.g. "XOR every byte with 0xFF") and confirms that `atom.set(v); atom.get()` returns `v` unchanged, same for `journal.append(e) → subscribe().next()`, same for `mailbox.deliver(v) → subscribe().next()`.
 - [ ] Tests: existing primitive and factory tests pass with `PayloadTransformer.IDENTITY` threaded through the new constructor parameter.
 - [ ] `./mvnw verify` passes from the root. `./mvnw -P release javadoc:jar -DskipTests` passes (no new doclint errors).
