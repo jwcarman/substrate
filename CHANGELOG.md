@@ -10,6 +10,8 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-04-13
+
 ### Added
 
 - **`PayloadTransformer` SPI** in `substrate-core` — a hook that sits between
@@ -508,6 +510,7 @@ abstractions:
 
 - **BOM** (`substrate-bom`) for version alignment across all modules
 
+[0.4.0]: https://github.com/jwcarman/substrate/releases/tag/0.4.0
 [0.3.0]: https://github.com/jwcarman/substrate/releases/tag/0.3.0
 [0.2.1]: https://github.com/jwcarman/substrate/releases/tag/0.2.1
 [0.2.0]: https://github.com/jwcarman/substrate/releases/tag/0.2.0
