@@ -31,6 +31,17 @@ occur between minor versions. The 1.0.0 release will mark API stability.
   by this module; anyone needing ChaCha20-Poly1305, AES-GCM-SIV, or anything
   else can write their own `PayloadTransformer` implementation and register
   it directly.
+- **`substrate.nats.journal.fetch-timeout`** (default `50ms`) and
+  **`substrate.nats.journal.tail-batch-size`** (default `100`) — new NATS
+  journal properties that govern real-time tail latency. The previous
+  hard-coded 500ms fetch timeout made every SSE-style delivery stall half
+  a second; the new defaults push per-event latency into the single-digit
+  millisecond range.
+- **`SilencePullStatusWarnings`** `ErrorListener` in `substrate-nats` —
+  drop-in replacement for nats.java's default `ErrorListenerLoggerImpl` that
+  suppresses the noisy 404 "No Messages" `pullStatusWarning` that fires at
+  the end of every `pullNoWait` request. Wire it into `Options.Builder
+  .errorListener(...)` when constructing the `Connection`.
 
 ### Changed
 
@@ -42,6 +53,39 @@ occur between minor versions. The 1.0.0 release will mark API stability.
   CAS semantics. The `token()` return value is opaque to callers, so code that
   compared tokens for equality (the only supported operation) keeps working
   without changes.
+- **NATS journal reads switched to `pullNoWait`.** Journal reads are now
+  snapshot operations — "give me everything in the stream right now" — rather
+  than blocking until either a batch fills or a timeout elapses. Combined
+  with the configurable batch and timeout, real-time tailing no longer stalls
+  ~500ms per delivery.
+- **`InMemoryJournalSpi` allows subscribe-before-publish.** `readAfter` and
+  `readLast` on a never-created key now return an empty list instead of
+  throwing `JournalExpiredException`, matching the NATS backend's semantics.
+  Observers can attach to a journal before the producer has written
+  anything — the common MCP session-stream pattern. When an in-memory
+  journal actually dies (inactivity TTL elapsed, retention expired, or
+  explicit `delete`), it leaves a 5-minute tombstone so subscribers still
+  see `JournalExpiredException` for a grace window before it fades to
+  "never existed."
+
+### Fixed
+
+- **`NatsAtomSpi.set()` / `touch()` no longer fight over NATS KV revisions.**
+  The previous implementation used `kv.update(key, value, revision)` for
+  CAS-on-revision. Any concurrent `touch()` bumped the revision between a
+  `set()`'s read and its update, causing the `set()` to fail the CAS and
+  bubble up as a spurious `AtomExpiredException`. Atom's `set()` is
+  semantically an unconditional overwrite-if-alive — not a compare-and-swap —
+  so we now use `kv.put()` and keep only the existence check. Concurrent
+  writers still get last-write-wins, which is the contract.
+- **`CassandraAtomSpi.touch()` no longer clobbers newer values.** The old
+  implementation did `SELECT` then `UPDATE ... IF EXISTS` with the read
+  value. `IF EXISTS` only checks row existence, not content — so if a
+  concurrent `set()` landed between the two statements, `touch()` would
+  write the older value back on top of the newer one. Switched to
+  `UPDATE ... IF token = ?` with an LWT on the token we just read, so
+  concurrent writers produce a clean CAS failure instead of a data
+  regression.
 
 ## [0.3.0] - 2026-04-11
 
