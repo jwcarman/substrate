@@ -16,16 +16,14 @@
 package org.jwcarman.substrate.nats;
 
 import io.nats.client.Connection;
-import io.nats.client.ErrorListener;
 import io.nats.client.JetStreamSubscription;
-import io.nats.client.Options;
 import io.nats.client.impl.ErrorListenerLoggerImpl;
 import io.nats.client.support.Status;
 
 /**
- * {@link ErrorListener} that suppresses the 404 "No Messages" pull status that substrate-nats'
- * journal reads receive at the end of every {@code pullNoWait} request. All other error/warning
- * callbacks are forwarded to {@link ErrorListenerLoggerImpl}.
+ * {@link io.nats.client.ErrorListener} that suppresses the 404 "No Messages" pull status that
+ * substrate-nats' journal reads receive at the end of every {@code pullNoWait} request. All other
+ * error/warning callbacks are forwarded to {@link ErrorListenerLoggerImpl}.
  *
  * <p>Wire it in when constructing the NATS {@link Connection}:
  *
