@@ -37,6 +37,7 @@ public class CassandraAtomSpi extends AbstractAtomSpi {
   private final PreparedStatement insertIfNotExists;
   private final PreparedStatement selectByKey;
   private final PreparedStatement updateIfExists;
+  private final PreparedStatement updateIfToken;
   private final PreparedStatement deleteIfExists;
 
   public CassandraAtomSpi(CqlSession session, String prefix, String tableName) {
@@ -81,6 +82,20 @@ public class CassandraAtomSpi extends AbstractAtomSpi {
                 + " = ? WHERE "
                 + FIELD_KEY
                 + " = ? IF EXISTS");
+
+    this.updateIfToken =
+        session.prepare(
+            "UPDATE "
+                + tableName
+                + " USING TTL ? SET "
+                + FIELD_VALUE
+                + " = ?, "
+                + quotedToken
+                + " = ? WHERE "
+                + FIELD_KEY
+                + " = ? IF "
+                + quotedToken
+                + " = ?");
 
     this.deleteIfExists =
         session.prepare("DELETE FROM " + tableName + " WHERE " + FIELD_KEY + " = ? IF EXISTS");
@@ -143,7 +158,8 @@ public class CassandraAtomSpi extends AbstractAtomSpi {
       return false;
     }
     String token = existing.getString(FIELD_TOKEN);
-    Row result = session.execute(updateIfExists.bind(ttlSeconds(ttl), value, token, key)).one();
+    Row result =
+        session.execute(updateIfToken.bind(ttlSeconds(ttl), value, token, key, token)).one();
     return result != null && result.getBoolean(APPLIED_COLUMN);
   }
 
