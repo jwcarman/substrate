@@ -38,12 +38,14 @@ import org.jwcarman.substrate.core.subscription.CoalescingHandoff;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultSubscriberBuilder;
 import org.jwcarman.substrate.core.subscription.FeederSupport;
+import org.jwcarman.substrate.core.transform.PayloadTransformer;
 
 public class DefaultAtom<T> implements Atom<T> {
 
   private final AtomSpi atomSpi;
   private final String key;
   private final Codec<T> codec;
+  private final PayloadTransformer transformer;
   private final Notifier notifier;
   private final Duration maxTtl;
   private final ShutdownCoordinator shutdownCoordinator;
@@ -52,12 +54,14 @@ public class DefaultAtom<T> implements Atom<T> {
       AtomSpi atomSpi,
       String key,
       Codec<T> codec,
+      PayloadTransformer transformer,
       Notifier notifier,
       Duration maxTtl,
       ShutdownCoordinator shutdownCoordinator) {
     this.atomSpi = atomSpi;
     this.key = key;
     this.codec = codec;
+    this.transformer = transformer;
     this.notifier = notifier;
     this.maxTtl = maxTtl;
     this.shutdownCoordinator = shutdownCoordinator;
@@ -68,7 +72,7 @@ public class DefaultAtom<T> implements Atom<T> {
     validateTtl(ttl);
     byte[] bytes = codec.encode(data);
     String newToken = token(bytes);
-    boolean alive = atomSpi.set(key, bytes, newToken, ttl);
+    boolean alive = atomSpi.set(key, transformer.encode(bytes), newToken, ttl);
     if (!alive) {
       throw new AtomExpiredException(key);
     }
@@ -84,7 +88,7 @@ public class DefaultAtom<T> implements Atom<T> {
   @Override
   public Snapshot<T> get() {
     RawAtom raw = atomSpi.read(key).orElseThrow(() -> new AtomExpiredException(key));
-    return new Snapshot<>(codec.decode(raw.value()), raw.token());
+    return new Snapshot<>(codec.decode(transformer.decode(raw.value())), raw.token());
   }
 
   @Override
@@ -160,7 +164,8 @@ public class DefaultAtom<T> implements Atom<T> {
           }
           String currentToken = raw.get().token();
           if (!currentToken.equals(lastToken.get())) {
-            Snapshot<T> snap = new Snapshot<>(codec.decode(raw.get().value()), currentToken);
+            Snapshot<T> snap =
+                new Snapshot<>(codec.decode(transformer.decode(raw.get().value())), currentToken);
             handoff.push(snap);
             lastToken.set(currentToken);
           }

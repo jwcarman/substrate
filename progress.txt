@@ -1,8 +1,8 @@
-LAST_RUN: 2026-04-13T00:00:00Z
-ITERATION: 70
-SPEC_COMPLETED: released-0.3.0-plus-token-shrink
-WHAT_WAS_DONE: Cut 0.3.0 release (first attempt failed on doclint errors in substrate-api, re-tagged and re-released after fixing heading-out-of-sequence, missing @return/@param on subscribe methods, and missing constructor doc comments on three Journal exception classes + FeederSupport.FeederStep). Added CLAUDE.md documenting the release process including the explicit ./mvnw -P release javadoc:jar -DskipTests check. Bumped to 0.4.0-SNAPSHOT. Truncated atom staleness token from full 256-bit SHA-256 (43 chars) to 128-bit truncated (22 chars) — same cryptographic distribution, half the token size.
-VERIFICATION: ./mvnw verify — BUILD SUCCESS. 0.3.0 published to Maven Central via GitHub Actions (run 24295803641). Token-truncation commit pushed as 5cdf2c7; build green before and after.
+LAST_RUN: 2026-04-13T17:36:00Z
+ITERATION: 71
+SPEC_COMPLETED: 066-payload-transformer-hook.md
+WHAT_WAS_DONE: Added PayloadTransformer SPI interface to substrate-core with IDENTITY constant, wired into DefaultAtom/DefaultJournal/DefaultMailbox (encode on write, decode on read), threaded through all three Default*Factory classes, added @ConditionalOnMissingBean identity bean in SubstrateAutoConfiguration, and wrote PayloadTransformerTest (identity round-trip) plus PayloadTransformerRoundTripTest (XOR transformer across all three primitives including staleness token verification).
+VERIFICATION: ./mvnw verify — BUILD SUCCESS (all 13 modules). ./mvnw -P release javadoc:jar -DskipTests — BUILD SUCCESS (no new doclint errors). No new @SuppressWarnings annotations.
 STATUS: MORE_WORK
-NEXT_SPEC: 066-payload-transformer-hook.md
-NOTES: Two sequenced specs queued for the next dev cycle. Spec 066 introduces a PayloadTransformer extension point (substrate-api) that sits between Codec and SPI on all three primitive read/write paths, with IDENTITY as the default — pure hook, no concrete transformer. Spec 067 adds an optional substrate-crypto module with an AES-GCM PayloadTransformer keyed by a SecretKeyResolver abstraction (currentKid() for encode, lookup(kid) for decode); autoconfig supports both the shared-key convenience property AND user-defined resolvers for key rotation. Spec 067 depends on 066 — Ralph should do them in order. Both specs intentionally scoped narrow: 066 is pure hook with no encryption, 067 is opinionated AES-GCM-only (any user needing a different algorithm writes their own PayloadTransformer and registers it as a bean).
+NEXT_SPEC: 067-substrate-crypto-module.md
+NOTES: PayloadTransformer lives in org.jwcarman.substrate.core.transform package alongside the other SPI types. Staleness tokens are computed from plaintext (pre-transform) bytes — verified by test. All existing tests updated to pass PayloadTransformer.IDENTITY through the new constructor parameter. Spec 067 (substrate-crypto with AES-GCM) depends on this hook and is next.

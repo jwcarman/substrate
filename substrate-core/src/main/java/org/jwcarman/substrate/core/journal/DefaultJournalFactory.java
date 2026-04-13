@@ -20,6 +20,7 @@ import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.codec.spi.TypeRef;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.Notifier;
+import org.jwcarman.substrate.core.transform.PayloadTransformer;
 import org.jwcarman.substrate.journal.Journal;
 import org.jwcarman.substrate.journal.JournalFactory;
 
@@ -27,6 +28,7 @@ public class DefaultJournalFactory implements JournalFactory {
 
   private final JournalSpi journalSpi;
   private final CodecFactory codecFactory;
+  private final PayloadTransformer transformer;
   private final Notifier notifier;
   private final JournalLimits limits;
   private final ShutdownCoordinator shutdownCoordinator;
@@ -34,11 +36,13 @@ public class DefaultJournalFactory implements JournalFactory {
   public DefaultJournalFactory(
       JournalSpi journalSpi,
       CodecFactory codecFactory,
+      PayloadTransformer transformer,
       Notifier notifier,
       JournalLimits limits,
       ShutdownCoordinator shutdownCoordinator) {
     this.journalSpi = journalSpi;
     this.codecFactory = codecFactory;
+    this.transformer = transformer;
     this.notifier = notifier;
     this.limits = limits;
     this.shutdownCoordinator = shutdownCoordinator;
@@ -50,7 +54,13 @@ public class DefaultJournalFactory implements JournalFactory {
     String key = journalSpi.journalKey(name);
     journalSpi.create(key, inactivityTtl);
     return new DefaultJournal<>(
-        journalSpi, key, codecFactory.create(type), notifier, limits, shutdownCoordinator);
+        journalSpi,
+        key,
+        codecFactory.create(type),
+        transformer,
+        notifier,
+        limits,
+        shutdownCoordinator);
   }
 
   @Override
@@ -59,21 +69,39 @@ public class DefaultJournalFactory implements JournalFactory {
     String key = journalSpi.journalKey(name);
     journalSpi.create(key, inactivityTtl);
     return new DefaultJournal<>(
-        journalSpi, key, codecFactory.create(typeRef), notifier, limits, shutdownCoordinator);
+        journalSpi,
+        key,
+        codecFactory.create(typeRef),
+        transformer,
+        notifier,
+        limits,
+        shutdownCoordinator);
   }
 
   @Override
   public <T> Journal<T> connect(String name, Class<T> type) {
     String key = journalSpi.journalKey(name);
     return new DefaultJournal<>(
-        journalSpi, key, codecFactory.create(type), notifier, limits, shutdownCoordinator);
+        journalSpi,
+        key,
+        codecFactory.create(type),
+        transformer,
+        notifier,
+        limits,
+        shutdownCoordinator);
   }
 
   @Override
   public <T> Journal<T> connect(String name, TypeRef<T> typeRef) {
     String key = journalSpi.journalKey(name);
     return new DefaultJournal<>(
-        journalSpi, key, codecFactory.create(typeRef), notifier, limits, shutdownCoordinator);
+        journalSpi,
+        key,
+        codecFactory.create(typeRef),
+        transformer,
+        notifier,
+        limits,
+        shutdownCoordinator);
   }
 
   private void validateInactivityTtl(Duration inactivityTtl) {

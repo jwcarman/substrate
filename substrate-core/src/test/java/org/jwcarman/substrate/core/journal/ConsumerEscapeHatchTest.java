@@ -33,6 +33,7 @@ import org.jwcarman.substrate.core.memory.journal.InMemoryJournalSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.core.notifier.DefaultNotifier;
 import org.jwcarman.substrate.core.notifier.Notifier;
+import org.jwcarman.substrate.core.transform.PayloadTransformer;
 import org.jwcarman.substrate.journal.JournalEntry;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -64,7 +65,13 @@ class ConsumerEscapeHatchTest {
 
     DefaultJournal<String> journal =
         new DefaultJournal<>(
-            spi, key, STRING_CODEC, notifier, JournalLimits.defaults(), new ShutdownCoordinator());
+            spi,
+            key,
+            STRING_CODEC,
+            PayloadTransformer.IDENTITY,
+            notifier,
+            JournalLimits.defaults(),
+            new ShutdownCoordinator());
 
     journal.append("one-entry", Duration.ofHours(1));
 

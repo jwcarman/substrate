@@ -34,6 +34,7 @@ import org.jwcarman.substrate.core.memory.journal.InMemoryJournalSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.core.notifier.DefaultNotifier;
 import org.jwcarman.substrate.core.notifier.Notifier;
+import org.jwcarman.substrate.core.transform.PayloadTransformer;
 import org.jwcarman.substrate.journal.Journal;
 import org.jwcarman.substrate.journal.JournalAlreadyExistsException;
 import org.jwcarman.substrate.journal.JournalExpiredException;
@@ -67,7 +68,12 @@ class DefaultJournalFactoryTest {
                 tools.jackson.databind.json.JsonMapper.builder().build()));
     factory =
         new DefaultJournalFactory(
-            spi, codecFactory, notifier, JournalLimits.defaults(), coordinator);
+            spi,
+            codecFactory,
+            PayloadTransformer.IDENTITY,
+            notifier,
+            JournalLimits.defaults(),
+            coordinator);
   }
 
   @Test

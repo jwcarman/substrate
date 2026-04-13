@@ -39,6 +39,7 @@ import org.jwcarman.substrate.core.memory.journal.InMemoryJournalSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.core.notifier.DefaultNotifier;
 import org.jwcarman.substrate.core.notifier.Notifier;
+import org.jwcarman.substrate.core.transform.PayloadTransformer;
 import org.jwcarman.substrate.journal.JournalEntry;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -73,7 +74,13 @@ class JournalSubscriptionTest {
     journalSpi.create("substrate:journal:test", Duration.ofHours(24));
     journal =
         new DefaultJournal<>(
-            journalSpi, "substrate:journal:test", STRING_CODEC, notifier, limits, coordinator);
+            journalSpi,
+            "substrate:journal:test",
+            STRING_CODEC,
+            PayloadTransformer.IDENTITY,
+            notifier,
+            limits,
+            coordinator);
   }
 
   @Test
@@ -511,7 +518,13 @@ class JournalSubscriptionTest {
         new JournalLimits(1, Duration.ofHours(24), Duration.ofDays(7), Duration.ofDays(30));
     DefaultJournal<String> smallJournal =
         new DefaultJournal<>(
-            journalSpi, "substrate:journal:test", STRING_CODEC, notifier, smallLimits, coordinator);
+            journalSpi,
+            "substrate:journal:test",
+            STRING_CODEC,
+            PayloadTransformer.IDENTITY,
+            notifier,
+            smallLimits,
+            coordinator);
 
     journal.append("e1", Duration.ofHours(1));
     journal.append("e2", Duration.ofHours(1));

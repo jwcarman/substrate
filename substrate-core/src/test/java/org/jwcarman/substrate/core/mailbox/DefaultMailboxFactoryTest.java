@@ -35,6 +35,7 @@ import org.jwcarman.substrate.core.memory.mailbox.InMemoryMailboxSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.core.notifier.DefaultNotifier;
 import org.jwcarman.substrate.core.notifier.Notifier;
+import org.jwcarman.substrate.core.transform.PayloadTransformer;
 import org.jwcarman.substrate.mailbox.Mailbox;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 import org.mockito.Mock;
@@ -58,7 +59,12 @@ class DefaultMailboxFactoryTest {
 
     DefaultMailboxFactory factory =
         new DefaultMailboxFactory(
-            spi, codecFactory, newNotifier(), Duration.ofMinutes(30), coordinator);
+            spi,
+            codecFactory,
+            PayloadTransformer.IDENTITY,
+            newNotifier(),
+            Duration.ofMinutes(30),
+            coordinator);
 
     Mailbox<String> mailbox = factory.connect("test", String.class);
 
@@ -75,7 +81,12 @@ class DefaultMailboxFactoryTest {
     InMemoryMailboxSpi spi = new InMemoryMailboxSpi();
     DefaultMailboxFactory factory =
         new DefaultMailboxFactory(
-            spi, codecFactory, newNotifier(), Duration.ofMinutes(30), coordinator);
+            spi,
+            codecFactory,
+            PayloadTransformer.IDENTITY,
+            newNotifier(),
+            Duration.ofMinutes(30),
+            coordinator);
 
     Mailbox<String> mailbox = factory.connect("nonexistent", String.class);
 
@@ -88,6 +99,7 @@ class DefaultMailboxFactoryTest {
         new DefaultMailboxFactory(
             mock(MailboxSpi.class),
             codecFactory,
+            PayloadTransformer.IDENTITY,
             newNotifier(),
             Duration.ofMinutes(30),
             coordinator);
@@ -103,6 +115,7 @@ class DefaultMailboxFactoryTest {
         new DefaultMailboxFactory(
             mock(MailboxSpi.class),
             codecFactory,
+            PayloadTransformer.IDENTITY,
             newNotifier(),
             Duration.ofMinutes(30),
             coordinator);
@@ -122,7 +135,12 @@ class DefaultMailboxFactoryTest {
 
     DefaultMailboxFactory factory =
         new DefaultMailboxFactory(
-            spi, codecFactory, newNotifier(), Duration.ofMinutes(30), coordinator);
+            spi,
+            codecFactory,
+            PayloadTransformer.IDENTITY,
+            newNotifier(),
+            Duration.ofMinutes(30),
+            coordinator);
 
     Mailbox<String> mailbox = factory.connect("test", typeRef);
     assertThat(mailbox.key()).isEqualTo("substrate:mailbox:test");
@@ -140,7 +158,13 @@ class DefaultMailboxFactoryTest {
     InMemoryMailboxSpi spi = new InMemoryMailboxSpi();
     Notifier notifier = newNotifier();
     DefaultMailboxFactory factory =
-        new DefaultMailboxFactory(spi, codecFactory, notifier, Duration.ofMinutes(30), coordinator);
+        new DefaultMailboxFactory(
+            spi,
+            codecFactory,
+            PayloadTransformer.IDENTITY,
+            notifier,
+            Duration.ofMinutes(30),
+            coordinator);
 
     Mailbox<String> created = factory.create("existing", String.class, Duration.ofMinutes(5));
     Mailbox<String> connected = factory.connect("existing", String.class);

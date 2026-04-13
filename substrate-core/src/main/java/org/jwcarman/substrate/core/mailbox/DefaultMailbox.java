@@ -29,6 +29,7 @@ import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultSubscriberBuilder;
 import org.jwcarman.substrate.core.subscription.FeederSupport;
 import org.jwcarman.substrate.core.subscription.SingleShotHandoff;
+import org.jwcarman.substrate.core.transform.PayloadTransformer;
 import org.jwcarman.substrate.mailbox.Mailbox;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 
@@ -37,6 +38,7 @@ public class DefaultMailbox<T> implements Mailbox<T> {
   private final MailboxSpi mailboxSpi;
   private final String key;
   private final Codec<T> codec;
+  private final PayloadTransformer transformer;
   private final Notifier notifier;
   private final ShutdownCoordinator shutdownCoordinator;
 
@@ -44,18 +46,20 @@ public class DefaultMailbox<T> implements Mailbox<T> {
       MailboxSpi mailboxSpi,
       String key,
       Codec<T> codec,
+      PayloadTransformer transformer,
       Notifier notifier,
       ShutdownCoordinator shutdownCoordinator) {
     this.mailboxSpi = mailboxSpi;
     this.key = key;
     this.codec = codec;
+    this.transformer = transformer;
     this.notifier = notifier;
     this.shutdownCoordinator = shutdownCoordinator;
   }
 
   @Override
   public void deliver(T value) {
-    mailboxSpi.deliver(key, codec.encode(value));
+    mailboxSpi.deliver(key, transformer.encode(codec.encode(value)));
     notifier.notifyMailboxChanged(key);
   }
 
@@ -95,7 +99,7 @@ public class DefaultMailbox<T> implements Mailbox<T> {
           try {
             Optional<byte[]> value = mailboxSpi.get(key);
             if (value.isPresent()) {
-              handoff.push(codec.decode(value.get()));
+              handoff.push(codec.decode(transformer.decode(value.get())));
               return false;
             }
             return true;

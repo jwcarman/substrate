@@ -33,6 +33,7 @@ import org.jwcarman.substrate.SubscriberConfig;
 import org.jwcarman.substrate.Subscription;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.Notifier;
+import org.jwcarman.substrate.core.transform.PayloadTransformer;
 import org.jwcarman.substrate.journal.JournalEntry;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -59,7 +60,14 @@ class DefaultJournalTest {
         .thenAnswer(inv -> new String((byte[]) inv.getArgument(0), UTF_8));
     lenient().when(notifier.subscribeToJournal(anyString(), any())).thenReturn(() -> {});
     journal =
-        new DefaultJournal<>(spi, KEY, codec, notifier, JournalLimits.defaults(), coordinator);
+        new DefaultJournal<>(
+            spi,
+            KEY,
+            codec,
+            PayloadTransformer.IDENTITY,
+            notifier,
+            JournalLimits.defaults(),
+            coordinator);
   }
 
   @Test

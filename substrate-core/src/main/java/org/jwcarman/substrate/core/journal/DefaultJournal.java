@@ -32,6 +32,7 @@ import org.jwcarman.substrate.core.subscription.CallbackPumpSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultSubscriberBuilder;
 import org.jwcarman.substrate.core.subscription.FeederSupport;
+import org.jwcarman.substrate.core.transform.PayloadTransformer;
 import org.jwcarman.substrate.journal.Journal;
 import org.jwcarman.substrate.journal.JournalEntry;
 import org.jwcarman.substrate.journal.JournalExpiredException;
@@ -41,6 +42,7 @@ public class DefaultJournal<T> implements Journal<T> {
   private final JournalSpi journalSpi;
   private final String key;
   private final Codec<T> codec;
+  private final PayloadTransformer transformer;
   private final Notifier notifier;
   private final JournalLimits limits;
   private final ShutdownCoordinator shutdownCoordinator;
@@ -49,12 +51,14 @@ public class DefaultJournal<T> implements Journal<T> {
       JournalSpi journalSpi,
       String key,
       Codec<T> codec,
+      PayloadTransformer transformer,
       Notifier notifier,
       JournalLimits limits,
       ShutdownCoordinator shutdownCoordinator) {
     this.journalSpi = journalSpi;
     this.key = key;
     this.codec = codec;
+    this.transformer = transformer;
     this.notifier = notifier;
     this.limits = limits;
     this.shutdownCoordinator = shutdownCoordinator;
@@ -67,7 +71,7 @@ public class DefaultJournal<T> implements Journal<T> {
           "Journal entry TTL " + ttl + " exceeds configured maximum " + limits.maxEntryTtl());
     }
     byte[] bytes = codec.encode(data);
-    String entryId = journalSpi.append(key, bytes, ttl);
+    String entryId = journalSpi.append(key, transformer.encode(bytes), ttl);
     notifier.notifyJournalChanged(key);
     return entryId;
   }
@@ -253,6 +257,7 @@ public class DefaultJournal<T> implements Journal<T> {
   }
 
   private JournalEntry<T> decode(RawJournalEntry raw) {
-    return new JournalEntry<>(raw.id(), raw.key(), codec.decode(raw.data()), raw.timestamp());
+    return new JournalEntry<>(
+        raw.id(), raw.key(), codec.decode(transformer.decode(raw.data())), raw.timestamp());
   }
 }

@@ -36,6 +36,7 @@ import org.jwcarman.substrate.core.notifier.DefaultNotifier;
 import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.sweep.Sweeper;
+import org.jwcarman.substrate.core.transform.PayloadTransformer;
 import org.jwcarman.substrate.journal.Journal;
 import org.jwcarman.substrate.journal.JournalFactory;
 import org.jwcarman.substrate.mailbox.Mailbox;
@@ -92,6 +93,12 @@ public class SubstrateAutoConfiguration {
   }
 
   @Bean
+  @ConditionalOnMissingBean(PayloadTransformer.class)
+  public PayloadTransformer payloadTransformer() {
+    return PayloadTransformer.IDENTITY;
+  }
+
+  @Bean
   public ShutdownCoordinator shutdownCoordinator() {
     return new ShutdownCoordinator();
   }
@@ -107,11 +114,17 @@ public class SubstrateAutoConfiguration {
   public AtomFactory atomFactory(
       AtomSpi atomSpi,
       CodecFactory codecFactory,
+      PayloadTransformer payloadTransformer,
       Notifier notifier,
       SubstrateProperties properties,
       ShutdownCoordinator shutdownCoordinator) {
     return new DefaultAtomFactory(
-        atomSpi, codecFactory, notifier, properties.atom().maxTtl(), shutdownCoordinator);
+        atomSpi,
+        codecFactory,
+        payloadTransformer,
+        notifier,
+        properties.atom().maxTtl(),
+        shutdownCoordinator);
   }
 
   @Bean
@@ -119,6 +132,7 @@ public class SubstrateAutoConfiguration {
   public JournalFactory journalFactory(
       JournalSpi journalSpi,
       CodecFactory codecFactory,
+      PayloadTransformer payloadTransformer,
       Notifier notifier,
       SubstrateProperties properties,
       ShutdownCoordinator shutdownCoordinator) {
@@ -130,7 +144,7 @@ public class SubstrateAutoConfiguration {
             jp.maxEntryTtl(),
             jp.maxRetentionTtl());
     return new DefaultJournalFactory(
-        journalSpi, codecFactory, notifier, limits, shutdownCoordinator);
+        journalSpi, codecFactory, payloadTransformer, notifier, limits, shutdownCoordinator);
   }
 
   @Bean
@@ -138,11 +152,17 @@ public class SubstrateAutoConfiguration {
   public MailboxFactory mailboxFactory(
       MailboxSpi mailboxSpi,
       CodecFactory codecFactory,
+      PayloadTransformer payloadTransformer,
       Notifier notifier,
       SubstrateProperties properties,
       ShutdownCoordinator shutdownCoordinator) {
     return new DefaultMailboxFactory(
-        mailboxSpi, codecFactory, notifier, properties.mailbox().maxTtl(), shutdownCoordinator);
+        mailboxSpi,
+        codecFactory,
+        payloadTransformer,
+        notifier,
+        properties.mailbox().maxTtl(),
+        shutdownCoordinator);
   }
 
   @Bean(destroyMethod = "close")

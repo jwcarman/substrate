@@ -23,11 +23,13 @@ import org.jwcarman.substrate.atom.Atom;
 import org.jwcarman.substrate.atom.AtomFactory;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.Notifier;
+import org.jwcarman.substrate.core.transform.PayloadTransformer;
 
 public class DefaultAtomFactory implements AtomFactory {
 
   private final AtomSpi atomSpi;
   private final CodecFactory codecFactory;
+  private final PayloadTransformer transformer;
   private final Notifier notifier;
   private final Duration maxTtl;
   private final ShutdownCoordinator shutdownCoordinator;
@@ -35,11 +37,13 @@ public class DefaultAtomFactory implements AtomFactory {
   public DefaultAtomFactory(
       AtomSpi atomSpi,
       CodecFactory codecFactory,
+      PayloadTransformer transformer,
       Notifier notifier,
       Duration maxTtl,
       ShutdownCoordinator shutdownCoordinator) {
     this.atomSpi = atomSpi;
     this.codecFactory = codecFactory;
+    this.transformer = transformer;
     this.notifier = notifier;
     this.maxTtl = maxTtl;
     this.shutdownCoordinator = shutdownCoordinator;
@@ -52,9 +56,10 @@ public class DefaultAtomFactory implements AtomFactory {
     String key = atomSpi.atomKey(name);
     byte[] bytes = codec.encode(initialValue);
     String token = DefaultAtom.token(bytes);
-    atomSpi.create(key, bytes, token, ttl);
+    atomSpi.create(key, transformer.encode(bytes), token, ttl);
     notifier.notifyAtomChanged(key);
-    return new DefaultAtom<>(atomSpi, key, codec, notifier, maxTtl, shutdownCoordinator);
+    return new DefaultAtom<>(
+        atomSpi, key, codec, transformer, notifier, maxTtl, shutdownCoordinator);
   }
 
   @Override
@@ -64,23 +69,26 @@ public class DefaultAtomFactory implements AtomFactory {
     String key = atomSpi.atomKey(name);
     byte[] bytes = codec.encode(initialValue);
     String token = DefaultAtom.token(bytes);
-    atomSpi.create(key, bytes, token, ttl);
+    atomSpi.create(key, transformer.encode(bytes), token, ttl);
     notifier.notifyAtomChanged(key);
-    return new DefaultAtom<>(atomSpi, key, codec, notifier, maxTtl, shutdownCoordinator);
+    return new DefaultAtom<>(
+        atomSpi, key, codec, transformer, notifier, maxTtl, shutdownCoordinator);
   }
 
   @Override
   public <T> Atom<T> connect(String name, Class<T> type) {
     Codec<T> codec = codecFactory.create(type);
     String key = atomSpi.atomKey(name);
-    return new DefaultAtom<>(atomSpi, key, codec, notifier, maxTtl, shutdownCoordinator);
+    return new DefaultAtom<>(
+        atomSpi, key, codec, transformer, notifier, maxTtl, shutdownCoordinator);
   }
 
   @Override
   public <T> Atom<T> connect(String name, TypeRef<T> typeRef) {
     Codec<T> codec = codecFactory.create(typeRef);
     String key = atomSpi.atomKey(name);
-    return new DefaultAtom<>(atomSpi, key, codec, notifier, maxTtl, shutdownCoordinator);
+    return new DefaultAtom<>(
+        atomSpi, key, codec, transformer, notifier, maxTtl, shutdownCoordinator);
   }
 
   private void validateTtl(Duration ttl) {

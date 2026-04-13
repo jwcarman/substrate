@@ -44,6 +44,7 @@ import org.jwcarman.substrate.core.memory.atom.InMemoryAtomSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.core.notifier.DefaultNotifier;
 import org.jwcarman.substrate.core.notifier.Notifier;
+import org.jwcarman.substrate.core.transform.PayloadTransformer;
 import tools.jackson.databind.json.JsonMapper;
 
 class DefaultAtomTest {
@@ -81,7 +82,15 @@ class DefaultAtomTest {
     String token = DefaultAtom.token(bytes);
     spi.create(KEY, bytes, token, TTL);
 
-    atom = new DefaultAtom<>(spi, KEY, STRING_CODEC, notifier, Duration.ofHours(24), coordinator);
+    atom =
+        new DefaultAtom<>(
+            spi,
+            KEY,
+            STRING_CODEC,
+            PayloadTransformer.IDENTITY,
+            notifier,
+            Duration.ofHours(24),
+            coordinator);
   }
 
   @Test
@@ -256,7 +265,14 @@ class DefaultAtomTest {
     shortSpi.create(KEY, bytes, token, shortTtl);
 
     DefaultAtom<String> shortAtom =
-        new DefaultAtom<>(shortSpi, KEY, STRING_CODEC, notifier, Duration.ofHours(24), coordinator);
+        new DefaultAtom<>(
+            shortSpi,
+            KEY,
+            STRING_CODEC,
+            PayloadTransformer.IDENTITY,
+            notifier,
+            Duration.ofHours(24),
+            coordinator);
 
     Snapshot<String> current = shortAtom.get();
 
@@ -361,7 +377,14 @@ class DefaultAtomTest {
     shortSpi.create(KEY, bytes, token, shortTtl);
 
     DefaultAtom<String> shortAtom =
-        new DefaultAtom<>(shortSpi, KEY, STRING_CODEC, notifier, Duration.ofHours(24), coordinator);
+        new DefaultAtom<>(
+            shortSpi,
+            KEY,
+            STRING_CODEC,
+            PayloadTransformer.IDENTITY,
+            notifier,
+            Duration.ofHours(24),
+            coordinator);
 
     Snapshot<String> current = shortAtom.get();
     AtomicBoolean expirationFired = new AtomicBoolean(false);

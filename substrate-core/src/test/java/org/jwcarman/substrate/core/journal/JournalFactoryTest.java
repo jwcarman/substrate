@@ -36,6 +36,7 @@ import org.jwcarman.substrate.core.memory.journal.InMemoryJournalSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.core.notifier.DefaultNotifier;
 import org.jwcarman.substrate.core.notifier.Notifier;
+import org.jwcarman.substrate.core.transform.PayloadTransformer;
 import org.jwcarman.substrate.journal.Journal;
 import org.jwcarman.substrate.journal.JournalEntry;
 import org.jwcarman.substrate.journal.JournalFactory;
@@ -57,7 +58,12 @@ class JournalFactoryTest {
     when(codecFactory.create(String.class)).thenReturn(stringCodec);
     JournalFactory factory =
         new DefaultJournalFactory(
-            spi, codecFactory, newNotifier(), JournalLimits.defaults(), coordinator);
+            spi,
+            codecFactory,
+            PayloadTransformer.IDENTITY,
+            newNotifier(),
+            JournalLimits.defaults(),
+            coordinator);
 
     Journal<String> journal = factory.create("my-stream", String.class, Duration.ofHours(1));
 
@@ -74,7 +80,12 @@ class JournalFactoryTest {
         .thenAnswer(inv -> new String((byte[]) inv.getArgument(0), UTF_8));
     JournalFactory factory =
         new DefaultJournalFactory(
-            spi, codecFactory, newNotifier(), JournalLimits.defaults(), coordinator);
+            spi,
+            codecFactory,
+            PayloadTransformer.IDENTITY,
+            newNotifier(),
+            JournalLimits.defaults(),
+            coordinator);
 
     Journal<String> journal = factory.create("test", String.class, Duration.ofHours(1));
     String id = journal.append("hello", Duration.ofHours(1));
@@ -99,7 +110,12 @@ class JournalFactoryTest {
         .thenAnswer(inv -> inv.getArgument(0).toString().getBytes(UTF_8));
     JournalFactory factory =
         new DefaultJournalFactory(
-            spi, codecFactory, newNotifier(), JournalLimits.defaults(), coordinator);
+            spi,
+            codecFactory,
+            PayloadTransformer.IDENTITY,
+            newNotifier(),
+            JournalLimits.defaults(),
+            coordinator);
 
     Journal<List<String>> journal = factory.create("typed-stream", typeRef, Duration.ofHours(1));
 

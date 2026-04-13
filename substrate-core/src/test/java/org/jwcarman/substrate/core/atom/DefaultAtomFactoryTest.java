@@ -38,6 +38,7 @@ import org.jwcarman.substrate.core.memory.atom.InMemoryAtomSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.core.notifier.DefaultNotifier;
 import org.jwcarman.substrate.core.notifier.Notifier;
+import org.jwcarman.substrate.core.transform.PayloadTransformer;
 
 class DefaultAtomFactoryTest {
 
@@ -83,7 +84,13 @@ class DefaultAtomFactoryTest {
             new org.jwcarman.codec.jackson.JacksonCodecFactory(
                 tools.jackson.databind.json.JsonMapper.builder().build()));
     factory =
-        new DefaultAtomFactory(spi, CODEC_FACTORY, notifier, Duration.ofHours(24), coordinator);
+        new DefaultAtomFactory(
+            spi,
+            CODEC_FACTORY,
+            PayloadTransformer.IDENTITY,
+            notifier,
+            Duration.ofHours(24),
+            coordinator);
   }
 
   @Test
@@ -186,7 +193,12 @@ class DefaultAtomFactoryTest {
 
     DefaultAtomFactory lazyFactory =
         new DefaultAtomFactory(
-            failOnAnySpiCall, CODEC_FACTORY, notifier, Duration.ofHours(24), coordinator);
+            failOnAnySpiCall,
+            CODEC_FACTORY,
+            PayloadTransformer.IDENTITY,
+            notifier,
+            Duration.ofHours(24),
+            coordinator);
 
     Atom<String> atom = lazyFactory.connect("test", String.class);
     assertThat(atom).isNotNull();

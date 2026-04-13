@@ -38,6 +38,7 @@ import org.jwcarman.substrate.core.memory.mailbox.InMemoryMailboxSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import org.jwcarman.substrate.core.notifier.DefaultNotifier;
 import org.jwcarman.substrate.core.notifier.Notifier;
+import org.jwcarman.substrate.core.transform.PayloadTransformer;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 import org.jwcarman.substrate.mailbox.MailboxFullException;
 import tools.jackson.databind.json.JsonMapper;
@@ -72,7 +73,9 @@ class DefaultMailboxTest {
     spi = new InMemoryMailboxSpi();
     notifier = new DefaultNotifier(new InMemoryNotifier(), CODEC_FACTORY);
     spi.create(KEY, Duration.ofMinutes(5));
-    mailbox = new DefaultMailbox<>(spi, KEY, STRING_CODEC, notifier, coordinator);
+    mailbox =
+        new DefaultMailbox<>(
+            spi, KEY, STRING_CODEC, PayloadTransformer.IDENTITY, notifier, coordinator);
   }
 
   @Test
@@ -302,7 +305,13 @@ class DefaultMailboxTest {
     String shortKey = "substrate:mailbox:short";
     shortTtlSpi.create(shortKey, Duration.ofMillis(100));
     DefaultMailbox<String> shortMailbox =
-        new DefaultMailbox<>(shortTtlSpi, shortKey, STRING_CODEC, notifier, coordinator);
+        new DefaultMailbox<>(
+            shortTtlSpi,
+            shortKey,
+            STRING_CODEC,
+            PayloadTransformer.IDENTITY,
+            notifier,
+            coordinator);
 
     CountDownLatch expirationLatch = new CountDownLatch(1);
     AtomicReference<Boolean> onNextFired = new AtomicReference<>(false);
@@ -322,7 +331,13 @@ class DefaultMailboxTest {
     String shortKey = "substrate:mailbox:short";
     shortTtlSpi.create(shortKey, Duration.ofMillis(100));
     DefaultMailbox<String> shortMailbox =
-        new DefaultMailbox<>(shortTtlSpi, shortKey, STRING_CODEC, notifier, coordinator);
+        new DefaultMailbox<>(
+            shortTtlSpi,
+            shortKey,
+            STRING_CODEC,
+            PayloadTransformer.IDENTITY,
+            notifier,
+            coordinator);
 
     BlockingSubscription<String> sub = shortMailbox.subscribe();
     await()
