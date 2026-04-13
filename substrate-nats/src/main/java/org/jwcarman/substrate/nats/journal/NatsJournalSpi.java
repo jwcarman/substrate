@@ -132,6 +132,9 @@ public class NatsJournalSpi extends AbstractJournalSpi {
       return List.copyOf(allEntries.subList(start, allEntries.size()));
     } catch (IOException | JetStreamApiException _) {
       return List.of();
+    } catch (InterruptedException _) {
+      Thread.currentThread().interrupt();
+      return List.of();
     }
   }
 
@@ -231,24 +234,19 @@ public class NatsJournalSpi extends AbstractJournalSpi {
 
       List<RawJournalEntry> entries = new ArrayList<>();
       try {
-        List<Message> batch;
-        do {
-          batch = sub.fetch(tailBatchSize, fetchTimeout);
-          for (Message msg : batch) {
-            entries.add(toJournalEntry(msg, key));
-          }
-        } while (batch.size() == tailBatchSize);
+        drainAvailable(sub, key, entries, tailBatchSize);
       } finally {
         sub.unsubscribe();
       }
       return entries;
-    } catch (IOException | JetStreamApiException _) {
+    } catch (IOException | JetStreamApiException | InterruptedException _) {
+      Thread.currentThread().interrupt();
       return List.of();
     }
   }
 
   private List<RawJournalEntry> fetchAllForSubject(String subject, String key)
-      throws IOException, JetStreamApiException {
+      throws IOException, JetStreamApiException, InterruptedException {
     PullSubscribeOptions pullOptions =
         PullSubscribeOptions.builder().stream(streamName)
             .configuration(
@@ -262,14 +260,32 @@ public class NatsJournalSpi extends AbstractJournalSpi {
 
     List<RawJournalEntry> entries = new ArrayList<>();
     try {
-      List<Message> batch = sub.fetch(1000, fetchTimeout);
-      for (Message msg : batch) {
-        entries.add(toJournalEntry(msg, key));
-      }
+      drainAvailable(sub, key, entries, 1000);
     } finally {
       sub.unsubscribe();
     }
     return entries;
+  }
+
+  private void drainAvailable(
+      JetStreamSubscription sub, String key, List<RawJournalEntry> entries, int batchSize)
+      throws InterruptedException {
+    int effectiveBatch = Math.max(batchSize, 1);
+    while (true) {
+      sub.pullNoWait(effectiveBatch);
+      int collected = 0;
+      while (true) {
+        Message msg = sub.nextMessage(fetchTimeout);
+        if (msg == null || msg.isStatusMessage()) {
+          break;
+        }
+        entries.add(toJournalEntry(msg, key));
+        collected++;
+      }
+      if (collected < effectiveBatch) {
+        return;
+      }
+    }
   }
 
   private long getSubjectMessageCount(String subject) throws IOException, JetStreamApiException {
