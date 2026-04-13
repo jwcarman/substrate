@@ -35,7 +35,7 @@ class SecretKeyResolverTest {
     SecretKey key = generateKey();
     SecretKeyResolver resolver = SecretKeyResolver.shared(key);
 
-    assertThat(resolver.currentKid()).isEqualTo(0);
+    assertThat(resolver.currentKid()).isZero();
     assertThat(resolver.lookup(0)).isSameAs(key);
   }
 

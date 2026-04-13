@@ -8,7 +8,6 @@
     .app     { fill: #2563eb; stroke: #1e3a8a; stroke-width: 2; }
     .box     { fill: #ffffff; stroke: #334155; stroke-width: 2; }
     .layer   { fill: #eff6ff; stroke: #334155; stroke-width: 2; }
-    .hook    { fill: #fef3c7; stroke: #a16207; stroke-width: 2; }
     .spi     { fill: #dbeafe; stroke: #334155; stroke-width: 2; }
     .backend { fill: #1e40af; stroke: #1e3a8a; stroke-width: 2; }
     .note    { fill: transparent; stroke: #94a3b8; stroke-width: 1.5; stroke-dasharray: 4 3; }
@@ -26,7 +25,6 @@
       .app     { fill: #1e40af; stroke: #93c5fd; }
       .box     { fill: #161b22; stroke: #94a3b8; }
       .layer   { fill: #1e293b; stroke: #94a3b8; }
-      .hook    { fill: #422006; stroke: #fbbf24; }
       .spi     { fill: #1e3a5f; stroke: #94a3b8; }
       .backend { fill: #1e3a8a; stroke: #bfdbfe; }
       .note    { stroke: #64748b; }
@@ -83,13 +81,11 @@
   <!-- Arrow 2 -->
   <path class="arrow" d="M 410 300 L 410 335" marker-end="url(#arrowhead)"/>
 
-  <!-- Layer 4: PayloadTransformer (highlighted as a hook) -->
-  <rect class="hook" x="220" y="345" width="380" height="65" rx="6"/>
+  <!-- Layer 4: PayloadTransformer -->
+  <rect class="layer" x="220" y="345" width="380" height="65" rx="6"/>
   <text class="label"       x="410" y="370" text-anchor="middle">PayloadTransformer</text>
   <text class="label-small" x="410" y="390" text-anchor="middle">byte[] ⇄ byte[]   (encryption, compression, ...)</text>
   <text class="label-tag"   x="410" y="404" text-anchor="middle">defaults to IDENTITY pass-through</text>
-
-  <text class="label-tag" x="760" y="380" text-anchor="start">SPI hook</text>
 
   <!-- Arrow 3 -->
   <path class="arrow" d="M 410 410 L 410 445" marker-end="url(#arrowhead)"/>

@@ -158,7 +158,7 @@ public class PostgresNotifierSpi implements NotifierSpi, SmartLifecycle {
     byte[] payload;
     try {
       payload = Base64.getDecoder().decode(encoded);
-    } catch (IllegalArgumentException e) {
+    } catch (IllegalArgumentException _) {
       log.warn("Ignoring malformed Base64 notification payload: {}", encoded);
       return;
     }

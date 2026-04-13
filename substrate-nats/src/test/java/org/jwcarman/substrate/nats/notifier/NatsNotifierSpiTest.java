@@ -18,7 +18,6 @@ package org.jwcarman.substrate.nats.notifier;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -54,7 +53,7 @@ class NatsNotifierSpiTest {
 
     notifier.notify(payload);
 
-    verify(connection).publish(eq(SUBJECT), eq(payload));
+    verify(connection).publish(SUBJECT, payload);
   }
 
   @Test

@@ -234,7 +234,7 @@ public class SnsNotifierSpi implements NotifierSpi, SmartLifecycle {
     byte[] payload;
     try {
       payload = Base64.getDecoder().decode(encoded);
-    } catch (IllegalArgumentException e) {
+    } catch (IllegalArgumentException _) {
       return;
     }
     for (Consumer<byte[]> handler : handlers) {

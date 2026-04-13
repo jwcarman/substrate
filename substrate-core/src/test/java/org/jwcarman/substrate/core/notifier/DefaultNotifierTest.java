@@ -182,10 +182,10 @@ class DefaultNotifierTest {
   @Test
   void malformedPayloadIsDropped() {
     InMemoryNotifier spi = new InMemoryNotifier();
-    DefaultNotifier notifier = new DefaultNotifier(spi, CODEC_FACTORY);
+    DefaultNotifier localNotifier = new DefaultNotifier(spi, CODEC_FACTORY);
 
     List<Notification> received = new ArrayList<>();
-    notifier.subscribeToAtom("key1", received::add);
+    localNotifier.subscribeToAtom("key1", received::add);
 
     spi.notify(new byte[] {0, 1, 2, 3});
 
