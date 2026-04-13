@@ -132,6 +132,9 @@ public class NatsJournalSpi extends AbstractJournalSpi {
       return List.copyOf(allEntries.subList(start, allEntries.size()));
     } catch (IOException | JetStreamApiException _) {
       return List.of();
+    } catch (InterruptedException _) {
+      Thread.currentThread().interrupt();
+      return List.of();
     }
   }
 
@@ -238,11 +241,14 @@ public class NatsJournalSpi extends AbstractJournalSpi {
       return entries;
     } catch (IOException | JetStreamApiException _) {
       return List.of();
+    } catch (InterruptedException _) {
+      Thread.currentThread().interrupt();
+      return List.of();
     }
   }
 
   private List<RawJournalEntry> fetchAllForSubject(String subject, String key)
-      throws IOException, JetStreamApiException {
+      throws IOException, JetStreamApiException, InterruptedException {
     PullSubscribeOptions pullOptions =
         PullSubscribeOptions.builder().stream(streamName)
             .configuration(
@@ -264,15 +270,24 @@ public class NatsJournalSpi extends AbstractJournalSpi {
   }
 
   private void drainAvailable(
-      JetStreamSubscription sub, String key, List<RawJournalEntry> entries, int batchSize) {
+      JetStreamSubscription sub, String key, List<RawJournalEntry> entries, int batchSize)
+      throws InterruptedException {
     int effectiveBatch = Math.max(batchSize, 1);
-    List<Message> batch;
-    do {
-      batch = sub.fetch(effectiveBatch, fetchTimeout);
-      for (Message msg : batch) {
+    while (true) {
+      sub.pullNoWait(effectiveBatch);
+      int collected = 0;
+      while (true) {
+        Message msg = sub.nextMessage(fetchTimeout);
+        if (msg == null || msg.isStatusMessage()) {
+          break;
+        }
         entries.add(toJournalEntry(msg, key));
+        collected++;
       }
-    } while (batch.size() == effectiveBatch);
+      if (collected < effectiveBatch) {
+        return;
+      }
+    }
   }
 
   private long getSubjectMessageCount(String subject) throws IOException, JetStreamApiException {
