@@ -132,9 +132,6 @@ public class NatsJournalSpi extends AbstractJournalSpi {
       return List.copyOf(allEntries.subList(start, allEntries.size()));
     } catch (IOException | JetStreamApiException _) {
       return List.of();
-    } catch (InterruptedException _) {
-      Thread.currentThread().interrupt();
-      return List.of();
     }
   }
 
@@ -239,14 +236,13 @@ public class NatsJournalSpi extends AbstractJournalSpi {
         sub.unsubscribe();
       }
       return entries;
-    } catch (IOException | JetStreamApiException | InterruptedException _) {
-      Thread.currentThread().interrupt();
+    } catch (IOException | JetStreamApiException _) {
       return List.of();
     }
   }
 
   private List<RawJournalEntry> fetchAllForSubject(String subject, String key)
-      throws IOException, JetStreamApiException, InterruptedException {
+      throws IOException, JetStreamApiException {
     PullSubscribeOptions pullOptions =
         PullSubscribeOptions.builder().stream(streamName)
             .configuration(
@@ -268,24 +264,15 @@ public class NatsJournalSpi extends AbstractJournalSpi {
   }
 
   private void drainAvailable(
-      JetStreamSubscription sub, String key, List<RawJournalEntry> entries, int batchSize)
-      throws InterruptedException {
+      JetStreamSubscription sub, String key, List<RawJournalEntry> entries, int batchSize) {
     int effectiveBatch = Math.max(batchSize, 1);
-    while (true) {
-      sub.pullNoWait(effectiveBatch);
-      int collected = 0;
-      while (true) {
-        Message msg = sub.nextMessage(fetchTimeout);
-        if (msg == null || msg.isStatusMessage()) {
-          break;
-        }
+    List<Message> batch;
+    do {
+      batch = sub.fetch(effectiveBatch, fetchTimeout);
+      for (Message msg : batch) {
         entries.add(toJournalEntry(msg, key));
-        collected++;
       }
-      if (collected < effectiveBatch) {
-        return;
-      }
-    }
+    } while (batch.size() == effectiveBatch);
   }
 
   private long getSubjectMessageCount(String subject) throws IOException, JetStreamApiException {
