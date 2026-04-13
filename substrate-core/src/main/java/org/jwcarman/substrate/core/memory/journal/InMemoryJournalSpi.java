@@ -55,7 +55,10 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
     }
   }
 
+  private static final Duration TOMBSTONE_GRACE = Duration.ofMinutes(5);
+
   private final ConcurrentMap<String, State> store = new ConcurrentHashMap<>();
+  private final ConcurrentMap<String, Instant> tombstones = new ConcurrentHashMap<>();
   private final int maxLen;
   private final AtomicLong counter = new AtomicLong(0);
 
@@ -112,9 +115,12 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
     Instant now = Instant.now();
     State state = store.get(key);
     if (state == null) {
-      throw new JournalExpiredException(key);
+      throwIfTombstoned(key, now);
+      return List.of();
     }
     if (state.isDead(now)) {
+      tombstone(key, now);
+      store.remove(key, state);
       throw new JournalExpiredException(key);
     }
     long cursor = parseId(afterId);
@@ -129,9 +135,12 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
     Instant now = Instant.now();
     State state = store.get(key);
     if (state == null) {
-      throw new JournalExpiredException(key);
+      throwIfTombstoned(key, now);
+      return List.of();
     }
     if (state.isDead(now)) {
+      tombstone(key, now);
+      store.remove(key, state);
       throw new JournalExpiredException(key);
     }
     List<RawJournalEntry> live =
@@ -141,6 +150,22 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
             .toList();
     int start = Math.max(0, live.size() - count);
     return List.copyOf(live.subList(start, live.size()));
+  }
+
+  private void tombstone(String key, Instant diedAt) {
+    tombstones.put(key, diedAt);
+  }
+
+  private void throwIfTombstoned(String key, Instant now) {
+    Instant diedAt = tombstones.get(key);
+    if (diedAt == null) {
+      return;
+    }
+    if (now.isAfter(diedAt.plus(TOMBSTONE_GRACE))) {
+      tombstones.remove(key, diedAt);
+      return;
+    }
+    throw new JournalExpiredException(key);
   }
 
   @Override
@@ -175,8 +200,16 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
     while (iterator.hasNext() && removed < maxToSweep) {
       var entry = iterator.next();
       if (entry.getValue().isDead(now)) {
+        tombstone(entry.getKey(), now);
         iterator.remove();
         removed++;
+      }
+    }
+    var tombIter = tombstones.entrySet().iterator();
+    while (tombIter.hasNext()) {
+      var tomb = tombIter.next();
+      if (now.isAfter(tomb.getValue().plus(TOMBSTONE_GRACE))) {
+        tombIter.remove();
       }
     }
     return removed;
@@ -184,7 +217,9 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
 
   @Override
   public void delete(String key) {
-    store.remove(key);
+    if (store.remove(key) != null) {
+      tombstone(key, Instant.now());
+    }
   }
 
   private static long parseId(String id) {

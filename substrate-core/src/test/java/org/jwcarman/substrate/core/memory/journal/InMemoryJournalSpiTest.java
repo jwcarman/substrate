@@ -155,9 +155,8 @@ class InMemoryJournalSpiTest {
   }
 
   @Test
-  void readAfterOnNonExistentKeyThrowsJournalExpiredException() {
-    assertThatThrownBy(() -> journal.readAfter("nonexistent", "0-0"))
-        .isInstanceOf(JournalExpiredException.class);
+  void readAfterOnNonExistentKeyReturnsEmpty() {
+    assertThat(journal.readAfter("nonexistent", "0-0")).isEmpty();
   }
 
   @Test
@@ -187,9 +186,8 @@ class InMemoryJournalSpiTest {
   }
 
   @Test
-  void readLastOnNonExistentKeyThrowsJournalExpiredException() {
-    assertThatThrownBy(() -> journal.readLast("nonexistent", 5))
-        .isInstanceOf(JournalExpiredException.class);
+  void readLastOnNonExistentKeyReturnsEmpty() {
+    assertThat(journal.readLast("nonexistent", 5)).isEmpty();
   }
 
   @Test
