@@ -113,7 +113,7 @@
   <!-- Layer 6: Backend -->
   <rect class="backend" x="180" y="575" width="460" height="100" rx="8"/>
   <text class="label-inv"       x="410" y="600" text-anchor="middle">Backend Module</text>
-  <text class="label-small-inv" x="410" y="625" text-anchor="middle">Redis  ·  PostgreSQL  ·  NATS  ·  MongoDB</text>
+  <text class="label-small-inv" x="410" y="625" text-anchor="middle">Redis  ·  PostgreSQL  ·  NATS  ·  MongoDB  ·  etcd</text>
   <text class="label-small-inv" x="410" y="645" text-anchor="middle">DynamoDB  ·  Cassandra  ·  Hazelcast  ·  RabbitMQ  ·  SNS</text>
   <text class="label-small-inv" x="410" y="663" text-anchor="middle">+ cross-node wake-up via NotifierSpi</text>
 

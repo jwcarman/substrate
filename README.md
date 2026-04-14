@@ -446,6 +446,7 @@ module per backend, not per primitive.
 | MongoDB    | `substrate-mongodb` | ✓ | ✓ | ✓ |
 | DynamoDB   | `substrate-dynamodb` | ✓ | ✓ | ✓ |
 | Cassandra  | `substrate-cassandra` | ✓ | ✓ | — |
+| etcd       | `substrate-etcd` | ✓ | — | — |
 | RabbitMQ   | `substrate-rabbitmq` | — | ✓ | — |
 | SNS/SQS    | `substrate-sns` | — | — | — |
 

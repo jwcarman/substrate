@@ -10,6 +10,18 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+### Added
+
+- **`substrate-etcd` module** — `AtomSpi` backed by etcd (Atom only;
+  etcd doesn't map cleanly to Journal or Mailbox semantics). Uses
+  etcd's native primitives so the backend avoids the CAS/touch hacks
+  other backends need: `create`/`set` run as atomic `txn` compares,
+  TTL is enforced via leases, and `touch` rotates keys onto fresh
+  leases with a `modRevision` CAS that prevents the read-then-rewrite
+  value regression that burned us on Cassandra. Recommended for
+  small-state atoms (session/config/flag-sized, well under etcd's
+  ~64KB practical value ceiling).
+
 ## [0.4.0] - 2026-04-13
 
 ### Added
