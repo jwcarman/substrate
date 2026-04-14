@@ -200,6 +200,42 @@ class EtcdAtomSpiIT {
   }
 
   @Test
+  void concurrentTouchAndSetDoesNotRegressValue() throws Exception {
+    String key = atom.atomKey("touch-set-race");
+    atom.create(key, "v0".getBytes(StandardCharsets.UTF_8), "tok-0", Duration.ofMinutes(5));
+
+    int iterations = 200;
+    Thread setter =
+        Thread.ofVirtual()
+            .start(
+                () -> {
+                  for (int i = 1; i <= iterations; i++) {
+                    atom.set(
+                        key,
+                        ("v" + i).getBytes(StandardCharsets.UTF_8),
+                        "tok-" + i,
+                        Duration.ofMinutes(5));
+                  }
+                });
+    Thread toucher =
+        Thread.ofVirtual()
+            .start(
+                () -> {
+                  for (int i = 0; i < iterations; i++) {
+                    atom.touch(key, Duration.ofMinutes(5));
+                  }
+                });
+    setter.join();
+    toucher.join();
+
+    Optional<RawAtom> finalState = atom.read(key);
+    assertThat(finalState).isPresent();
+    assertThat(new String(finalState.get().value(), StandardCharsets.UTF_8))
+        .isEqualTo("v" + iterations);
+    assertThat(finalState.get().token()).isEqualTo("tok-" + iterations);
+  }
+
+  @Test
   void sweepReturnsZero() {
     assertThat(atom.sweep(100)).isZero();
   }

@@ -109,12 +109,17 @@ public class EtcdAtomSpi extends AbstractAtomSpi {
     if (current == null) {
       return false;
     }
-    return leasedWrite(
-        new Cmp(keyBs, Cmp.Op.GREATER, CmpTarget.createRevision(0L)),
-        newLeaseId -> Op.put(keyBs, current.getValue(), withLease(newLeaseId)),
-        current.getLease(),
-        ttl,
-        "touch atom in etcd");
+    // CAS on the modRevision we observed so a concurrent set() can't cause touch to
+    // re-put a stale value on top of a newer one. If the CAS fails the key is still
+    // alive (a concurrent writer just refreshed it with their own TTL), so return true.
+    boolean applied =
+        leasedWrite(
+            new Cmp(keyBs, Cmp.Op.EQUAL, CmpTarget.modRevision(current.getModRevision())),
+            newLeaseId -> Op.put(keyBs, current.getValue(), withLease(newLeaseId)),
+            current.getLease(),
+            ttl,
+            "touch atom in etcd");
+    return applied || atomExists(keyBs);
   }
 
   /**
@@ -183,6 +188,10 @@ public class EtcdAtomSpi extends AbstractAtomSpi {
   private long currentLeaseId(ByteSequence keyBs) {
     KeyValue kv = currentKv(keyBs);
     return kv == null ? -1L : kv.getLease();
+  }
+
+  private boolean atomExists(ByteSequence keyBs) {
+    return currentKv(keyBs) != null;
   }
 
   private KeyValue currentKv(ByteSequence keyBs) {

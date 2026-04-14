@@ -218,13 +218,38 @@ class EtcdAtomSpiErrorsTest {
   }
 
   @Test
-  void touchReturnsFalseWhenTxnFails() {
+  void touchReturnsTrueWhenCasLosesButKeyStillAlive() {
     stubGet(kv(7L));
     stubGrantLease(99L);
     stubTxn(false);
     doReturn(CompletableFuture.completedFuture(null)).when(lease).revoke(anyLong());
 
-    assertThat(atom.touch("substrate:atom:k", Duration.ofSeconds(5))).isFalse();
+    // CAS failure means someone else wrote in between — key is alive with a fresh TTL.
+    assertThat(atom.touch("substrate:atom:k", Duration.ofSeconds(5))).isTrue();
+  }
+
+  @Test
+  void touchReturnsFalseWhenCasLosesAndKeyIsGone() {
+    // First get() returns the key (for initial lookup); second get() returns empty
+    // (atomExists() call after CAS loss) to simulate concurrent delete.
+    KeyValue existing = kv(7L);
+    List<KeyValue> presentKvs = List.of(existing);
+    List<KeyValue> absentKvs = List.of();
+    GetResponse present = mock(GetResponse.class);
+    GetResponse absent = mock(GetResponse.class);
+    when(present.getKvs()).thenReturn(presentKvs);
+    when(absent.getKvs()).thenReturn(absentKvs);
+    CompletableFuture<GetResponse> presentFuture = CompletableFuture.completedFuture(present);
+    CompletableFuture<GetResponse> absentFuture = CompletableFuture.completedFuture(absent);
+    when(kv.get(any(ByteSequence.class))).thenReturn(presentFuture, absentFuture);
+    when(kv.get(any(ByteSequence.class), any(GetOption.class)))
+        .thenReturn(presentFuture, absentFuture);
+    stubGrantLease(99L);
+    stubTxn(false);
+    doReturn(CompletableFuture.completedFuture(null)).when(lease).revoke(anyLong());
+    Duration ttl = Duration.ofSeconds(5);
+
+    assertThat(atom.touch("substrate:atom:k", ttl)).isFalse();
   }
 
   @Test
