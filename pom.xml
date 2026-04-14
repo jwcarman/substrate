@@ -115,6 +115,7 @@
         <module>substrate-cassandra</module>
         <module>substrate-sns</module>
         <module>substrate-crypto</module>
+        <module>substrate-etcd</module>
     </modules>
 
     <dependencies>

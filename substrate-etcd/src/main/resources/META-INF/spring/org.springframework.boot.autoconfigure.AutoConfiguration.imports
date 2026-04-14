@@ -1,0 +1,2 @@
+org.jwcarman.substrate.etcd.EtcdAutoConfiguration
+org.jwcarman.substrate.etcd.atom.EtcdAtomAutoConfiguration
