@@ -28,6 +28,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
+import java.util.function.LongFunction;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
 import org.jwcarman.substrate.core.atom.AbstractAtomSpi;
 import org.jwcarman.substrate.core.atom.RawAtom;
@@ -56,27 +57,16 @@ public class EtcdAtomSpi extends AbstractAtomSpi {
   @Override
   public void create(String key, byte[] value, String token, Duration ttl) {
     ByteSequence keyBs = bs(key);
-    long leaseId = grantLease(ttl);
-    try {
-      var txnResponse =
-          client
-              .getKVClient()
-              .txn()
-              .If(new Cmp(keyBs, Cmp.Op.EQUAL, CmpTarget.createRevision(0L)))
-              .Then(Op.put(keyBs, bs(AtomPayload.encode(value, token)), putWithLease(leaseId)))
-              .commit()
-              .get();
-      if (!txnResponse.isSucceeded()) {
-        revokeQuiet(leaseId);
-        throw new AtomAlreadyExistsException(key);
-      }
-    } catch (InterruptedException e) {
-      revokeQuiet(leaseId);
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("Interrupted while creating atom in etcd", e);
-    } catch (ExecutionException e) {
-      revokeQuiet(leaseId);
-      throw new IllegalStateException("Failed to create atom in etcd", e.getCause());
+    boolean created =
+        leasedWrite(
+            new Cmp(keyBs, Cmp.Op.EQUAL, CmpTarget.createRevision(0L)),
+            newLeaseId ->
+                Op.put(keyBs, bs(AtomPayload.encode(value, token)), withLease(newLeaseId)),
+            0L,
+            ttl,
+            "create atom in etcd");
+    if (!created) {
+      throw new AtomAlreadyExistsException(key);
     }
   }
 
@@ -104,32 +94,12 @@ public class EtcdAtomSpi extends AbstractAtomSpi {
     if (oldLeaseId == -1L) {
       return false;
     }
-    long newLeaseId = grantLease(ttl);
-    try {
-      var txnResponse =
-          client
-              .getKVClient()
-              .txn()
-              .If(new Cmp(keyBs, Cmp.Op.GREATER, CmpTarget.createRevision(0L)))
-              .Then(Op.put(keyBs, bs(AtomPayload.encode(value, token)), putWithLease(newLeaseId)))
-              .commit()
-              .get();
-      if (!txnResponse.isSucceeded()) {
-        revokeQuiet(newLeaseId);
-        return false;
-      }
-      if (oldLeaseId > 0) {
-        revokeQuiet(oldLeaseId);
-      }
-      return true;
-    } catch (InterruptedException e) {
-      revokeQuiet(newLeaseId);
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("Interrupted while setting atom in etcd", e);
-    } catch (ExecutionException e) {
-      revokeQuiet(newLeaseId);
-      throw new IllegalStateException("Failed to set atom in etcd", e.getCause());
-    }
+    return leasedWrite(
+        new Cmp(keyBs, Cmp.Op.GREATER, CmpTarget.createRevision(0L)),
+        newLeaseId -> Op.put(keyBs, bs(AtomPayload.encode(value, token)), withLease(newLeaseId)),
+        oldLeaseId,
+        ttl,
+        "set atom in etcd");
   }
 
   @Override
@@ -139,31 +109,43 @@ public class EtcdAtomSpi extends AbstractAtomSpi {
     if (current == null) {
       return false;
     }
+    return leasedWrite(
+        new Cmp(keyBs, Cmp.Op.GREATER, CmpTarget.createRevision(0L)),
+        newLeaseId -> Op.put(keyBs, current.getValue(), withLease(newLeaseId)),
+        current.getLease(),
+        ttl,
+        "touch atom in etcd");
+  }
+
+  /**
+   * Runs a put-on-a-fresh-lease txn and cleans up leases on either outcome:
+   *
+   * <ul>
+   *   <li>granted lease is revoked if the txn fails or the commit throws
+   *   <li>old lease is revoked after a successful replacement
+   * </ul>
+   *
+   * Returns whether the txn compare succeeded.
+   */
+  private boolean leasedWrite(
+      Cmp condition, LongFunction<Op> putOp, long oldLeaseId, Duration ttl, String description) {
     long newLeaseId = grantLease(ttl);
     try {
       var txnResponse =
-          client
-              .getKVClient()
-              .txn()
-              .If(new Cmp(keyBs, Cmp.Op.GREATER, CmpTarget.createRevision(0L)))
-              .Then(Op.put(keyBs, current.getValue(), putWithLease(newLeaseId)))
-              .commit()
-              .get();
+          client.getKVClient().txn().If(condition).Then(putOp.apply(newLeaseId)).commit().get();
       if (!txnResponse.isSucceeded()) {
         revokeQuiet(newLeaseId);
         return false;
       }
-      if (current.getLease() > 0) {
-        revokeQuiet(current.getLease());
-      }
+      revokeQuiet(oldLeaseId);
       return true;
     } catch (InterruptedException e) {
       revokeQuiet(newLeaseId);
       Thread.currentThread().interrupt();
-      throw new IllegalStateException("Interrupted while touching atom in etcd", e);
+      throw new IllegalStateException("Interrupted while " + description, e);
     } catch (ExecutionException e) {
       revokeQuiet(newLeaseId);
-      throw new IllegalStateException("Failed to touch atom in etcd", e.getCause());
+      throw new IllegalStateException("Failed to " + description, e.getCause());
     }
   }
 
@@ -224,7 +206,7 @@ public class EtcdAtomSpi extends AbstractAtomSpi {
     return ByteSequence.from(bytes);
   }
 
-  private static PutOption putWithLease(long leaseId) {
+  private static PutOption withLease(long leaseId) {
     return PutOption.builder().withLeaseId(leaseId).build();
   }
 }

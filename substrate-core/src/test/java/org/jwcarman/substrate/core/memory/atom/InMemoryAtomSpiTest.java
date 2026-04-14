@@ -55,7 +55,8 @@ class InMemoryAtomSpiTest {
     spi.create("key", new byte[] {1}, "t1", Duration.ofSeconds(10));
 
     Duration tenSeconds = Duration.ofSeconds(10);
-    assertThatThrownBy(() -> spi.create("key", new byte[] {2}, "t2", tenSeconds))
+    byte[] newValue = new byte[] {2};
+    assertThatThrownBy(() -> spi.create("key", newValue, "t2", tenSeconds))
         .isInstanceOf(AtomAlreadyExistsException.class);
   }
 

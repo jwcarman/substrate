@@ -38,6 +38,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
@@ -232,9 +233,31 @@ class EtcdAtomSpiErrorsTest {
     stubGrantLease(99L);
     stubTxnFailure(new RuntimeException("txn boom"));
 
-    assertThatThrownBy(() -> atom.touch("substrate:atom:k", Duration.ofSeconds(5)))
+    Duration ttl = Duration.ofSeconds(5);
+    assertThatThrownBy(() -> atom.touch("substrate:atom:k", ttl))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("Failed to touch atom in etcd");
+  }
+
+  @Test
+  void setWrapsCurrentLeaseIdExecutionFailure() {
+    stubGetFailure(new RuntimeException("lookup boom"));
+    byte[] value = "v".getBytes(StandardCharsets.UTF_8);
+    Duration ttl = Duration.ofSeconds(5);
+
+    assertThatThrownBy(() -> atom.set("substrate:atom:k", value, "tok", ttl))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Failed to read atom from etcd");
+  }
+
+  @Test
+  void touchWrapsCurrentKvExecutionFailure() {
+    stubGetFailure(new RuntimeException("lookup boom"));
+    Duration ttl = Duration.ofSeconds(5);
+
+    assertThatThrownBy(() -> atom.touch("substrate:atom:k", ttl))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Failed to read atom from etcd");
   }
 
   @Test
@@ -251,6 +274,79 @@ class EtcdAtomSpiErrorsTest {
   @Test
   void sweepReturnsZero() {
     assertThat(atom.sweep(100)).isZero();
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> CompletableFuture<T> interruptedFuture()
+      throws InterruptedException, ExecutionException {
+    CompletableFuture<T> future = mock(CompletableFuture.class);
+    when(future.get()).thenThrow(new InterruptedException("test"));
+    return future;
+  }
+
+  @Test
+  void grantLeaseInterruptWrapsAndSetsInterrupt() throws Exception {
+    CompletableFuture<LeaseGrantResponse> future = interruptedFuture();
+    when(lease.grant(anyLong())).thenReturn(future);
+    byte[] value = "v".getBytes(StandardCharsets.UTF_8);
+    Duration ttl = Duration.ofSeconds(5);
+
+    assertThatThrownBy(() -> atom.create("substrate:atom:k", value, "tok", ttl))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Interrupted while granting etcd lease");
+    assertThat(Thread.interrupted()).isTrue();
+  }
+
+  @Test
+  void readInterruptWrapsAndSetsInterrupt() throws Exception {
+    CompletableFuture<GetResponse> future = interruptedFuture();
+    when(kv.get(any(ByteSequence.class))).thenReturn(future);
+
+    assertThatThrownBy(() -> atom.read("substrate:atom:k"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Interrupted while reading atom from etcd");
+    assertThat(Thread.interrupted()).isTrue();
+  }
+
+  @Test
+  void deleteInterruptWrapsAndSetsInterrupt() throws Exception {
+    CompletableFuture<io.etcd.jetcd.kv.DeleteResponse> future = interruptedFuture();
+    when(kv.delete(any(ByteSequence.class))).thenReturn(future);
+
+    assertThatThrownBy(() -> atom.delete("substrate:atom:k"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Interrupted while deleting atom from etcd");
+    assertThat(Thread.interrupted()).isTrue();
+  }
+
+  @Test
+  void setInterruptWrapsAndSetsInterrupt() throws Exception {
+    stubGet(kv(7L));
+    stubGrantLease(99L);
+    Txn txn = mock(Txn.class, RETURNS_DEEP_STUBS);
+    when(kv.txn()).thenReturn(txn);
+    CompletableFuture<TxnResponse> future = interruptedFuture();
+    when(txn.If(any()).Then(any()).commit()).thenReturn(future);
+    doReturn(CompletableFuture.completedFuture(null)).when(lease).revoke(anyLong());
+    byte[] value = "v".getBytes(StandardCharsets.UTF_8);
+    Duration ttl = Duration.ofSeconds(5);
+
+    assertThatThrownBy(() -> atom.set("substrate:atom:k", value, "tok", ttl))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Interrupted while set atom in etcd");
+    assertThat(Thread.interrupted()).isTrue();
+  }
+
+  @Test
+  void currentKvInterruptWrapsAndSetsInterrupt() throws Exception {
+    CompletableFuture<GetResponse> future = interruptedFuture();
+    when(kv.get(any(ByteSequence.class), any(GetOption.class))).thenReturn(future);
+    Duration ttl = Duration.ofSeconds(5);
+
+    assertThatThrownBy(() -> atom.touch("substrate:atom:k", ttl))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Interrupted while reading atom from etcd");
+    assertThat(Thread.interrupted()).isTrue();
   }
 
   @Test
