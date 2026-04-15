@@ -103,6 +103,11 @@ public class RedisJournalSpi extends AbstractJournalSpi {
     commands.del(key, key + COMPLETED_SUFFIX);
   }
 
+  @Override
+  public boolean exists(String key) {
+    return commands.exists(key) > 0;
+  }
+
   private RawJournalEntry toJournalEntry(String key, StreamMessage<String, String> message) {
     Map<String, String> body = message.getBody();
     String encodedData = body.get(FIELD_DATA);

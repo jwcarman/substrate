@@ -79,4 +79,9 @@ public class RedisMailboxSpi extends AbstractMailboxSpi {
   public void delete(String key) {
     commands.del(key);
   }
+
+  @Override
+  public boolean exists(String key) {
+    return commands.exists(key) > 0;
+  }
 }

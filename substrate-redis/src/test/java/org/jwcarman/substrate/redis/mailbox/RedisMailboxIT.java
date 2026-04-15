@@ -72,6 +72,18 @@ class RedisMailboxIT {
   }
 
   @Test
+  void existsReturnsFalseForNeverCreatedKey() {
+    assertThat(mailbox.exists(mailbox.mailboxKey("never-created"))).isFalse();
+  }
+
+  @Test
+  void existsReturnsTrueForCreatedKey() {
+    String key = mailbox.mailboxKey("exists-test");
+    mailbox.create(key, Duration.ofMinutes(5));
+    assertThat(mailbox.exists(key)).isTrue();
+  }
+
+  @Test
   void getThrowsWhenMailboxDoesNotExist() {
     String key = mailbox.mailboxKey("empty-test");
 
