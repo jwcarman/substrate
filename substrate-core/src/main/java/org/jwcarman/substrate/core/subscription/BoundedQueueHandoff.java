@@ -60,7 +60,9 @@ public final class BoundedQueueHandoff<T> extends AbstractHandoff<T> {
           return;
         }
       }
-      if (terminal != null) return;
+      if (terminal != null) {
+        return;
+      }
       queue.addLast(item);
       notEmpty.signalAll();
     } finally {
@@ -71,7 +73,9 @@ public final class BoundedQueueHandoff<T> extends AbstractHandoff<T> {
   @Override
   protected T takeValue() {
     T v = queue.pollFirst();
-    if (v != null) notFull.signalAll();
+    if (v != null) {
+      notFull.signalAll();
+    }
     return v;
   }
 

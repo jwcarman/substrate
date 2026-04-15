@@ -30,7 +30,9 @@ public final class SingleSlotHandoff<T> extends AbstractHandoff<T> {
   public void deliver(T item) {
     lock.lock();
     try {
-      if (terminal != null) return;
+      if (terminal != null) {
+        return;
+      }
       value = item;
       notEmpty.signalAll();
     } finally {

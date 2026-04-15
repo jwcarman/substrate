@@ -19,6 +19,8 @@ import java.time.Duration;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.jwcarman.substrate.NextResult;
 
 /**
@@ -34,6 +36,8 @@ import org.jwcarman.substrate.NextResult;
  * @param <T> the type of values transferred through the handoff
  */
 public abstract class AbstractHandoff<T> implements Handoff<T> {
+
+  private static final Log log = LogFactory.getLog(AbstractHandoff.class);
 
   /** Lock guarding all mutable state of this handoff. */
   protected final Lock lock = new ReentrantLock();
@@ -74,9 +78,15 @@ public abstract class AbstractHandoff<T> implements Handoff<T> {
       long remaining = deadlineNanos - System.nanoTime();
       while (true) {
         T v = takeValue();
-        if (v != null) return new NextResult.Value<>(v);
-        if (terminal != null) return terminal;
-        if (remaining <= 0) return new NextResult.Timeout<>();
+        if (v != null) {
+          return new NextResult.Value<>(v);
+        }
+        if (terminal != null) {
+          return terminal;
+        }
+        if (remaining <= 0) {
+          return new NextResult.Timeout<>();
+        }
         try {
           remaining = notEmpty.awaitNanos(remaining);
         } catch (InterruptedException _) {
@@ -117,8 +127,16 @@ public abstract class AbstractHandoff<T> implements Handoff<T> {
   private void mark(NextResult<T> t) {
     lock.lock();
     try {
-      if (terminal != null) return;
+      if (terminal != null) {
+        if (log.isDebugEnabled()) {
+          log.debug("Handoff terminal already set (" + terminal + "); ignoring " + t);
+        }
+        return;
+      }
       terminal = t;
+      if (log.isDebugEnabled()) {
+        log.debug("Handoff terminal set: " + t);
+      }
       notEmpty.signalAll();
       onTerminalSet();
     } finally {
