@@ -19,6 +19,7 @@ import io.lettuce.core.RedisClient;
 import io.lettuce.core.codec.ByteArrayCodec;
 import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 import org.jwcarman.substrate.core.autoconfigure.SubstrateAutoConfiguration;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.redis.RedisAutoConfiguration;
@@ -45,7 +46,10 @@ public class RedisNotifierAutoConfiguration {
   public RedisNotifierSpi redisNotifier(
       RedisConnectionFactory connectionFactory, RedisProperties properties) {
     LettuceConnectionFactory lcf = (LettuceConnectionFactory) connectionFactory;
-    RedisClient client = (RedisClient) lcf.getNativeClient();
+    RedisClient client =
+        Objects.requireNonNull(
+            (RedisClient) lcf.getNativeClient(),
+            "LettuceConnectionFactory did not expose a native RedisClient");
 
     StatefulRedisPubSubConnection<byte[], byte[]> pubSubConnection =
         client.connectPubSub(ByteArrayCodec.INSTANCE);

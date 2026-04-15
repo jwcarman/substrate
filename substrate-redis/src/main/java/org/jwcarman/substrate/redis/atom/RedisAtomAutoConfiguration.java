@@ -18,6 +18,7 @@ package org.jwcarman.substrate.redis.atom;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.sync.RedisCommands;
 import io.lettuce.core.codec.StringCodec;
+import java.util.Objects;
 import org.jwcarman.substrate.core.atom.AtomSpi;
 import org.jwcarman.substrate.core.autoconfigure.SubstrateAutoConfiguration;
 import org.jwcarman.substrate.redis.RedisAutoConfiguration;
@@ -44,7 +45,10 @@ public class RedisAtomAutoConfiguration {
   public RedisAtomSpi redisAtomSpi(
       RedisConnectionFactory connectionFactory, RedisProperties properties) {
     LettuceConnectionFactory lcf = (LettuceConnectionFactory) connectionFactory;
-    RedisClient client = (RedisClient) lcf.getNativeClient();
+    RedisClient client =
+        Objects.requireNonNull(
+            (RedisClient) lcf.getNativeClient(),
+            "LettuceConnectionFactory did not expose a native RedisClient");
     RedisCommands<String, String> commands = client.connect(StringCodec.UTF8).sync();
     return new RedisAtomSpi(commands, properties.atom().prefix());
   }

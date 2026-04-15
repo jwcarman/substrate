@@ -18,6 +18,7 @@ package org.jwcarman.substrate.redis.journal;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.codec.StringCodec;
+import java.util.Objects;
 import org.jwcarman.substrate.core.autoconfigure.SubstrateAutoConfiguration;
 import org.jwcarman.substrate.core.journal.JournalSpi;
 import org.jwcarman.substrate.redis.RedisAutoConfiguration;
@@ -44,7 +45,10 @@ public class RedisJournalAutoConfiguration {
   public RedisJournalSpi redisJournal(
       RedisConnectionFactory connectionFactory, RedisProperties properties) {
     LettuceConnectionFactory lcf = (LettuceConnectionFactory) connectionFactory;
-    RedisClient client = (RedisClient) lcf.getNativeClient();
+    RedisClient client =
+        Objects.requireNonNull(
+            (RedisClient) lcf.getNativeClient(),
+            "LettuceConnectionFactory did not expose a native RedisClient");
     StatefulRedisConnection<String, String> connection = client.connect(StringCodec.UTF8);
 
     return new RedisJournalSpi(

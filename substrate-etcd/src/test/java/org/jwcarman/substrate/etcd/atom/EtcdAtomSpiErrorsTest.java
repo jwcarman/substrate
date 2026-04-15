@@ -116,14 +116,10 @@ class EtcdAtomSpiErrorsTest {
   @Test
   void createWrapsLeaseGrantExecutionFailure() {
     stubGrantLeaseFailure(new RuntimeException("grant boom"));
+    byte[] value = "v".getBytes(StandardCharsets.UTF_8);
+    Duration ttl = Duration.ofSeconds(5);
 
-    assertThatThrownBy(
-            () ->
-                atom.create(
-                    "substrate:atom:k",
-                    "v".getBytes(StandardCharsets.UTF_8),
-                    "tok",
-                    Duration.ofSeconds(5)))
+    assertThatThrownBy(() -> atom.create("substrate:atom:k", value, "tok", ttl))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("Failed to grant etcd lease");
   }
@@ -132,14 +128,10 @@ class EtcdAtomSpiErrorsTest {
   void createThrowsAlreadyExistsWhenTxnFails() {
     stubGrantLease(42L);
     stubTxn(false);
+    byte[] value = "v".getBytes(StandardCharsets.UTF_8);
+    Duration ttl = Duration.ofSeconds(5);
 
-    assertThatThrownBy(
-            () ->
-                atom.create(
-                    "substrate:atom:dup",
-                    "v".getBytes(StandardCharsets.UTF_8),
-                    "tok",
-                    Duration.ofSeconds(5)))
+    assertThatThrownBy(() -> atom.create("substrate:atom:dup", value, "tok", ttl))
         .isInstanceOf(AtomAlreadyExistsException.class);
   }
 
@@ -147,14 +139,10 @@ class EtcdAtomSpiErrorsTest {
   void createWrapsTxnExecutionFailure() {
     stubGrantLease(42L);
     stubTxnFailure(new RuntimeException("txn boom"));
+    byte[] value = "v".getBytes(StandardCharsets.UTF_8);
+    Duration ttl = Duration.ofSeconds(5);
 
-    assertThatThrownBy(
-            () ->
-                atom.create(
-                    "substrate:atom:k",
-                    "v".getBytes(StandardCharsets.UTF_8),
-                    "tok",
-                    Duration.ofSeconds(5)))
+    assertThatThrownBy(() -> atom.create("substrate:atom:k", value, "tok", ttl))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("Failed to create atom in etcd");
   }
@@ -198,14 +186,10 @@ class EtcdAtomSpiErrorsTest {
     stubGet(kv(7L));
     stubGrantLease(99L);
     stubTxnFailure(new RuntimeException("txn boom"));
+    byte[] value = "v".getBytes(StandardCharsets.UTF_8);
+    Duration ttl = Duration.ofSeconds(5);
 
-    assertThatThrownBy(
-            () ->
-                atom.set(
-                    "substrate:atom:k",
-                    "v".getBytes(StandardCharsets.UTF_8),
-                    "tok",
-                    Duration.ofSeconds(5)))
+    assertThatThrownBy(() -> atom.set("substrate:atom:k", value, "tok", ttl))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("Failed to set atom in etcd");
   }
