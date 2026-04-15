@@ -238,6 +238,22 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
     } while (exclusiveStartKey != null);
   }
 
+  @Override
+  public boolean exists(String key) {
+    QueryResponse response =
+        client.query(
+            QueryRequest.builder()
+                .tableName(tableName)
+                .keyConditionExpression("#k = :k")
+                .expressionAttributeNames(Map.of(EXPR_KEY_ALIAS, FIELD_KEY))
+                .expressionAttributeValues(
+                    Map.of(EXPR_KEY_PARAM, AttributeValue.builder().s(key).build()))
+                .projectionExpression("#k")
+                .limit(1)
+                .build());
+    return !response.items().isEmpty();
+  }
+
   private RawJournalEntry mapItem(Map<String, AttributeValue> item, String key) {
     byte[] data =
         item.containsKey(FIELD_DATA) ? item.get(FIELD_DATA).b().asByteArray() : new byte[0];

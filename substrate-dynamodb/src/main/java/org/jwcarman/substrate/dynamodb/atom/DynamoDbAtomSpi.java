@@ -168,4 +168,22 @@ public class DynamoDbAtomSpi extends AbstractAtomSpi {
             .key(Map.of(FIELD_PK, AttributeValue.builder().s(key).build()))
             .build());
   }
+
+  @Override
+  public boolean exists(String key) {
+    GetItemResponse response =
+        client.getItem(
+            GetItemRequest.builder()
+                .tableName(tableName)
+                .key(Map.of(FIELD_PK, AttributeValue.builder().s(key).build()))
+                .projectionExpression("#t")
+                .expressionAttributeNames(Map.of("#t", FIELD_TTL))
+                .consistentRead(true)
+                .build());
+    if (!response.hasItem() || response.item().isEmpty()) {
+      return false;
+    }
+    long ttlValue = Long.parseLong(response.item().get(FIELD_TTL).n());
+    return Instant.now().getEpochSecond() < ttlValue;
+  }
 }
