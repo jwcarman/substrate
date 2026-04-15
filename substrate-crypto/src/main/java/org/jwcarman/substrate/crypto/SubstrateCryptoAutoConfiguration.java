@@ -17,6 +17,8 @@ package org.jwcarman.substrate.crypto;
 
 import java.util.Base64;
 import javax.crypto.spec.SecretKeySpec;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.jwcarman.substrate.core.autoconfigure.SubstrateAutoConfiguration;
 import org.jwcarman.substrate.core.transform.PayloadTransformer;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -47,12 +49,20 @@ import org.springframework.context.annotation.Bean;
 @EnableConfigurationProperties(SubstrateCryptoProperties.class)
 public class SubstrateCryptoAutoConfiguration {
 
+  private static final Log log = LogFactory.getLog(SubstrateCryptoAutoConfiguration.class);
+
   @Bean
   @ConditionalOnProperty("substrate.crypto.shared-key")
   @ConditionalOnMissingBean(SecretKeyResolver.class)
   public SecretKeyResolver sharedKeyResolver(SubstrateCryptoProperties props) {
     byte[] raw = Base64.getDecoder().decode(props.sharedKey());
     validateAesKeyLength(raw.length);
+    log.info(
+        "Substrate encryption-at-rest enabled: AES-"
+            + (raw.length * 8)
+            + "-GCM with shared key (kid="
+            + props.sharedKid()
+            + ")");
     return SecretKeyResolver.shared(new SecretKeySpec(raw, "AES"), props.sharedKid());
   }
 
