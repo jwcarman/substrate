@@ -36,7 +36,7 @@ implementations that backend supports.
         <dependency>
             <groupId>org.jwcarman.substrate</groupId>
             <artifactId>substrate-bom</artifactId>
-            <version>0.5.0</version>
+            <version>0.6.0</version>
             <type>pom</type>
             <scope>import</scope>
         </dependency>
@@ -367,15 +367,24 @@ All three factories provide both modes:
 - **`create(...)`** — eager. Performs backend I/O immediately to write
   the initial state and establish the lease. Throws
   `*AlreadyExistsException` if something is already there with that
-  name.
+  name. Name collision is the sole trigger — the TTL and other
+  arguments passed here are not compared against the pre-existing
+  resource; policy reconciliation is the caller's responsibility.
 - **`connect(...)`** — lazy. Returns a handle without any backend I/O.
-  The first operation on the handle (`get`, `set`, `subscribe`,
-  `append`, `deliver`, etc.) is when you'll discover whether the
-  primitive actually exists.
+  The first real operation on the handle (`get`, `set`, `subscribe`,
+  `append`, `deliver`, etc.) probes existence once and throws
+  `*NotFoundException` if no resource exists at that name. After the
+  one-shot probe passes, subsequent operations behave exactly like a
+  `create`-sourced handle, with normal terminal-state semantics via
+  `*ExpiredException` / `*CompletedException`. `delete()` does **not**
+  probe — it preserves idempotent-no-op semantics so retry-safe
+  cleanup code works unchanged.
 
 Use `create` when your code is the producer that sets up the primitive.
 Use `connect` when another node owns creation and your code is just an
-observer or consumer.
+observer or consumer. Get-or-create semantics are expressible as
+`try { factory.create(...) } catch (*AlreadyExistsException _) { factory.connect(...) }`;
+the TTL-conflict policy is the caller's to choose.
 
 ### Generic value types via `TypeRef`
 
@@ -402,15 +411,17 @@ library and uses the same anonymous-subclass trick as Jackson's
 | Exception | Thrown when |
 |---|---|
 | `AtomAlreadyExistsException` | `AtomFactory.create(name, ...)` is called and an atom with that name already exists and is still alive. |
+| `AtomNotFoundException` | First operation on an `AtomFactory.connect(...)`-sourced handle finds no atom exists at that name. Signals an identity-time "wrong name" mismatch, distinct from expiry. |
 | `AtomExpiredException` | `set` / `get` / `touch` is called on an atom whose lease has elapsed or which has been deleted. |
 | `JournalAlreadyExistsException` | `JournalFactory.create(name, ...)` is called and a journal with that name already exists and is still active. |
+| `JournalNotFoundException` | First operation on a `JournalFactory.connect(...)`-sourced handle finds no journal exists at that name. |
 | `JournalCompletedException` | `append()` is called on a journal that has been completed via `complete()`. |
 | `JournalExpiredException` | `append` / read is called on a journal whose retention or inactivity TTL has elapsed. |
+| `MailboxNotFoundException` | First operation on a `MailboxFactory.connect(...)`-sourced handle finds no mailbox exists at that name. |
 | `MailboxExpiredException` | `deliver` / read is called on a mailbox whose TTL has elapsed or which has been deleted. |
 | `MailboxFullException` | A second `deliver()` is attempted on a mailbox that has already received a delivery. |
 
-All seven extend `RuntimeException` — no checked exceptions in the
-substrate API.
+All extend `RuntimeException` — no checked exceptions in the substrate API.
 
 ## Architecture
 
