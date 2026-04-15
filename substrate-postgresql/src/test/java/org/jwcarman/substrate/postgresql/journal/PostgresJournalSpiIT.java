@@ -51,6 +51,18 @@ class PostgresJournalSpiIT {
   }
 
   @Test
+  void existsReturnsFalseForNeverCreatedKey() {
+    assertThat(journal.exists(journal.journalKey("never"))).isFalse();
+  }
+
+  @Test
+  void existsReturnsTrueAfterAppend() {
+    String key = journal.journalKey("exists-test");
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    assertThat(journal.exists(key)).isTrue();
+  }
+
+  @Test
   void appendAndReadAfterFullLifecycle() {
     String key = journal.journalKey("test-stream");
     String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));

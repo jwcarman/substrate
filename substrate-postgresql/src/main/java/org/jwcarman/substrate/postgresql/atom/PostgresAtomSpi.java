@@ -90,6 +90,16 @@ public class PostgresAtomSpi extends AbstractAtomSpi {
   }
 
   @Override
+  public boolean exists(String key) {
+    Boolean result =
+        jdbcTemplate.queryForObject(
+            "SELECT EXISTS(SELECT 1 FROM substrate_atom WHERE key = ? AND expires_at > NOW())",
+            Boolean.class,
+            key);
+    return Boolean.TRUE.equals(result);
+  }
+
+  @Override
   public int sweep(int maxToSweep) {
     // SKIP LOCKED allows concurrent sweepers on multiple nodes to grab
     // disjoint batches without blocking each other.
