@@ -37,7 +37,7 @@ import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.core.transform.PayloadTransformer;
 import org.jwcarman.substrate.journal.Journal;
 import org.jwcarman.substrate.journal.JournalAlreadyExistsException;
-import org.jwcarman.substrate.journal.JournalExpiredException;
+import org.jwcarman.substrate.journal.JournalNotFoundException;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -110,7 +110,7 @@ class DefaultJournalFactoryTest {
 
     Duration oneHour = Duration.ofHours(1);
     assertThatThrownBy(() -> journal.append("data", oneHour))
-        .isInstanceOf(JournalExpiredException.class);
+        .isInstanceOf(JournalNotFoundException.class);
   }
 
   @Test

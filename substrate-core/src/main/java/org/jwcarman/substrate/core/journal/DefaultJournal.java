@@ -36,6 +36,7 @@ import org.jwcarman.substrate.core.transform.PayloadTransformer;
 import org.jwcarman.substrate.journal.Journal;
 import org.jwcarman.substrate.journal.JournalEntry;
 import org.jwcarman.substrate.journal.JournalExpiredException;
+import org.jwcarman.substrate.journal.JournalNotFoundException;
 
 public class DefaultJournal<T> implements Journal<T> {
 
@@ -46,6 +47,7 @@ public class DefaultJournal<T> implements Journal<T> {
   private final Notifier notifier;
   private final JournalLimits limits;
   private final ShutdownCoordinator shutdownCoordinator;
+  private final AtomicBoolean connected;
 
   public DefaultJournal(
       JournalSpi journalSpi,
@@ -55,6 +57,18 @@ public class DefaultJournal<T> implements Journal<T> {
       Notifier notifier,
       JournalLimits limits,
       ShutdownCoordinator shutdownCoordinator) {
+    this(journalSpi, key, codec, transformer, notifier, limits, shutdownCoordinator, false);
+  }
+
+  public DefaultJournal(
+      JournalSpi journalSpi,
+      String key,
+      Codec<T> codec,
+      PayloadTransformer transformer,
+      Notifier notifier,
+      JournalLimits limits,
+      ShutdownCoordinator shutdownCoordinator,
+      boolean connected) {
     this.journalSpi = journalSpi;
     this.key = key;
     this.codec = codec;
@@ -62,10 +76,18 @@ public class DefaultJournal<T> implements Journal<T> {
     this.notifier = notifier;
     this.limits = limits;
     this.shutdownCoordinator = shutdownCoordinator;
+    this.connected = new AtomicBoolean(connected);
+  }
+
+  private void ensureExists() {
+    if (connected.compareAndSet(true, false) && !journalSpi.exists(key)) {
+      throw new JournalNotFoundException(key);
+    }
   }
 
   @Override
   public String append(T data, Duration ttl) {
+    ensureExists();
     if (ttl.compareTo(limits.maxEntryTtl()) > 0) {
       throw new IllegalArgumentException(
           "Journal entry TTL " + ttl + " exceeds configured maximum " + limits.maxEntryTtl());
@@ -78,6 +100,7 @@ public class DefaultJournal<T> implements Journal<T> {
 
   @Override
   public void complete(Duration retentionTtl) {
+    ensureExists();
     if (retentionTtl.compareTo(limits.maxRetentionTtl()) > 0) {
       throw new IllegalArgumentException(
           "Journal retention TTL "
@@ -91,12 +114,14 @@ public class DefaultJournal<T> implements Journal<T> {
 
   @Override
   public void delete() {
+    // delete() is idempotent — no existence probe, even for connected handles
     journalSpi.delete(key);
     notifier.notifyJournalDeleted(key);
   }
 
   @Override
   public BlockingSubscription<JournalEntry<T>> subscribe() {
+    ensureExists();
     List<RawJournalEntry> lastEntries = journalSpi.readLast(key, 1);
     String startingCheckpoint = lastEntries.isEmpty() ? null : lastEntries.getLast().id();
     return buildBlockingSubscription(startingCheckpoint, List.of());
@@ -104,11 +129,13 @@ public class DefaultJournal<T> implements Journal<T> {
 
   @Override
   public BlockingSubscription<JournalEntry<T>> subscribeAfter(String afterId) {
+    ensureExists();
     return buildBlockingSubscription(afterId, List.of());
   }
 
   @Override
   public BlockingSubscription<JournalEntry<T>> subscribeLast(int count) {
+    ensureExists();
     List<RawJournalEntry> preload = journalSpi.readLast(key, count);
     String startingCheckpoint = preload.isEmpty() ? null : preload.getLast().id();
     return buildBlockingSubscription(startingCheckpoint, preload);
@@ -116,6 +143,7 @@ public class DefaultJournal<T> implements Journal<T> {
 
   @Override
   public Subscription subscribe(Subscriber<JournalEntry<T>> subscriber) {
+    ensureExists();
     List<RawJournalEntry> lastEntries = journalSpi.readLast(key, 1);
     String startingCheckpoint = lastEntries.isEmpty() ? null : lastEntries.getLast().id();
     return buildCallbackSubscription(startingCheckpoint, List.of(), subscriber);
@@ -123,22 +151,26 @@ public class DefaultJournal<T> implements Journal<T> {
 
   @Override
   public Subscription subscribe(Consumer<SubscriberConfig<JournalEntry<T>>> customizer) {
+    ensureExists();
     return subscribe(DefaultSubscriberBuilder.from(customizer));
   }
 
   @Override
   public Subscription subscribeAfter(String afterId, Subscriber<JournalEntry<T>> subscriber) {
+    ensureExists();
     return buildCallbackSubscription(afterId, List.of(), subscriber);
   }
 
   @Override
   public Subscription subscribeAfter(
       String afterId, Consumer<SubscriberConfig<JournalEntry<T>>> customizer) {
+    ensureExists();
     return subscribeAfter(afterId, DefaultSubscriberBuilder.from(customizer));
   }
 
   @Override
   public Subscription subscribeLast(int count, Subscriber<JournalEntry<T>> subscriber) {
+    ensureExists();
     List<RawJournalEntry> preload = journalSpi.readLast(key, count);
     String startingCheckpoint = preload.isEmpty() ? null : preload.getLast().id();
     return buildCallbackSubscription(startingCheckpoint, preload, subscriber);
@@ -147,6 +179,7 @@ public class DefaultJournal<T> implements Journal<T> {
   @Override
   public Subscription subscribeLast(
       int count, Consumer<SubscriberConfig<JournalEntry<T>>> customizer) {
+    ensureExists();
     return subscribeLast(count, DefaultSubscriberBuilder.from(customizer));
   }
 
