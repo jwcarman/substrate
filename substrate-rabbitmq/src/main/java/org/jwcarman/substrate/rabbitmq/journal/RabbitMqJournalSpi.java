@@ -140,6 +140,11 @@ public class RabbitMqJournalSpi extends AbstractJournalSpi implements AutoClosea
   }
 
   @Override
+  public boolean exists(String key) {
+    return streamExists(toStreamName(key));
+  }
+
+  @Override
   public void delete(String key) {
     String streamName = toStreamName(key);
     Producer producer = producers.remove(streamName);
