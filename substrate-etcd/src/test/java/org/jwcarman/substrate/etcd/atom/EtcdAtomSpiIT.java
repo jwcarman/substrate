@@ -57,6 +57,18 @@ class EtcdAtomSpiIT {
   }
 
   @Test
+  void existsReturnsFalseForNeverCreatedKey() {
+    assertThat(atom.exists(atom.atomKey("never"))).isFalse();
+  }
+
+  @Test
+  void existsReturnsTrueAfterCreate() {
+    String key = atom.atomKey("exists-test");
+    atom.create(key, "v".getBytes(StandardCharsets.UTF_8), "tok", Duration.ofMinutes(5));
+    assertThat(atom.exists(key)).isTrue();
+  }
+
+  @Test
   void createAndReadRoundTrip() {
     String key = atom.atomKey("round-trip");
     byte[] value = "hello".getBytes(StandardCharsets.UTF_8);

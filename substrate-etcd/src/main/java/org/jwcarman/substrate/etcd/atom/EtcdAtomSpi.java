@@ -155,6 +155,11 @@ public class EtcdAtomSpi extends AbstractAtomSpi {
   }
 
   @Override
+  public boolean exists(String key) {
+    return atomExists(bs(key));
+  }
+
+  @Override
   public void delete(String key) {
     try {
       client.getKVClient().delete(bs(key)).get();
