@@ -41,6 +41,23 @@ class InMemoryAtomSpiTest {
   }
 
   @Test
+  void existsReturnsFalseForNeverCreatedKey() {
+    assertThat(spi.exists("missing")).isFalse();
+  }
+
+  @Test
+  void existsReturnsTrueForCreatedKey() {
+    spi.create("key", new byte[] {1}, "t", Duration.ofSeconds(10));
+    assertThat(spi.exists("key")).isTrue();
+  }
+
+  @Test
+  void existsReturnsFalseAfterExpiry() {
+    spi.create("key", new byte[] {1}, "t", Duration.ofMillis(1));
+    await().atMost(Duration.ofSeconds(2)).until(() -> !spi.exists("key"));
+  }
+
+  @Test
   void createStoresAtom() {
     spi.create("key", new byte[] {1, 2, 3}, "token1", Duration.ofSeconds(10));
 

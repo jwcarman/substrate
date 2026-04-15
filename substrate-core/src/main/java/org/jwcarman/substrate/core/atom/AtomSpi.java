@@ -77,6 +77,16 @@ public interface AtomSpi extends Sweepable {
   boolean touch(String key, Duration ttl);
 
   /**
+   * Returns whether a live atom exists at the given key.
+   *
+   * <p>An atom is "live" if it was created, has not expired, and has not been deleted.
+   *
+   * @param key the backend storage key
+   * @return {@code true} if a live atom exists at this key
+   */
+  boolean exists(String key);
+
+  /**
    * Removes the atom at the given key. This operation is idempotent — deleting a non-existent atom
    * is a no-op.
    *

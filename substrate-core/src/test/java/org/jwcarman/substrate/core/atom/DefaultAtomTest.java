@@ -493,4 +493,83 @@ class DefaultAtomTest {
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("exceeds configured maximum");
   }
+
+  private DefaultAtom<String> connectedAtom(AtomSpi mockSpi) {
+    return new DefaultAtom<>(
+        mockSpi,
+        KEY,
+        STRING_CODEC,
+        PayloadTransformer.IDENTITY,
+        notifier,
+        Duration.ofHours(24),
+        coordinator,
+        true);
+  }
+
+  @Test
+  void connectSourcedGetOnNonexistentThrowsAtomNotFoundException() {
+    AtomSpi mockSpi = org.mockito.Mockito.mock(AtomSpi.class);
+    org.mockito.Mockito.when(mockSpi.exists(KEY)).thenReturn(false);
+    DefaultAtom<String> a = connectedAtom(mockSpi);
+    assertThatThrownBy(a::get)
+        .isInstanceOf(org.jwcarman.substrate.atom.AtomNotFoundException.class);
+  }
+
+  @Test
+  void connectSourcedSetOnNonexistentThrows() {
+    AtomSpi mockSpi = org.mockito.Mockito.mock(AtomSpi.class);
+    org.mockito.Mockito.when(mockSpi.exists(KEY)).thenReturn(false);
+    DefaultAtom<String> a = connectedAtom(mockSpi);
+    assertThatThrownBy(() -> a.set("x", Duration.ofMinutes(1)))
+        .isInstanceOf(org.jwcarman.substrate.atom.AtomNotFoundException.class);
+  }
+
+  @Test
+  void createSourcedHandleDoesNotProbe() {
+    AtomSpi mockSpi = org.mockito.Mockito.mock(AtomSpi.class);
+    DefaultAtom<String> a =
+        new DefaultAtom<>(
+            mockSpi,
+            KEY,
+            STRING_CODEC,
+            PayloadTransformer.IDENTITY,
+            notifier,
+            Duration.ofHours(24),
+            coordinator);
+    org.mockito.Mockito.when(mockSpi.read(KEY))
+        .thenReturn(java.util.Optional.of(new RawAtom("v".getBytes(UTF_8), "tok")));
+    a.get();
+    org.mockito.Mockito.verify(mockSpi, org.mockito.Mockito.never())
+        .exists(org.mockito.ArgumentMatchers.anyString());
+  }
+
+  @Test
+  void probeFiresExactlyOnceAcrossManyOperations() {
+    AtomSpi mockSpi = org.mockito.Mockito.mock(AtomSpi.class);
+    org.mockito.Mockito.when(mockSpi.exists(KEY)).thenReturn(true);
+    org.mockito.Mockito.when(mockSpi.read(KEY))
+        .thenReturn(java.util.Optional.of(new RawAtom("v".getBytes(UTF_8), "tok")));
+    org.mockito.Mockito.when(
+            mockSpi.set(
+                org.mockito.ArgumentMatchers.eq(KEY),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any()))
+        .thenReturn(true);
+    DefaultAtom<String> a = connectedAtom(mockSpi);
+    a.get();
+    a.set("x", Duration.ofMinutes(1));
+    a.get();
+    org.mockito.Mockito.verify(mockSpi, org.mockito.Mockito.times(1)).exists(KEY);
+  }
+
+  @Test
+  void connectSourcedDeleteDoesNotProbe() {
+    AtomSpi mockSpi = org.mockito.Mockito.mock(AtomSpi.class);
+    DefaultAtom<String> a = connectedAtom(mockSpi);
+    a.delete();
+    org.mockito.Mockito.verify(mockSpi, org.mockito.Mockito.never())
+        .exists(org.mockito.ArgumentMatchers.anyString());
+    org.mockito.Mockito.verify(mockSpi).delete(KEY);
+  }
 }

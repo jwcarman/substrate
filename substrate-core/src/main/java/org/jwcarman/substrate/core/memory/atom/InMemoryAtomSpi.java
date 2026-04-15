@@ -95,6 +95,12 @@ public class InMemoryAtomSpi extends AbstractAtomSpi {
   }
 
   @Override
+  public boolean exists(String key) {
+    ExpiringEntry<RawAtom> entry = store.get(key);
+    return entry != null && !entry.isExpired();
+  }
+
+  @Override
   public int sweep(int maxToSweep) {
     return ExpiringEntry.sweepExpired(store, maxToSweep);
   }

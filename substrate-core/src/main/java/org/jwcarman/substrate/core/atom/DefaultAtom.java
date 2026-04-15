@@ -21,6 +21,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.jwcarman.codec.spi.Codec;
@@ -30,6 +31,7 @@ import org.jwcarman.substrate.SubscriberConfig;
 import org.jwcarman.substrate.Subscription;
 import org.jwcarman.substrate.atom.Atom;
 import org.jwcarman.substrate.atom.AtomExpiredException;
+import org.jwcarman.substrate.atom.AtomNotFoundException;
 import org.jwcarman.substrate.atom.Snapshot;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.Notifier;
@@ -49,6 +51,7 @@ public class DefaultAtom<T> implements Atom<T> {
   private final Notifier notifier;
   private final Duration maxTtl;
   private final ShutdownCoordinator shutdownCoordinator;
+  private final AtomicBoolean connected;
 
   public DefaultAtom(
       AtomSpi atomSpi,
@@ -58,6 +61,18 @@ public class DefaultAtom<T> implements Atom<T> {
       Notifier notifier,
       Duration maxTtl,
       ShutdownCoordinator shutdownCoordinator) {
+    this(atomSpi, key, codec, transformer, notifier, maxTtl, shutdownCoordinator, false);
+  }
+
+  public DefaultAtom(
+      AtomSpi atomSpi,
+      String key,
+      Codec<T> codec,
+      PayloadTransformer transformer,
+      Notifier notifier,
+      Duration maxTtl,
+      ShutdownCoordinator shutdownCoordinator,
+      boolean connected) {
     this.atomSpi = atomSpi;
     this.key = key;
     this.codec = codec;
@@ -65,10 +80,18 @@ public class DefaultAtom<T> implements Atom<T> {
     this.notifier = notifier;
     this.maxTtl = maxTtl;
     this.shutdownCoordinator = shutdownCoordinator;
+    this.connected = new AtomicBoolean(connected);
+  }
+
+  private void ensureExists() {
+    if (connected.compareAndSet(true, false) && !atomSpi.exists(key)) {
+      throw new AtomNotFoundException(key);
+    }
   }
 
   @Override
   public void set(T data, Duration ttl) {
+    ensureExists();
     validateTtl(ttl);
     byte[] bytes = codec.encode(data);
     String newToken = token(bytes);
@@ -81,50 +104,59 @@ public class DefaultAtom<T> implements Atom<T> {
 
   @Override
   public boolean touch(Duration ttl) {
+    ensureExists();
     validateTtl(ttl);
     return atomSpi.touch(key, ttl);
   }
 
   @Override
   public Snapshot<T> get() {
+    ensureExists();
     RawAtom raw = atomSpi.read(key).orElseThrow(() -> new AtomExpiredException(key));
     return new Snapshot<>(codec.decode(transformer.decode(raw.value())), raw.token());
   }
 
   @Override
   public void delete() {
+    // delete() is idempotent — no existence probe, even for connected handles
     atomSpi.delete(key);
     notifier.notifyAtomDeleted(key);
   }
 
   @Override
   public BlockingSubscription<Snapshot<T>> subscribe() {
+    ensureExists();
     return buildBlockingSubscription(null);
   }
 
   @Override
   public BlockingSubscription<Snapshot<T>> subscribe(Snapshot<T> lastSeen) {
+    ensureExists();
     return buildBlockingSubscription(lastSeen);
   }
 
   @Override
   public Subscription subscribe(Subscriber<Snapshot<T>> subscriber) {
+    ensureExists();
     return buildCallbackPumpSubscription(null, subscriber);
   }
 
   @Override
   public Subscription subscribe(Consumer<SubscriberConfig<Snapshot<T>>> customizer) {
+    ensureExists();
     return subscribe(DefaultSubscriberBuilder.from(customizer));
   }
 
   @Override
   public Subscription subscribe(Snapshot<T> lastSeen, Subscriber<Snapshot<T>> subscriber) {
+    ensureExists();
     return buildCallbackPumpSubscription(lastSeen, subscriber);
   }
 
   @Override
   public Subscription subscribe(
       Snapshot<T> lastSeen, Consumer<SubscriberConfig<Snapshot<T>>> customizer) {
+    ensureExists();
     return subscribe(lastSeen, DefaultSubscriberBuilder.from(customizer));
   }
 
