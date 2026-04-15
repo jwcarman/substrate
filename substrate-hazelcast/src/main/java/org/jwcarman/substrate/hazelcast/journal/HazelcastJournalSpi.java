@@ -132,6 +132,20 @@ public class HazelcastJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
+  public boolean exists(String key) {
+    IMap<String, Boolean> completedMap = hazelcast.getMap(COMPLETED_MAP_NAME);
+    if (completedMap.containsKey(key)) {
+      return true;
+    }
+    for (var obj : hazelcast.getDistributedObjects()) {
+      if (obj instanceof Ringbuffer<?> rb && key.equals(rb.getName())) {
+        return rb.tailSequence() >= 0;
+      }
+    }
+    return false;
+  }
+
+  @Override
   public void delete(String key) {
     Ringbuffer<String> ringbuffer = hazelcast.getRingbuffer(key);
     ringbuffer.destroy();

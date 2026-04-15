@@ -70,4 +70,9 @@ public class HazelcastAtomSpi extends AbstractAtomSpi {
   public void delete(String key) {
     map.delete(key);
   }
+
+  @Override
+  public boolean exists(String key) {
+    return map.containsKey(key);
+  }
 }
