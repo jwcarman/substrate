@@ -44,6 +44,18 @@ class MongoDbJournalSpiIT extends AbstractMongoDbIT {
   }
 
   @Test
+  void existsReturnsFalseForNeverCreatedKey() {
+    assertThat(journal.exists(journal.journalKey("never"))).isFalse();
+  }
+
+  @Test
+  void existsReturnsTrueAfterAppend() {
+    String key = journal.journalKey("exists-test");
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    assertThat(journal.exists(key)).isTrue();
+  }
+
+  @Test
   void appendReturnsUuidV7Id() {
     String key = journal.journalKey("append-test");
     String id = journal.append(key, "hello".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));

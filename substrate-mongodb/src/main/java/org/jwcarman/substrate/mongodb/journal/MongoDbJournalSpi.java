@@ -148,6 +148,12 @@ public class MongoDbJournalSpi extends AbstractJournalSpi {
     mongoTemplate.remove(query, collectionName);
   }
 
+  @Override
+  public boolean exists(String key) {
+    Query query = new Query(Criteria.where(FIELD_KEY).is(key));
+    return mongoTemplate.exists(query, collectionName);
+  }
+
   private RawJournalEntry mapDocument(Document doc) {
     Date date = doc.get(FIELD_TIMESTAMP, Date.class);
     Instant timestamp = date != null ? date.toInstant() : null;

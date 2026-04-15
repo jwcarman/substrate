@@ -45,6 +45,18 @@ class MongoDbAtomSpiIT extends AbstractMongoDbIT {
   }
 
   @Test
+  void existsReturnsFalseForNeverCreatedKey() {
+    assertThat(spi.exists(spi.atomKey("never-" + System.nanoTime()))).isFalse();
+  }
+
+  @Test
+  void existsReturnsTrueAfterCreate() {
+    String key = spi.atomKey("exists-" + System.nanoTime());
+    spi.create(key, "v".getBytes(StandardCharsets.UTF_8), "tok", Duration.ofMinutes(5));
+    assertThat(spi.exists(key)).isTrue();
+  }
+
+  @Test
   void createAndReadReturnsValue() {
     String key = spi.atomKey("test-" + System.nanoTime());
     byte[] value = "hello".getBytes(StandardCharsets.UTF_8);
