@@ -10,6 +10,8 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-04-15
+
 ### Changed
 
 - **Handoff rendezvous internals simplified** — the five-class hierarchy
@@ -37,6 +39,20 @@ occur between minor versions. The 1.0.0 release will mark API stability.
   value regression that burned us on Cassandra. Recommended for
   small-state atoms (session/config/flag-sized, well under etcd's
   ~64KB practical value ceiling).
+
+### Fixed
+
+- **Sonar cleanups.** Redis auto-configurations (`RedisAtom`,
+  `RedisJournal`, `RedisMailbox`, `RedisNotifier`) now fail fast with
+  `Objects.requireNonNull` if `LettuceConnectionFactory.getNativeClient()`
+  returns null, instead of throwing an opaque NPE. Etcd error-path tests
+  extract locals out of `assertThatThrownBy` lambdas so only one
+  throwing invocation remains per lambda.
+
+- **Test robustness.** `BoundedQueueHandoffTest` uses Awaitility to wait
+  for producer/consumer threads to actually enter `WAITING` state before
+  signaling, replacing fixed `Thread.sleep` calls. Tests are now
+  deterministic under load instead of timing-dependent.
 
 ## [0.4.0] - 2026-04-13
 
@@ -538,6 +554,7 @@ abstractions:
 
 - **BOM** (`substrate-bom`) for version alignment across all modules
 
+[0.5.0]: https://github.com/jwcarman/substrate/releases/tag/0.5.0
 [0.4.0]: https://github.com/jwcarman/substrate/releases/tag/0.4.0
 [0.3.0]: https://github.com/jwcarman/substrate/releases/tag/0.3.0
 [0.2.1]: https://github.com/jwcarman/substrate/releases/tag/0.2.1
