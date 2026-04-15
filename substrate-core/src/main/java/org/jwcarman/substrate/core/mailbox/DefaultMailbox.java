@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.core.mailbox;
 
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.substrate.BlockingSubscription;
@@ -32,6 +33,7 @@ import org.jwcarman.substrate.core.subscription.SingleSlotHandoff;
 import org.jwcarman.substrate.core.transform.PayloadTransformer;
 import org.jwcarman.substrate.mailbox.Mailbox;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
+import org.jwcarman.substrate.mailbox.MailboxNotFoundException;
 
 public class DefaultMailbox<T> implements Mailbox<T> {
 
@@ -41,6 +43,7 @@ public class DefaultMailbox<T> implements Mailbox<T> {
   private final PayloadTransformer transformer;
   private final Notifier notifier;
   private final ShutdownCoordinator shutdownCoordinator;
+  private final AtomicBoolean connected;
 
   public DefaultMailbox(
       MailboxSpi mailboxSpi,
@@ -49,28 +52,49 @@ public class DefaultMailbox<T> implements Mailbox<T> {
       PayloadTransformer transformer,
       Notifier notifier,
       ShutdownCoordinator shutdownCoordinator) {
+    this(mailboxSpi, key, codec, transformer, notifier, shutdownCoordinator, false);
+  }
+
+  public DefaultMailbox(
+      MailboxSpi mailboxSpi,
+      String key,
+      Codec<T> codec,
+      PayloadTransformer transformer,
+      Notifier notifier,
+      ShutdownCoordinator shutdownCoordinator,
+      boolean connected) {
     this.mailboxSpi = mailboxSpi;
     this.key = key;
     this.codec = codec;
     this.transformer = transformer;
     this.notifier = notifier;
     this.shutdownCoordinator = shutdownCoordinator;
+    this.connected = new AtomicBoolean(connected);
+  }
+
+  private void ensureExists() {
+    if (connected.compareAndSet(true, false) && !mailboxSpi.exists(key)) {
+      throw new MailboxNotFoundException(key);
+    }
   }
 
   @Override
   public void deliver(T value) {
+    ensureExists();
     mailboxSpi.deliver(key, transformer.encode(codec.encode(value)));
     notifier.notifyMailboxChanged(key);
   }
 
   @Override
   public void delete() {
+    // delete() is idempotent — no existence probe, even for connected handles
     mailboxSpi.delete(key);
     notifier.notifyMailboxDeleted(key);
   }
 
   @Override
   public BlockingSubscription<T> subscribe() {
+    ensureExists();
     SingleSlotHandoff<T> handoff = new SingleSlotHandoff<>();
     Runnable canceller = startFeeder(handoff);
     return new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
@@ -78,6 +102,7 @@ public class DefaultMailbox<T> implements Mailbox<T> {
 
   @Override
   public Subscription subscribe(Subscriber<T> subscriber) {
+    ensureExists();
     SingleSlotHandoff<T> handoff = new SingleSlotHandoff<>();
     Runnable canceller = startFeeder(handoff);
     var source = new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
@@ -86,6 +111,7 @@ public class DefaultMailbox<T> implements Mailbox<T> {
 
   @Override
   public Subscription subscribe(Consumer<SubscriberConfig<T>> customizer) {
+    ensureExists();
     return subscribe(DefaultSubscriberBuilder.from(customizer));
   }
 

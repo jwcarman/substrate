@@ -67,6 +67,12 @@ public class InMemoryMailboxSpi extends AbstractMailboxSpi {
   }
 
   @Override
+  public boolean exists(String key) {
+    ExpiringEntry<Optional<byte[]>> entry = store.get(key);
+    return entry != null && !entry.isExpired();
+  }
+
+  @Override
   public int sweep(int maxToSweep) {
     return ExpiringEntry.sweepExpired(store, maxToSweep);
   }

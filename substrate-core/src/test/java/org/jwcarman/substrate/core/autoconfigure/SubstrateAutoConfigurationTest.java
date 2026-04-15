@@ -366,6 +366,11 @@ class SubstrateAutoConfigurationTest {
     }
 
     @Override
+    public boolean exists(String key) {
+      return false;
+    }
+
+    @Override
     public String mailboxKey(String name) {
       return "stub:" + name;
     }
