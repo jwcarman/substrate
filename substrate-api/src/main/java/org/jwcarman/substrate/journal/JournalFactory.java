@@ -26,9 +26,17 @@ import org.jwcarman.codec.spi.TypeRef;
  * <ul>
  *   <li>{@code create} — eagerly provisions a new journal in the backend. Performs I/O immediately
  *       and throws {@link JournalAlreadyExistsException} if a journal with the same name already
- *       exists.
- *   <li>{@code connect} — returns a lazy handle to an existing journal. No backend I/O is performed
- *       until the first operation is invoked on the returned {@link Journal}.
+ *       exists. Name collision is the sole trigger — the inactivity TTL and other arguments passed
+ *       here are not compared against the pre-existing resource; policy reconciliation is the
+ *       caller's responsibility.
+ *   <li>{@code connect} — returns a handle to an existing journal without performing backend I/O at
+ *       factory call time. The first read, append, or subscribe operation on the handle probes the
+ *       backend once: if no journal exists at {@code name}, that first operation throws {@link
+ *       JournalNotFoundException}. {@link Journal#delete()} does not probe and remains a retry-safe
+ *       no-op when the journal is already gone. Once the one-shot probe passes, subsequent
+ *       operations behave exactly as they would on a {@code create}-sourced handle — terminal-state
+ *       transitions surface as {@link JournalExpiredException} or {@link JournalCompletedException}
+ *       in the normal way.
  * </ul>
  *
  * @see Journal
@@ -38,7 +46,10 @@ public interface JournalFactory {
   /**
    * Creates a new journal with the given name and inactivity TTL.
    *
-   * <p>This method performs backend I/O immediately to provision the journal.
+   * <p>This method performs backend I/O immediately to provision the journal. Name collision is the
+   * sole trigger for {@link JournalAlreadyExistsException} — the {@code inactivityTtl} passed here
+   * is not compared against any pre-existing journal's configuration; policy reconciliation is the
+   * caller's responsibility.
    *
    * @param <T> the entry payload type
    * @param name the unique name for the journal
@@ -53,7 +64,10 @@ public interface JournalFactory {
    * Creates a new journal with the given name and inactivity TTL, using a {@link TypeRef} for
    * generic payload types.
    *
-   * <p>This method performs backend I/O immediately to provision the journal.
+   * <p>This method performs backend I/O immediately to provision the journal. Name collision is the
+   * sole trigger for {@link JournalAlreadyExistsException} — the {@code inactivityTtl} passed here
+   * is not compared against any pre-existing journal's configuration; policy reconciliation is the
+   * caller's responsibility.
    *
    * @param <T> the entry payload type
    * @param name the unique name for the journal
@@ -65,24 +79,40 @@ public interface JournalFactory {
   <T> Journal<T> create(String name, TypeRef<T> typeRef, Duration inactivityTtl);
 
   /**
-   * Connects to an existing journal by name. No backend I/O is performed until the first operation
-   * is invoked on the returned {@link Journal}.
+   * Connects to an existing journal by name.
+   *
+   * <p>No backend I/O is performed at factory call time. The first read, append, or subscribe
+   * operation on the returned handle probes the backend once and throws {@link
+   * JournalNotFoundException} if no journal exists at {@code name}. {@link Journal#delete()} does
+   * not probe and remains a retry-safe no-op. Once the one-shot probe passes, the handle behaves
+   * exactly as one returned from {@code create} — subsequent terminal-state transitions surface as
+   * {@link JournalExpiredException} or {@link JournalCompletedException}.
    *
    * @param <T> the entry payload type
    * @param name the name of the journal to connect to
    * @param type the payload class
-   * @return a lazy {@link Journal} handle
+   * @return a {@link Journal} handle
+   * @throws JournalNotFoundException at first operation, if no journal exists at {@code name}
+   *     (surfaced on the first read/append/subscribe call, not at {@code connect} time)
    */
   <T> Journal<T> connect(String name, Class<T> type);
 
   /**
-   * Connects to an existing journal by name, using a {@link TypeRef} for generic payload types. No
-   * backend I/O is performed until the first operation is invoked on the returned {@link Journal}.
+   * Connects to an existing journal by name, using a {@link TypeRef} for generic payload types.
+   *
+   * <p>No backend I/O is performed at factory call time. The first read, append, or subscribe
+   * operation on the returned handle probes the backend once and throws {@link
+   * JournalNotFoundException} if no journal exists at {@code name}. {@link Journal#delete()} does
+   * not probe and remains a retry-safe no-op. Once the one-shot probe passes, the handle behaves
+   * exactly as one returned from {@code create} — subsequent terminal-state transitions surface as
+   * {@link JournalExpiredException} or {@link JournalCompletedException}.
    *
    * @param <T> the entry payload type
    * @param name the name of the journal to connect to
    * @param typeRef a type reference capturing the full generic payload type
-   * @return a lazy {@link Journal} handle
+   * @return a {@link Journal} handle
+   * @throws JournalNotFoundException at first operation, if no journal exists at {@code name}
+   *     (surfaced on the first read/append/subscribe call, not at {@code connect} time)
    */
   <T> Journal<T> connect(String name, TypeRef<T> typeRef);
 }
