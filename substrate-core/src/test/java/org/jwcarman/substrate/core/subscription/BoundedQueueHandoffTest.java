@@ -121,15 +121,15 @@ class BoundedQueueHandoffTest {
     var h = new BoundedQueueHandoff<String>(10);
     var result = new java.util.concurrent.atomic.AtomicReference<NextResult<String>>();
     var done = new CountDownLatch(1);
-    Thread.ofVirtual()
-        .start(
-            () -> {
-              result.set(h.poll(Duration.ofSeconds(5)));
-              done.countDown();
-            });
+    var consumer =
+        Thread.ofVirtual()
+            .start(
+                () -> {
+                  result.set(h.poll(Duration.ofSeconds(5)));
+                  done.countDown();
+                });
 
-    // Let the consumer park.
-    Thread.sleep(100);
+    awaitParked(consumer);
     h.markCompleted();
     assertThat(done.await(2, TimeUnit.SECONDS)).isTrue();
     assertThat(result.get()).isInstanceOf(NextResult.Completed.class);
@@ -140,18 +140,16 @@ class BoundedQueueHandoffTest {
     var h = new BoundedQueueHandoff<String>(1);
     h.deliver("fill");
 
-    var started = new CountDownLatch(1);
     var finished = new CountDownLatch(1);
-    Thread.ofVirtual()
-        .start(
-            () -> {
-              started.countDown();
-              h.deliver("blocked");
-              finished.countDown();
-            });
+    var producer =
+        Thread.ofVirtual()
+            .start(
+                () -> {
+                  h.deliver("blocked");
+                  finished.countDown();
+                });
 
-    assertThat(started.await(2, TimeUnit.SECONDS)).isTrue();
-    Thread.sleep(50);
+    awaitParked(producer);
     h.markCompleted();
     assertThat(finished.await(2, TimeUnit.SECONDS)).isTrue();
   }
@@ -203,20 +201,27 @@ class BoundedQueueHandoffTest {
     var h = new BoundedQueueHandoff<String>(1);
     h.deliver("fill");
 
-    var started = new CountDownLatch(1);
     var finished = new CountDownLatch(1);
     var thread =
         Thread.ofVirtual()
             .start(
                 () -> {
-                  started.countDown();
                   h.deliver("blocked");
                   finished.countDown();
                 });
 
-    assertThat(started.await(2, TimeUnit.SECONDS)).isTrue();
-    Thread.sleep(50);
+    awaitParked(thread);
     thread.interrupt();
     assertThat(finished.await(2, TimeUnit.SECONDS)).isTrue();
+  }
+
+  private static void awaitParked(Thread t) {
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .until(
+            () -> {
+              Thread.State state = t.getState();
+              return state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING;
+            });
   }
 }
