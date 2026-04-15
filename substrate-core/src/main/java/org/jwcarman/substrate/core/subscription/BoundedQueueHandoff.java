@@ -15,13 +15,9 @@
  */
 package org.jwcarman.substrate.core.subscription;
 
-import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-import org.jwcarman.substrate.NextResult;
 
 /**
  * FIFO bounded-queue handoff. Values sit in an in-memory queue with a bounded capacity so the
@@ -34,14 +30,11 @@ import org.jwcarman.substrate.NextResult;
  *
  * @param <T> the type of values transferred through the handoff
  */
-public final class BoundedQueueHandoff<T> implements Handoff<T> {
+public final class BoundedQueueHandoff<T> extends AbstractHandoff<T> {
 
   private final int capacity;
   private final Deque<T> queue = new ArrayDeque<>();
-  private final Lock lock = new ReentrantLock();
   private final Condition notFull = lock.newCondition();
-  private final Condition notEmpty = lock.newCondition();
-  private NextResult<T> terminal;
 
   /**
    * Creates a bounded-queue handoff.
@@ -76,67 +69,15 @@ public final class BoundedQueueHandoff<T> implements Handoff<T> {
   }
 
   @Override
-  public NextResult<T> poll(Duration timeout) {
-    lock.lock();
-    try {
-      long deadlineNanos = System.nanoTime() + timeout.toNanos();
-      long remaining = deadlineNanos - System.nanoTime();
-      while (true) {
-        if (!queue.isEmpty()) {
-          T v = queue.removeFirst();
-          notFull.signalAll();
-          return new NextResult.Value<>(v);
-        }
-        if (terminal != null) return terminal;
-        if (remaining <= 0) return new NextResult.Timeout<>();
-        try {
-          remaining = notEmpty.awaitNanos(remaining);
-        } catch (InterruptedException _) {
-          Thread.currentThread().interrupt();
-          return new NextResult.Timeout<>();
-        }
-      }
-    } finally {
-      lock.unlock();
-    }
+  protected T takeValue() {
+    T v = queue.pollFirst();
+    if (v != null) notFull.signalAll();
+    return v;
   }
 
   @Override
-  public void error(Throwable cause) {
-    mark(new NextResult.Errored<>(cause));
-  }
-
-  @Override
-  public void markCompleted() {
-    mark(new NextResult.Completed<>());
-  }
-
-  @Override
-  public void markExpired() {
-    mark(new NextResult.Expired<>());
-  }
-
-  @Override
-  public void markDeleted() {
-    mark(new NextResult.Deleted<>());
-  }
-
-  @Override
-  public void markCancelled() {
-    mark(new NextResult.Cancelled<>());
-  }
-
-  private void mark(NextResult<T> t) {
-    lock.lock();
-    try {
-      if (terminal != null) return;
-      terminal = t;
-      // Wake both a reader parked in poll() and any feeder blocked in
-      // deliver() so it can observe the terminal and bail out.
-      notEmpty.signalAll();
-      notFull.signalAll();
-    } finally {
-      lock.unlock();
-    }
+  protected void onTerminalSet() {
+    // Wake any feeder parked in deliver() so it can observe the terminal and bail out.
+    notFull.signalAll();
   }
 }
