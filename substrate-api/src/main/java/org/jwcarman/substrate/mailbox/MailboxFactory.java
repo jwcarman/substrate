@@ -24,11 +24,10 @@ import org.jwcarman.codec.spi.TypeRef;
  * <p>Two families of operations are provided:
  *
  * <ul>
- *   <li><strong>{@code create}</strong> — eagerly provisions a new mailbox in the backing store.
- *       This performs backend I/O and establishes the mailbox's TTL. If a mailbox with the given
- *       name already exists, name collision is the sole trigger for failure — the TTL passed here
- *       is not compared against the pre-existing mailbox; policy reconciliation is the caller's
- *       responsibility.
+ *   <li><strong>{@code create}</strong> — eagerly provisions a mailbox in the backing store. This
+ *       performs backend I/O and establishes the mailbox's TTL. Creating a mailbox with an existing
+ *       name replaces it: {@code create} is last-write-wins, and the TTL passed here supersedes any
+ *       previously configured TTL for that name.
  *   <li><strong>{@code connect}</strong> — returns a handle to an existing mailbox without
  *       performing backend I/O at factory call time. The first deliver or subscribe operation
  *       ({@link Mailbox#deliver} or {@link Mailbox#subscribe}) probes the backend once: if no
@@ -46,9 +45,9 @@ public interface MailboxFactory {
   /**
    * Create a new mailbox with the given name and value type.
    *
-   * <p>If a mailbox with {@code name} already exists, name collision is the sole trigger for
-   * failure — the {@code ttl} passed here is not compared against any pre-existing mailbox's
-   * configuration; policy reconciliation is the caller's responsibility.
+   * <p>If a mailbox with {@code name} already exists, it is replaced: {@code create} is
+   * last-write-wins, and the {@code ttl} passed here supersedes any previously configured TTL for
+   * that name.
    *
    * @param <T> the mailbox value type
    * @param name the logical name for the mailbox
@@ -61,9 +60,9 @@ public interface MailboxFactory {
   /**
    * Create a new mailbox with the given name and generic value type.
    *
-   * <p>If a mailbox with {@code name} already exists, name collision is the sole trigger for
-   * failure — the {@code ttl} passed here is not compared against any pre-existing mailbox's
-   * configuration; policy reconciliation is the caller's responsibility.
+   * <p>If a mailbox with {@code name} already exists, it is replaced: {@code create} is
+   * last-write-wins, and the {@code ttl} passed here supersedes any previously configured TTL for
+   * that name.
    *
    * @param <T> the mailbox value type
    * @param name the logical name for the mailbox
