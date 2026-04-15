@@ -44,6 +44,23 @@ class InMemoryJournalSpiTest {
   }
 
   @Test
+  void existsReturnsFalseForNeverCreatedKey() {
+    assertThat(journal.exists(KEY)).isFalse();
+  }
+
+  @Test
+  void existsReturnsTrueForCreatedKey() {
+    journal.create(KEY, Duration.ofHours(1));
+    assertThat(journal.exists(KEY)).isTrue();
+  }
+
+  @Test
+  void existsReturnsFalseAfterExpiry() {
+    journal.create(KEY, Duration.ofMillis(1));
+    await().atMost(Duration.ofSeconds(2)).until(() -> !journal.exists(KEY));
+  }
+
+  @Test
   void createMakesJournalAvailableForAppends() {
     journal.create(KEY, Duration.ofHours(1));
 

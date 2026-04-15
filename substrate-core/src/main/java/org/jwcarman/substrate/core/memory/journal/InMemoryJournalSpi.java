@@ -186,6 +186,13 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
+  public boolean exists(String key) {
+    Instant now = Instant.now();
+    State state = store.get(key);
+    return state != null && !state.isDead(now);
+  }
+
+  @Override
   public boolean isComplete(String key) {
     Instant now = Instant.now();
     State state = store.get(key);

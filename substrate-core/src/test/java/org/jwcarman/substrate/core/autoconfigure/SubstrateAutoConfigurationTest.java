@@ -323,6 +323,11 @@ class SubstrateAutoConfigurationTest {
     }
 
     @Override
+    public boolean exists(String key) {
+      return false;
+    }
+
+    @Override
     public int sweep(int maxToSweep) {
       return 0;
     }
