@@ -10,6 +10,22 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+### Changed
+
+- **Handoff rendezvous internals simplified** — the five-class hierarchy
+  in `substrate-core` (`NextHandoff` + `AbstractHandoff` +
+  `AbstractSingleSlotHandoff` + `CoalescingHandoff` + `SingleShotHandoff`
+  + `BlockingBoundedHandoff`) collapses to one interface (`Handoff`) and
+  two implementations (`SingleSlotHandoff` for Atom/Mailbox,
+  `BoundedQueueHandoff` for Journal). Values and terminal markers now
+  live in separate fields, so terminals are sticky, pending values
+  always drain first, and `markCancelled` stops being a special case.
+  Per-primitive delivery semantics (mailbox's exactly-once auto-complete,
+  atom's deliver-on-change, journal's deliver-every-entry) move into the
+  primitive feeders. Internal-only refactor — no API change for code
+  that consumes `BlockingSubscription`/`Subscription`. Removes the
+  "Cancelled marker dropped: queue full" edge case.
+
 ### Added
 
 - **`substrate-etcd` module** — `AtomSpi` backed by etcd (Atom only;

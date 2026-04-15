@@ -46,7 +46,7 @@ class FeederSupportTest {
 
   @Test
   void stepReturningTrueContinuesLoop() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
     var invocations = new AtomicInteger(0);
 
     Runnable canceller =
@@ -58,7 +58,7 @@ class FeederSupportTest {
             () -> {
               int count = invocations.incrementAndGet();
               if (count <= 3) {
-                handoff.push("value-" + count);
+                handoff.deliver("value-" + count);
                 notifier.notifyAtomChanged(KEY);
               }
               return true;
@@ -73,7 +73,7 @@ class FeederSupportTest {
 
   @Test
   void stepReturningFalseExitsCleanly() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
 
     Runnable canceller =
         FeederSupport.start(
@@ -82,20 +82,20 @@ class FeederSupportTest {
             handoff,
             "test-feeder",
             () -> {
-              handoff.push("only-once");
+              handoff.deliver("only-once");
               return false;
             });
 
-    assertThat(handoff.pull(Duration.ofSeconds(2))).isEqualTo(new NextResult.Value<>("only-once"));
+    assertThat(handoff.poll(Duration.ofSeconds(2))).isEqualTo(new NextResult.Value<>("only-once"));
 
-    assertThat(handoff.pull(SHORT_TIMEOUT)).isInstanceOf(NextResult.Timeout.class);
+    assertThat(handoff.poll(SHORT_TIMEOUT)).isInstanceOf(NextResult.Timeout.class);
 
     canceller.run();
   }
 
   @Test
   void uncaughtRuntimeExceptionCallsHandoffError() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
     var cause = new RuntimeException("boom");
 
     Runnable canceller =
@@ -108,7 +108,7 @@ class FeederSupportTest {
               throw cause;
             });
 
-    NextResult<String> result = handoff.pull(Duration.ofSeconds(2));
+    NextResult<String> result = handoff.poll(Duration.ofSeconds(2));
     assertThat(result).isInstanceOf(NextResult.Errored.class);
     assertThat(((NextResult.Errored<String>) result).cause()).isSameAs(cause);
 
@@ -117,7 +117,7 @@ class FeederSupportTest {
 
   @Test
   void deletedNotificationCallsMarkDeletedAndExits() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
     var stepEntered = new CountDownLatch(1);
 
     Runnable canceller =
@@ -135,7 +135,7 @@ class FeederSupportTest {
 
     notifier.notifyAtomDeleted(KEY);
 
-    NextResult<String> result = handoff.pull(Duration.ofSeconds(2));
+    NextResult<String> result = handoff.poll(Duration.ofSeconds(2));
     assertThat(result).isInstanceOf(NextResult.Deleted.class);
 
     canceller.run();
@@ -143,7 +143,7 @@ class FeederSupportTest {
 
   @Test
   void cancellerStopsFeederThread() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
     var invocations = new AtomicInteger(0);
 
     Runnable canceller =
@@ -172,7 +172,7 @@ class FeederSupportTest {
 
   @Test
   void interruptExitsLoopWithoutFiringError() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
     var stepEntered = new CountDownLatch(1);
 
     Runnable canceller =
@@ -190,12 +190,12 @@ class FeederSupportTest {
 
     canceller.run();
 
-    assertThat(handoff.pull(SHORT_TIMEOUT)).isInstanceOf(NextResult.Timeout.class);
+    assertThat(handoff.poll(SHORT_TIMEOUT)).isInstanceOf(NextResult.Timeout.class);
   }
 
   @Test
   void notificationForDifferentKeyIsIgnored() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
     var stepCount = new AtomicInteger(0);
 
     Runnable canceller =
@@ -215,7 +215,7 @@ class FeederSupportTest {
 
     notifier.notifyAtomDeleted("other-key");
 
-    assertThat(handoff.pull(SHORT_TIMEOUT)).isInstanceOf(NextResult.Timeout.class);
+    assertThat(handoff.poll(SHORT_TIMEOUT)).isInstanceOf(NextResult.Timeout.class);
 
     canceller.run();
   }

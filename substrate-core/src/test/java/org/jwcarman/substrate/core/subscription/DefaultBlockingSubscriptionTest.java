@@ -37,7 +37,7 @@ class DefaultBlockingSubscriptionTest {
 
   @Test
   void canBeUsedInTryWithResourcesAndCancelsOnExit() {
-    var handoff = new BlockingBoundedHandoff<String>(10);
+    var handoff = new BoundedQueueHandoff<String>(10);
     var cancellerInvocations = new AtomicInteger(0);
 
     try (BlockingSubscription<String> sub =
@@ -54,7 +54,7 @@ class DefaultBlockingSubscriptionTest {
 
   @Test
   void closeIsIdempotentAndEquivalentToCancel() {
-    var handoff = new BlockingBoundedHandoff<String>(10);
+    var handoff = new BoundedQueueHandoff<String>(10);
     var cancellerInvocations = new AtomicInteger(0);
     var sub =
         new DefaultBlockingSubscription<>(
@@ -70,8 +70,8 @@ class DefaultBlockingSubscriptionTest {
 
   @Test
   void nextReturnsValueAndRemainsActive() {
-    var handoff = new BlockingBoundedHandoff<String>(10);
-    handoff.push("hello");
+    var handoff = new BoundedQueueHandoff<String>(10);
+    handoff.deliver("hello");
     var canceller = new AtomicInteger(0);
     var sub = new DefaultBlockingSubscription<>(handoff, canceller::incrementAndGet, coordinator);
 
@@ -82,7 +82,7 @@ class DefaultBlockingSubscriptionTest {
 
   @Test
   void nextReturnsTimeoutAndRemainsActive() {
-    var handoff = new BlockingBoundedHandoff<String>(10);
+    var handoff = new BoundedQueueHandoff<String>(10);
     var sub = new DefaultBlockingSubscription<>(handoff, () -> {}, coordinator);
 
     NextResult<String> result = sub.next(SHORT_TIMEOUT);
@@ -92,7 +92,7 @@ class DefaultBlockingSubscriptionTest {
 
   @Test
   void completedFlipsActiveToFalse() {
-    var handoff = new BlockingBoundedHandoff<String>(10);
+    var handoff = new BoundedQueueHandoff<String>(10);
     handoff.markCompleted();
     var sub = new DefaultBlockingSubscription<>(handoff, () -> {}, coordinator);
 
@@ -102,7 +102,7 @@ class DefaultBlockingSubscriptionTest {
 
   @Test
   void expiredFlipsActiveToFalse() {
-    var handoff = new BlockingBoundedHandoff<String>(10);
+    var handoff = new BoundedQueueHandoff<String>(10);
     handoff.markExpired();
     var sub = new DefaultBlockingSubscription<>(handoff, () -> {}, coordinator);
 
@@ -112,7 +112,7 @@ class DefaultBlockingSubscriptionTest {
 
   @Test
   void deletedFlipsActiveToFalse() {
-    var handoff = new BlockingBoundedHandoff<String>(10);
+    var handoff = new BoundedQueueHandoff<String>(10);
     handoff.markDeleted();
     var sub = new DefaultBlockingSubscription<>(handoff, () -> {}, coordinator);
 
@@ -122,7 +122,7 @@ class DefaultBlockingSubscriptionTest {
 
   @Test
   void erroredFlipsActiveToFalse() {
-    var handoff = new BlockingBoundedHandoff<String>(10);
+    var handoff = new BoundedQueueHandoff<String>(10);
     handoff.error(new RuntimeException("boom"));
     var sub = new DefaultBlockingSubscription<>(handoff, () -> {}, coordinator);
 
@@ -132,7 +132,7 @@ class DefaultBlockingSubscriptionTest {
 
   @Test
   void cancelFlipsActiveAndRunsCanceller() {
-    var handoff = new BlockingBoundedHandoff<String>(10);
+    var handoff = new BoundedQueueHandoff<String>(10);
     var canceller = new AtomicInteger(0);
     var sub = new DefaultBlockingSubscription<>(handoff, canceller::incrementAndGet, coordinator);
 
@@ -143,7 +143,7 @@ class DefaultBlockingSubscriptionTest {
 
   @Test
   void cancelIsIdempotent() {
-    var handoff = new BlockingBoundedHandoff<String>(10);
+    var handoff = new BoundedQueueHandoff<String>(10);
     var canceller = new AtomicInteger(0);
     var sub = new DefaultBlockingSubscription<>(handoff, canceller::incrementAndGet, coordinator);
 
@@ -198,7 +198,7 @@ class DefaultBlockingSubscriptionTest {
 
   @Test
   void preInterruptedThreadReturnsTimeoutAndFlipsDone() {
-    var handoff = new BlockingBoundedHandoff<String>(10);
+    var handoff = new BoundedQueueHandoff<String>(10);
     var sub = new DefaultBlockingSubscription<>(handoff, () -> {}, coordinator);
 
     Thread.currentThread().interrupt();
@@ -214,7 +214,7 @@ class DefaultBlockingSubscriptionTest {
 
   @Test
   void interruptDuringPullFlipsDone() throws Exception {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
     var sub = new DefaultBlockingSubscription<>(handoff, () -> {}, coordinator);
     var resultRef = new AtomicReference<NextResult<String>>();
     var latch = new CountDownLatch(1);
@@ -243,7 +243,7 @@ class DefaultBlockingSubscriptionTest {
 
   @Test
   void consumerLoopExitsCleanlyUnderInterrupt() throws Exception {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
     var sub = new DefaultBlockingSubscription<>(handoff, () -> {}, coordinator);
     var loopExited = new AtomicBoolean(false);
 
@@ -273,8 +273,8 @@ class DefaultBlockingSubscriptionTest {
 
   @Test
   void valueDoesNotFlipActive() {
-    var handoff = new BlockingBoundedHandoff<String>(10);
-    handoff.push("hello");
+    var handoff = new BoundedQueueHandoff<String>(10);
+    handoff.deliver("hello");
     var sub = new DefaultBlockingSubscription<>(handoff, () -> {}, coordinator);
 
     sub.next(SHORT_TIMEOUT);
@@ -283,7 +283,7 @@ class DefaultBlockingSubscriptionTest {
 
   @Test
   void timeoutWithoutInterruptDoesNotFlipActive() {
-    var handoff = new BlockingBoundedHandoff<String>(10);
+    var handoff = new BoundedQueueHandoff<String>(10);
     var sub = new DefaultBlockingSubscription<>(handoff, () -> {}, coordinator);
 
     sub.next(SHORT_TIMEOUT);

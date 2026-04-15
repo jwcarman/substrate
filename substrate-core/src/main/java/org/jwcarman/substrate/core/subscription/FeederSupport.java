@@ -63,7 +63,7 @@ public final class FeederSupport {
   public static Runnable start(
       String key,
       BiFunction<String, Consumer<Notification>, NotifierSubscription> subscribeFn,
-      NextHandoff<?> handoff,
+      Handoff<?> handoff,
       String threadName,
       FeederStep step) {
 
@@ -101,7 +101,7 @@ public final class FeederSupport {
   private static void runLoop(
       AtomicBoolean running,
       Semaphore semaphore,
-      NextHandoff<?> handoff,
+      Handoff<?> handoff,
       FeederStep step,
       NotifierSubscription notifierSub,
       String threadName,

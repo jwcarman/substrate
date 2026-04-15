@@ -34,14 +34,14 @@ class CallbackPumpSubscriptionTest {
 
   private static final Duration AWAIT_TIMEOUT = Duration.ofSeconds(5);
 
-  private Subscription startPump(NextHandoff<String> handoff, Subscriber<String> subscriber) {
+  private Subscription startPump(Handoff<String> handoff, Subscriber<String> subscriber) {
     var source = new DefaultBlockingSubscription<>(handoff, () -> {}, new ShutdownCoordinator());
     return new CallbackPumpSubscription<>(source, subscriber);
   }
 
   @Test
   void onNextIsInvokedForEachValue() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
     var received = new CopyOnWriteArrayList<String>();
     var latch = new CountDownLatch(2);
 
@@ -52,9 +52,9 @@ class CallbackPumpSubscriptionTest {
           latch.countDown();
         });
 
-    handoff.push("first");
+    handoff.deliver("first");
     await().atMost(AWAIT_TIMEOUT).until(() -> received.size() >= 1);
-    handoff.push("second");
+    handoff.deliver("second");
 
     await().atMost(AWAIT_TIMEOUT).until(() -> received.size() >= 2);
     assertThat(received).contains("first", "second");
@@ -62,7 +62,7 @@ class CallbackPumpSubscriptionTest {
 
   @Test
   void onNextExceptionDoesNotStopDelivery() {
-    var handoff = new BlockingBoundedHandoff<String>(10);
+    var handoff = new BoundedQueueHandoff<String>(10);
     var received = new CopyOnWriteArrayList<String>();
 
     startPump(
@@ -74,8 +74,8 @@ class CallbackPumpSubscriptionTest {
           }
         });
 
-    handoff.push("throw");
-    handoff.push("after-throw");
+    handoff.deliver("throw");
+    handoff.deliver("after-throw");
 
     await().atMost(AWAIT_TIMEOUT).until(() -> received.size() >= 2);
     assertThat(received).containsExactly("throw", "after-throw");
@@ -83,7 +83,7 @@ class CallbackPumpSubscriptionTest {
 
   @Test
   void onCompleteFiresOnCompletion() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
     var completedRef = new CountDownLatch(1);
 
     var sub =
@@ -102,7 +102,7 @@ class CallbackPumpSubscriptionTest {
 
   @Test
   void onExpirationFiresOnExpired() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
     var expiredLatch = new CountDownLatch(1);
 
     var sub =
@@ -121,7 +121,7 @@ class CallbackPumpSubscriptionTest {
 
   @Test
   void onDeleteFiresOnDeleted() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
     var deletedLatch = new CountDownLatch(1);
 
     var sub =
@@ -140,7 +140,7 @@ class CallbackPumpSubscriptionTest {
 
   @Test
   void onErrorFiresOnErrored() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
     var errorRef = new AtomicReference<Throwable>();
     var errorLatch = new CountDownLatch(1);
 
@@ -166,7 +166,7 @@ class CallbackPumpSubscriptionTest {
 
   @Test
   void onCancelledFiresOnCancelled() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
     var cancelledLatch = new CountDownLatch(1);
 
     var sub =
@@ -185,7 +185,7 @@ class CallbackPumpSubscriptionTest {
 
   @Test
   void defaultSubscriberHandlersAreNoOps() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
     var sub = startPump(handoff, value -> {});
 
     handoff.markCompleted();
@@ -195,7 +195,7 @@ class CallbackPumpSubscriptionTest {
 
   @Test
   void cancelStopsHandlerLoop() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
     var sub = startPump(handoff, value -> {});
 
     assertThat(sub.isActive()).isTrue();
@@ -206,7 +206,7 @@ class CallbackPumpSubscriptionTest {
 
   @Test
   void cancelOnIdleSubscriptionExitsQuickly() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
     var sub = startPump(handoff, value -> {});
 
     await().atMost(Duration.ofMillis(200)).until(sub::isActive);
@@ -221,25 +221,20 @@ class CallbackPumpSubscriptionTest {
 
   @Test
   void idleSubscriptionDoesNoPeriodicWork() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
     var pullCount = new AtomicInteger(0);
 
     var countingHandoff =
-        new NextHandoff<String>() {
+        new Handoff<String>() {
           @Override
-          public void push(String item) {
-            handoff.push(item);
+          public void deliver(String item) {
+            handoff.deliver(item);
           }
 
           @Override
-          public void pushAll(java.util.List<String> items) {
-            handoff.pushAll(items);
-          }
-
-          @Override
-          public org.jwcarman.substrate.NextResult<String> pull(Duration timeout) {
+          public org.jwcarman.substrate.NextResult<String> poll(Duration timeout) {
             pullCount.incrementAndGet();
-            return handoff.pull(timeout);
+            return handoff.poll(timeout);
           }
 
           @Override
@@ -284,28 +279,23 @@ class CallbackPumpSubscriptionTest {
 
   @Test
   void externalInterruptExitsHandlerLoop() throws Exception {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
     var threadRef = new AtomicReference<Thread>();
     var started = new CountDownLatch(1);
     var received = new CopyOnWriteArrayList<String>();
 
     var capturingHandoff =
-        new NextHandoff<String>() {
+        new Handoff<String>() {
           @Override
-          public void push(String item) {
-            handoff.push(item);
+          public void deliver(String item) {
+            handoff.deliver(item);
           }
 
           @Override
-          public void pushAll(java.util.List<String> items) {
-            handoff.pushAll(items);
-          }
-
-          @Override
-          public org.jwcarman.substrate.NextResult<String> pull(Duration timeout) {
+          public org.jwcarman.substrate.NextResult<String> poll(Duration timeout) {
             threadRef.compareAndSet(null, Thread.currentThread());
             started.countDown();
-            return handoff.pull(timeout);
+            return handoff.poll(timeout);
           }
 
           @Override
@@ -342,7 +332,7 @@ class CallbackPumpSubscriptionTest {
 
     await().atMost(Duration.ofMillis(500)).until(() -> !sub.isActive());
 
-    handoff.push("after-interrupt");
+    handoff.deliver("after-interrupt");
     await()
         .during(Duration.ofMillis(100))
         .atMost(Duration.ofMillis(500))
@@ -351,28 +341,23 @@ class CallbackPumpSubscriptionTest {
 
   @Test
   void interruptDoesNotFireOnError() throws Exception {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
     var threadRef = new AtomicReference<Thread>();
     var started = new CountDownLatch(1);
     var errorFired = new AtomicBoolean(false);
 
     var capturingHandoff =
-        new NextHandoff<String>() {
+        new Handoff<String>() {
           @Override
-          public void push(String item) {
-            handoff.push(item);
+          public void deliver(String item) {
+            handoff.deliver(item);
           }
 
           @Override
-          public void pushAll(java.util.List<String> items) {
-            handoff.pushAll(items);
-          }
-
-          @Override
-          public org.jwcarman.substrate.NextResult<String> pull(Duration timeout) {
+          public org.jwcarman.substrate.NextResult<String> poll(Duration timeout) {
             threadRef.compareAndSet(null, Thread.currentThread());
             started.countDown();
-            return handoff.pull(timeout);
+            return handoff.poll(timeout);
           }
 
           @Override
@@ -419,7 +404,7 @@ class CallbackPumpSubscriptionTest {
 
   @Test
   void onCompleteHandlerExceptionIsSwallowed() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
 
     var sub =
         startPump(
@@ -439,7 +424,7 @@ class CallbackPumpSubscriptionTest {
 
   @Test
   void onExpirationHandlerExceptionIsSwallowed() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
 
     var sub =
         startPump(
@@ -459,7 +444,7 @@ class CallbackPumpSubscriptionTest {
 
   @Test
   void onDeleteHandlerExceptionIsSwallowed() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
 
     var sub =
         startPump(
@@ -479,7 +464,7 @@ class CallbackPumpSubscriptionTest {
 
   @Test
   void onErrorHandlerExceptionIsSwallowed() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
 
     var sub =
         startPump(
@@ -499,7 +484,7 @@ class CallbackPumpSubscriptionTest {
 
   @Test
   void onCancelledHandlerExceptionIsSwallowed() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
 
     var sub =
         startPump(
@@ -519,14 +504,14 @@ class CallbackPumpSubscriptionTest {
 
   @Test
   void valuePushedWhileParkedWakesHandlerImmediately() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
     var received = new CopyOnWriteArrayList<String>();
 
     startPump(handoff, received::add);
 
     await().atMost(Duration.ofMillis(200)).pollInterval(Duration.ofMillis(10)).until(() -> true);
 
-    handoff.push("wake-up");
+    handoff.deliver("wake-up");
 
     await()
         .atMost(Duration.ofMillis(200))
@@ -536,7 +521,7 @@ class CallbackPumpSubscriptionTest {
 
   @Test
   void wrappingAnAlreadyCancelledSourceStillDeliversOnCancelled() {
-    var handoff = new CoalescingHandoff<String>();
+    var handoff = new SingleSlotHandoff<String>();
     var coordinator = new ShutdownCoordinator();
     var source = new DefaultBlockingSubscription<>(handoff, () -> {}, coordinator);
 

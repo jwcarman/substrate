@@ -34,10 +34,10 @@ import org.jwcarman.substrate.atom.Snapshot;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.core.subscription.CallbackPumpSubscription;
-import org.jwcarman.substrate.core.subscription.CoalescingHandoff;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultSubscriberBuilder;
 import org.jwcarman.substrate.core.subscription.FeederSupport;
+import org.jwcarman.substrate.core.subscription.SingleSlotHandoff;
 import org.jwcarman.substrate.core.transform.PayloadTransformer;
 
 public class DefaultAtom<T> implements Atom<T> {
@@ -134,20 +134,20 @@ public class DefaultAtom<T> implements Atom<T> {
   }
 
   private BlockingSubscription<Snapshot<T>> buildBlockingSubscription(Snapshot<T> lastSeen) {
-    CoalescingHandoff<Snapshot<T>> handoff = new CoalescingHandoff<>();
+    SingleSlotHandoff<Snapshot<T>> handoff = new SingleSlotHandoff<>();
     Runnable canceller = startFeeder(handoff, lastSeen);
     return new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
   }
 
   private Subscription buildCallbackPumpSubscription(
       Snapshot<T> lastSeen, Subscriber<Snapshot<T>> subscriber) {
-    CoalescingHandoff<Snapshot<T>> handoff = new CoalescingHandoff<>();
+    SingleSlotHandoff<Snapshot<T>> handoff = new SingleSlotHandoff<>();
     Runnable canceller = startFeeder(handoff, lastSeen);
     var source = new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
     return new CallbackPumpSubscription<>(source, subscriber);
   }
 
-  private Runnable startFeeder(CoalescingHandoff<Snapshot<T>> handoff, Snapshot<T> lastSeen) {
+  private Runnable startFeeder(SingleSlotHandoff<Snapshot<T>> handoff, Snapshot<T> lastSeen) {
     AtomicReference<String> lastToken =
         new AtomicReference<>(lastSeen != null ? lastSeen.token() : null);
 
@@ -166,7 +166,7 @@ public class DefaultAtom<T> implements Atom<T> {
           if (!currentToken.equals(lastToken.get())) {
             Snapshot<T> snap =
                 new Snapshot<>(codec.decode(transformer.decode(raw.get().value())), currentToken);
-            handoff.push(snap);
+            handoff.deliver(snap);
             lastToken.set(currentToken);
           }
           return true;

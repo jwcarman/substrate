@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.NextResult;
 import org.jwcarman.substrate.Subscription;
-import org.jwcarman.substrate.core.subscription.BlockingBoundedHandoff;
+import org.jwcarman.substrate.core.subscription.BoundedQueueHandoff;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
 
 class ShutdownCoordinatorTest {
@@ -40,10 +40,10 @@ class ShutdownCoordinatorTest {
 
     var sub1 =
         new DefaultBlockingSubscription<>(
-            new BlockingBoundedHandoff<String>(10), canceller1::incrementAndGet, coordinator);
+            new BoundedQueueHandoff<String>(10), canceller1::incrementAndGet, coordinator);
     var sub2 =
         new DefaultBlockingSubscription<>(
-            new BlockingBoundedHandoff<String>(10), canceller2::incrementAndGet, coordinator);
+            new BoundedQueueHandoff<String>(10), canceller2::incrementAndGet, coordinator);
 
     assertThat(sub1.isActive()).isTrue();
     assertThat(sub2.isActive()).isTrue();
@@ -59,7 +59,7 @@ class ShutdownCoordinatorTest {
   @Test
   void stopUnblocksThreadsCurrentlyInsideNext() throws InterruptedException {
     var coordinator = new ShutdownCoordinator();
-    var handoff = new BlockingBoundedHandoff<String>(10);
+    var handoff = new BoundedQueueHandoff<String>(10);
     var sub = new DefaultBlockingSubscription<>(handoff, () -> {}, coordinator);
 
     var entered = new CountDownLatch(1);
@@ -102,7 +102,7 @@ class ShutdownCoordinatorTest {
     var canceller = new AtomicInteger(0);
     var sub =
         new DefaultBlockingSubscription<>(
-            new BlockingBoundedHandoff<String>(10), canceller::incrementAndGet, coordinator);
+            new BoundedQueueHandoff<String>(10), canceller::incrementAndGet, coordinator);
 
     sub.cancel();
     // After explicit cancel, stop() should NOT invoke the canceller a second time
@@ -115,7 +115,7 @@ class ShutdownCoordinatorTest {
   void naturalTerminationUnregistersFromCoordinator() {
     var coordinator = new ShutdownCoordinator();
     var canceller = new AtomicInteger(0);
-    var handoff = new BlockingBoundedHandoff<String>(10);
+    var handoff = new BoundedQueueHandoff<String>(10);
     var sub = new DefaultBlockingSubscription<>(handoff, canceller::incrementAndGet, coordinator);
 
     // Push a terminal directly — consumer observes it on next()
@@ -139,7 +139,7 @@ class ShutdownCoordinatorTest {
     var canceller = new AtomicInteger(0);
     var sub =
         new DefaultBlockingSubscription<>(
-            new BlockingBoundedHandoff<String>(10), canceller::incrementAndGet, coordinator);
+            new BoundedQueueHandoff<String>(10), canceller::incrementAndGet, coordinator);
 
     // A subscription registered after the coordinator has stopped should be
     // cancelled immediately by the register() call itself.
@@ -152,10 +152,10 @@ class ShutdownCoordinatorTest {
     var coordinator = new ShutdownCoordinator();
     var sub1 =
         new DefaultBlockingSubscription<>(
-            new BlockingBoundedHandoff<String>(10), () -> {}, coordinator);
+            new BoundedQueueHandoff<String>(10), () -> {}, coordinator);
     var sub2 =
         new DefaultBlockingSubscription<>(
-            new BlockingBoundedHandoff<String>(10), () -> {}, coordinator);
+            new BoundedQueueHandoff<String>(10), () -> {}, coordinator);
 
     var callbackFired = new CountDownLatch(1);
     coordinator.stop(callbackFired::countDown);
@@ -183,7 +183,7 @@ class ShutdownCoordinatorTest {
   @Test
   void registryBecomesEmptyAfterAllCancellationsComplete() {
     var coordinator = new ShutdownCoordinator();
-    var handoff = new BlockingBoundedHandoff<String>(10);
+    var handoff = new BoundedQueueHandoff<String>(10);
     var sub = new DefaultBlockingSubscription<>(handoff, () -> {}, coordinator);
 
     sub.cancel();
@@ -194,7 +194,7 @@ class ShutdownCoordinatorTest {
     var secondCanceller = new AtomicInteger(0);
     var sub2 =
         new DefaultBlockingSubscription<>(
-            new BlockingBoundedHandoff<String>(10), secondCanceller::incrementAndGet, coordinator);
+            new BoundedQueueHandoff<String>(10), secondCanceller::incrementAndGet, coordinator);
     coordinator.stop();
     assertThat(secondCanceller.get()).isEqualTo(1);
     // sub was already cancelled; stop should not run the canceller again (done

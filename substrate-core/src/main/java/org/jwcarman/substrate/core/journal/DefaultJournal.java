@@ -27,7 +27,7 @@ import org.jwcarman.substrate.SubscriberConfig;
 import org.jwcarman.substrate.Subscription;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.Notifier;
-import org.jwcarman.substrate.core.subscription.BlockingBoundedHandoff;
+import org.jwcarman.substrate.core.subscription.BoundedQueueHandoff;
 import org.jwcarman.substrate.core.subscription.CallbackPumpSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultSubscriberBuilder;
@@ -157,8 +157,8 @@ public class DefaultJournal<T> implements Journal<T> {
 
   private BlockingSubscription<JournalEntry<T>> buildBlockingSubscription(
       String startingCheckpoint, List<RawJournalEntry> preload) {
-    BlockingBoundedHandoff<JournalEntry<T>> handoff =
-        new BlockingBoundedHandoff<>(limits.subscriptionQueueCapacity());
+    BoundedQueueHandoff<JournalEntry<T>> handoff =
+        new BoundedQueueHandoff<>(limits.subscriptionQueueCapacity());
     Runnable canceller = startFeeder(handoff, startingCheckpoint, preload);
     return new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
   }
@@ -167,15 +167,15 @@ public class DefaultJournal<T> implements Journal<T> {
       String startingCheckpoint,
       List<RawJournalEntry> preload,
       Subscriber<JournalEntry<T>> subscriber) {
-    BlockingBoundedHandoff<JournalEntry<T>> handoff =
-        new BlockingBoundedHandoff<>(limits.subscriptionQueueCapacity());
+    BoundedQueueHandoff<JournalEntry<T>> handoff =
+        new BoundedQueueHandoff<>(limits.subscriptionQueueCapacity());
     Runnable canceller = startFeeder(handoff, startingCheckpoint, preload);
     var source = new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
     return new CallbackPumpSubscription<>(source, subscriber);
   }
 
   private Runnable startFeeder(
-      BlockingBoundedHandoff<JournalEntry<T>> handoff,
+      BoundedQueueHandoff<JournalEntry<T>> handoff,
       String startingCheckpoint,
       List<RawJournalEntry> preload) {
     AtomicReference<String> checkpoint = new AtomicReference<>(startingCheckpoint);
@@ -190,7 +190,7 @@ public class DefaultJournal<T> implements Journal<T> {
   }
 
   private boolean runOneIteration(
-      BlockingBoundedHandoff<JournalEntry<T>> handoff,
+      BoundedQueueHandoff<JournalEntry<T>> handoff,
       AtomicReference<String> checkpoint,
       AtomicBoolean preloaded,
       List<RawJournalEntry> preload) {
@@ -202,7 +202,7 @@ public class DefaultJournal<T> implements Journal<T> {
   }
 
   private void pushPreloadIfNeeded(
-      BlockingBoundedHandoff<JournalEntry<T>> handoff,
+      BoundedQueueHandoff<JournalEntry<T>> handoff,
       AtomicReference<String> checkpoint,
       AtomicBoolean preloaded,
       List<RawJournalEntry> preload) {
@@ -210,17 +210,17 @@ public class DefaultJournal<T> implements Journal<T> {
       return;
     }
     for (RawJournalEntry raw : preload) {
-      handoff.push(decode(raw));
+      handoff.deliver(decode(raw));
       checkpoint.set(raw.id());
     }
   }
 
   private boolean readBatchAndPush(
-      BlockingBoundedHandoff<JournalEntry<T>> handoff, AtomicReference<String> checkpoint) {
+      BoundedQueueHandoff<JournalEntry<T>> handoff, AtomicReference<String> checkpoint) {
     try {
       List<RawJournalEntry> batch = readAfterCheckpoint(checkpoint.get());
       for (RawJournalEntry raw : batch) {
-        handoff.push(decode(raw));
+        handoff.deliver(decode(raw));
         checkpoint.set(raw.id());
       }
       return true;
@@ -231,14 +231,14 @@ public class DefaultJournal<T> implements Journal<T> {
   }
 
   private boolean drainIfCompleted(
-      BlockingBoundedHandoff<JournalEntry<T>> handoff, AtomicReference<String> checkpoint) {
+      BoundedQueueHandoff<JournalEntry<T>> handoff, AtomicReference<String> checkpoint) {
     if (!journalSpi.isComplete(key)) {
       return false;
     }
     try {
       List<RawJournalEntry> finalBatch = readAfterCheckpoint(checkpoint.get());
       for (RawJournalEntry raw : finalBatch) {
-        handoff.push(decode(raw));
+        handoff.deliver(decode(raw));
         checkpoint.set(raw.id());
       }
     } catch (JournalExpiredException _) {

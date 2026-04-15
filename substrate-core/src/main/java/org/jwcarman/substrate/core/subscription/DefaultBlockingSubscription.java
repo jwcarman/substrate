@@ -23,13 +23,13 @@ import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 
 public class DefaultBlockingSubscription<T> implements BlockingSubscription<T> {
 
-  private final NextHandoff<T> handoff;
+  private final Handoff<T> handoff;
   private final Runnable canceller;
   private final ShutdownCoordinator shutdownCoordinator;
   private final AtomicBoolean done = new AtomicBoolean(false);
 
   public DefaultBlockingSubscription(
-      NextHandoff<T> handoff, Runnable canceller, ShutdownCoordinator shutdownCoordinator) {
+      Handoff<T> handoff, Runnable canceller, ShutdownCoordinator shutdownCoordinator) {
     this.handoff = handoff;
     this.canceller = canceller;
     this.shutdownCoordinator = shutdownCoordinator;
@@ -43,7 +43,7 @@ public class DefaultBlockingSubscription<T> implements BlockingSubscription<T> {
       return new NextResult.Timeout<>();
     }
 
-    NextResult<T> result = handoff.pull(timeout);
+    NextResult<T> result = handoff.poll(timeout);
 
     if (result.isTerminal() || Thread.currentThread().isInterrupted()) {
       markDone();
@@ -61,8 +61,8 @@ public class DefaultBlockingSubscription<T> implements BlockingSubscription<T> {
   public void cancel() {
     if (markDone()) {
       canceller.run();
-      // markCancelled unblocks any thread parked inside next() by waking the
-      // handoff's internal condition. The woken pull returns Cancelled, the
+      // markCancelled unblocks any thread parked inside next() by setting the
+      // sticky Cancelled terminal. The woken poll returns Cancelled, the
       // caller observes isActive false on the next loop turn, and exits.
       handoff.markCancelled();
     }

@@ -28,7 +28,7 @@ import org.jwcarman.substrate.core.subscription.CallbackPumpSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultSubscriberBuilder;
 import org.jwcarman.substrate.core.subscription.FeederSupport;
-import org.jwcarman.substrate.core.subscription.SingleShotHandoff;
+import org.jwcarman.substrate.core.subscription.SingleSlotHandoff;
 import org.jwcarman.substrate.core.transform.PayloadTransformer;
 import org.jwcarman.substrate.mailbox.Mailbox;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
@@ -71,14 +71,14 @@ public class DefaultMailbox<T> implements Mailbox<T> {
 
   @Override
   public BlockingSubscription<T> subscribe() {
-    SingleShotHandoff<T> handoff = new SingleShotHandoff<>();
+    SingleSlotHandoff<T> handoff = new SingleSlotHandoff<>();
     Runnable canceller = startFeeder(handoff);
     return new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
   }
 
   @Override
   public Subscription subscribe(Subscriber<T> subscriber) {
-    SingleShotHandoff<T> handoff = new SingleShotHandoff<>();
+    SingleSlotHandoff<T> handoff = new SingleSlotHandoff<>();
     Runnable canceller = startFeeder(handoff);
     var source = new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
     return new CallbackPumpSubscription<>(source, subscriber);
@@ -89,7 +89,7 @@ public class DefaultMailbox<T> implements Mailbox<T> {
     return subscribe(DefaultSubscriberBuilder.from(customizer));
   }
 
-  private Runnable startFeeder(SingleShotHandoff<T> handoff) {
+  private Runnable startFeeder(SingleSlotHandoff<T> handoff) {
     return FeederSupport.start(
         key,
         notifier::subscribeToMailbox,
@@ -99,7 +99,9 @@ public class DefaultMailbox<T> implements Mailbox<T> {
           try {
             Optional<byte[]> value = mailboxSpi.get(key);
             if (value.isPresent()) {
-              handoff.push(codec.decode(transformer.decode(value.get())));
+              handoff.deliver(codec.decode(transformer.decode(value.get())));
+              // Mailbox semantics: exactly one delivery, then complete.
+              handoff.markCompleted();
               return false;
             }
             return true;
