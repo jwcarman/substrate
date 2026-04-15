@@ -120,6 +120,10 @@ public final class FeederSupport {
     } catch (InterruptedException _) {
       Thread.currentThread().interrupt();
     } catch (RuntimeException e) {
+      if (isInterrupt(e)) {
+        Thread.currentThread().interrupt();
+        return;
+      }
       log.warn(label + " caught unexpected error", e);
       handoff.error(e);
     } finally {
@@ -128,6 +132,18 @@ public final class FeederSupport {
         log.debug(label + " exited");
       }
     }
+  }
+
+  private static boolean isInterrupt(Throwable t) {
+    if (Thread.currentThread().isInterrupted()) {
+      return true;
+    }
+    for (Throwable cause = t; cause != null; cause = cause.getCause()) {
+      if (cause instanceof InterruptedException) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static String feederLabel(String threadName, String key) {

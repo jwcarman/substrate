@@ -194,6 +194,26 @@ class FeederSupportTest {
   }
 
   @Test
+  void runtimeExceptionWrappingInterruptExitsCleanlyWithoutHandoffError() {
+    var handoff = new SingleSlotHandoff<String>();
+    var cause = new RuntimeException("command interrupted", new InterruptedException());
+
+    Runnable canceller =
+        FeederSupport.start(
+            KEY,
+            notifier::subscribeToAtom,
+            handoff,
+            "test-feeder",
+            () -> {
+              throw cause;
+            });
+
+    assertThat(handoff.poll(SHORT_TIMEOUT)).isInstanceOf(NextResult.Timeout.class);
+
+    canceller.run();
+  }
+
+  @Test
   void notificationForDifferentKeyIsIgnored() {
     var handoff = new SingleSlotHandoff<String>();
     var stepCount = new AtomicInteger(0);

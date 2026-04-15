@@ -38,6 +38,14 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 - `exists(String key)` method on `JournalSpi`, `AtomSpi`, `MailboxSpi` for
   backend implementers.
 
+### Fixed
+
+- Feeder threads no longer log a WARN with a stack trace when a subscription
+  is cancelled mid-SPI-call. Driver-specific wrapper exceptions carrying an
+  `InterruptedException` cause (e.g., Lettuce's `RedisCommandInterruptedException`)
+  are now recognized as normal cancellation and exit the feeder cleanly without
+  firing `handoff.error`.
+
 ## [0.5.0] - 2026-04-15
 
 ### Changed
