@@ -50,6 +50,7 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
   private final PreparedStatement readAfterStatement;
   private final PreparedStatement readLastStatement;
   private final PreparedStatement deleteStatement;
+  private final PreparedStatement existsStatement;
 
   public CassandraJournalSpi(
       CqlSession session, String prefix, String tableName, Duration defaultTtl) {
@@ -121,6 +122,9 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
                 + " DESC LIMIT ?");
 
     this.deleteStatement = session.prepare("DELETE FROM " + tableName + WHERE + FIELD_KEY + " = ?");
+
+    this.existsStatement =
+        session.prepare(SELECT + FIELD_KEY + FROM + tableName + WHERE + FIELD_KEY + " = ? LIMIT 1");
   }
 
   public void createSchema() {
@@ -228,6 +232,11 @@ public class CassandraJournalSpi extends AbstractJournalSpi {
   @Override
   public void delete(String key) {
     session.execute(deleteStatement.bind(key));
+  }
+
+  @Override
+  public boolean exists(String key) {
+    return session.execute(existsStatement.bind(key)).one() != null;
   }
 
   private RawJournalEntry mapRow(String key, Row row) {

@@ -32,7 +32,7 @@ import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.codec.spi.TypeRef;
 import org.jwcarman.substrate.atom.Atom;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
-import org.jwcarman.substrate.atom.AtomExpiredException;
+import org.jwcarman.substrate.atom.AtomNotFoundException;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.memory.atom.InMemoryAtomSpi;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
@@ -186,6 +186,11 @@ class DefaultAtomFactoryTest {
           }
 
           @Override
+          public boolean exists(String key) {
+            throw new AssertionError("SPI should not be called during connect");
+          }
+
+          @Override
           public String atomKey(String name) {
             return "substrate:atom:" + name;
           }
@@ -216,7 +221,7 @@ class DefaultAtomFactoryTest {
   void connectedHandleThrowsOnGetWhenNoLiveAtom() {
     Atom<String> atom = factory.connect("nonexistent", String.class);
 
-    assertThatThrownBy(atom::get).isInstanceOf(AtomExpiredException.class);
+    assertThatThrownBy(atom::get).isInstanceOf(AtomNotFoundException.class);
   }
 
   @Test
@@ -225,14 +230,15 @@ class DefaultAtomFactoryTest {
 
     Duration tenSeconds = Duration.ofSeconds(10);
     assertThatThrownBy(() -> atom.set("value", tenSeconds))
-        .isInstanceOf(AtomExpiredException.class);
+        .isInstanceOf(AtomNotFoundException.class);
   }
 
   @Test
-  void connectedHandleTouchReturnsFalseWhenNoLiveAtom() {
+  void connectedHandleTouchThrowsWhenNoLiveAtom() {
     Atom<String> atom = factory.connect("nonexistent", String.class);
 
-    assertThat(atom.touch(Duration.ofSeconds(10))).isFalse();
+    Duration tenSeconds = Duration.ofSeconds(10);
+    assertThatThrownBy(() -> atom.touch(tenSeconds)).isInstanceOf(AtomNotFoundException.class);
   }
 
   @Test

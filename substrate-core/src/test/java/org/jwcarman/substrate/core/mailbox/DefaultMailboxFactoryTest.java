@@ -38,6 +38,7 @@ import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.core.transform.PayloadTransformer;
 import org.jwcarman.substrate.mailbox.Mailbox;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
+import org.jwcarman.substrate.mailbox.MailboxNotFoundException;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.json.JsonMapper;
@@ -75,7 +76,8 @@ class DefaultMailboxFactoryTest {
   @Test
   void connectedHandleThrowsOnFirstOperationIfNoLiveMailbox() {
     when(codecFactory.create(String.class)).thenReturn(stringCodec);
-    when(stringCodec.encode(anyString()))
+    lenient()
+        .when(stringCodec.encode(anyString()))
         .thenAnswer(inv -> ((String) inv.getArgument(0)).getBytes(UTF_8));
 
     InMemoryMailboxSpi spi = new InMemoryMailboxSpi();
@@ -90,7 +92,7 @@ class DefaultMailboxFactoryTest {
 
     Mailbox<String> mailbox = factory.connect("nonexistent", String.class);
 
-    assertThatThrownBy(() -> mailbox.deliver("hello")).isInstanceOf(MailboxExpiredException.class);
+    assertThatThrownBy(() -> mailbox.deliver("hello")).isInstanceOf(MailboxNotFoundException.class);
   }
 
   @Test

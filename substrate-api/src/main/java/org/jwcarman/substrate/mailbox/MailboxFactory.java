@@ -24,11 +24,18 @@ import org.jwcarman.codec.spi.TypeRef;
  * <p>Two families of operations are provided:
  *
  * <ul>
- *   <li><strong>{@code create}</strong> — eagerly provisions a new mailbox in the backing store.
- *       This performs backend I/O and establishes the mailbox's TTL.
- *   <li><strong>{@code connect}</strong> — lazily obtains a handle to an existing mailbox. No
- *       backend I/O occurs until the first operation (e.g., {@link Mailbox#deliver} or {@link
- *       Mailbox#subscribe}) is invoked on the returned handle.
+ *   <li><strong>{@code create}</strong> — eagerly provisions a mailbox in the backing store. This
+ *       performs backend I/O and establishes the mailbox's TTL. Creating a mailbox with an existing
+ *       name replaces it: {@code create} is last-write-wins, and the TTL passed here supersedes any
+ *       previously configured TTL for that name.
+ *   <li><strong>{@code connect}</strong> — returns a handle to an existing mailbox without
+ *       performing backend I/O at factory call time. The first deliver or subscribe operation
+ *       ({@link Mailbox#deliver} or {@link Mailbox#subscribe}) probes the backend once: if no
+ *       mailbox exists at {@code name}, that first operation throws {@link
+ *       MailboxNotFoundException}. {@link Mailbox#delete()} does not probe and remains a retry-safe
+ *       no-op when the mailbox is already gone. Once the one-shot probe passes, subsequent
+ *       operations behave exactly as they would on a {@code create}-sourced handle — terminal-state
+ *       transitions surface as {@link MailboxExpiredException} in the normal way.
  * </ul>
  *
  * @see Mailbox
@@ -37,6 +44,10 @@ public interface MailboxFactory {
 
   /**
    * Create a new mailbox with the given name and value type.
+   *
+   * <p>If a mailbox with {@code name} already exists, it is replaced: {@code create} is
+   * last-write-wins, and the {@code ttl} passed here supersedes any previously configured TTL for
+   * that name.
    *
    * @param <T> the mailbox value type
    * @param name the logical name for the mailbox
@@ -49,6 +60,10 @@ public interface MailboxFactory {
   /**
    * Create a new mailbox with the given name and generic value type.
    *
+   * <p>If a mailbox with {@code name} already exists, it is replaced: {@code create} is
+   * last-write-wins, and the {@code ttl} passed here supersedes any previously configured TTL for
+   * that name.
+   *
    * @param <T> the mailbox value type
    * @param name the logical name for the mailbox
    * @param typeRef a type reference capturing the generic value type
@@ -58,24 +73,40 @@ public interface MailboxFactory {
   <T> Mailbox<T> create(String name, TypeRef<T> typeRef, Duration ttl);
 
   /**
-   * Connect to an existing mailbox. No backend I/O is performed until the first operation on the
-   * returned handle.
+   * Connect to an existing mailbox.
+   *
+   * <p>No backend I/O is performed at factory call time. The first deliver or subscribe operation
+   * on the returned handle probes the backend once and throws {@link MailboxNotFoundException} if
+   * no mailbox exists at {@code name}. {@link Mailbox#delete()} does not probe and remains a
+   * retry-safe no-op. Once the one-shot probe passes, the handle behaves exactly as one returned
+   * from {@code create} — subsequent terminal-state transitions surface as {@link
+   * MailboxExpiredException}.
    *
    * @param <T> the mailbox value type
    * @param name the logical name of the mailbox to connect to
    * @param type the value type class
-   * @return a lazy handle to the mailbox
+   * @return a handle to the mailbox
+   * @throws MailboxNotFoundException at first operation, if no mailbox exists at {@code name}
+   *     (surfaced on the first deliver/subscribe call, not at {@code connect} time)
    */
   <T> Mailbox<T> connect(String name, Class<T> type);
 
   /**
-   * Connect to an existing mailbox using a generic value type. No backend I/O is performed until
-   * the first operation on the returned handle.
+   * Connect to an existing mailbox using a generic value type.
+   *
+   * <p>No backend I/O is performed at factory call time. The first deliver or subscribe operation
+   * on the returned handle probes the backend once and throws {@link MailboxNotFoundException} if
+   * no mailbox exists at {@code name}. {@link Mailbox#delete()} does not probe and remains a
+   * retry-safe no-op. Once the one-shot probe passes, the handle behaves exactly as one returned
+   * from {@code create} — subsequent terminal-state transitions surface as {@link
+   * MailboxExpiredException}.
    *
    * @param <T> the mailbox value type
    * @param name the logical name of the mailbox to connect to
    * @param typeRef a type reference capturing the generic value type
-   * @return a lazy handle to the mailbox
+   * @return a handle to the mailbox
+   * @throws MailboxNotFoundException at first operation, if no mailbox exists at {@code name}
+   *     (surfaced on the first deliver/subscribe call, not at {@code connect} time)
    */
   <T> Mailbox<T> connect(String name, TypeRef<T> typeRef);
 }

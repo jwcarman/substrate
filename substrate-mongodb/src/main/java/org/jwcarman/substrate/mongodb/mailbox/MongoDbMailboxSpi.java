@@ -108,4 +108,11 @@ public class MongoDbMailboxSpi extends AbstractMailboxSpi {
     Query query = new Query(Criteria.where(FIELD_KEY).is(key));
     mongoTemplate.remove(query, collectionName);
   }
+
+  @Override
+  public boolean exists(String key) {
+    Query query =
+        new Query(Criteria.where(FIELD_KEY).is(key).and(FIELD_EXPIRE_AT).gt(Instant.now()));
+    return mongoTemplate.exists(query, collectionName);
+  }
 }

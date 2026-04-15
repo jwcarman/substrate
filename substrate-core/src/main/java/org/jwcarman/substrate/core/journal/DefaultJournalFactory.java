@@ -88,7 +88,8 @@ public class DefaultJournalFactory implements JournalFactory {
         transformer,
         notifier,
         limits,
-        shutdownCoordinator);
+        shutdownCoordinator,
+        true);
   }
 
   @Override
@@ -101,7 +102,8 @@ public class DefaultJournalFactory implements JournalFactory {
         transformer,
         notifier,
         limits,
-        shutdownCoordinator);
+        shutdownCoordinator,
+        true);
   }
 
   private void validateInactivityTtl(Duration inactivityTtl) {

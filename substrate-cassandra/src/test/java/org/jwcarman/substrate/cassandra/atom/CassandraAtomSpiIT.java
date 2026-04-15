@@ -68,6 +68,18 @@ class CassandraAtomSpiIT {
   }
 
   @Test
+  void existsReturnsFalseForNeverCreatedKey() {
+    assertThat(atom.exists(atom.atomKey("never"))).isFalse();
+  }
+
+  @Test
+  void existsReturnsTrueAfterCreate() {
+    String key = atom.atomKey("exists-test");
+    atom.create(key, "v".getBytes(StandardCharsets.UTF_8), "tok", Duration.ofMinutes(5));
+    assertThat(atom.exists(key)).isTrue();
+  }
+
+  @Test
   void createAndRead() {
     String key = atom.atomKey("test1");
     atom.create(key, "hello".getBytes(StandardCharsets.UTF_8), "tok1", Duration.ofMinutes(5));

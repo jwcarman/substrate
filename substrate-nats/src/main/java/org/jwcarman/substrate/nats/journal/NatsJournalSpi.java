@@ -174,6 +174,15 @@ public class NatsJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
+  public boolean exists(String key) {
+    try {
+      return getSubjectMessageCount(toSubject(key)) > 0;
+    } catch (IOException | JetStreamApiException _) {
+      return false;
+    }
+  }
+
+  @Override
   public void delete(String key) {
     String subject = toSubject(key);
     try {

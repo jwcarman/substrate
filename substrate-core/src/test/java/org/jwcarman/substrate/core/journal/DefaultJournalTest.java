@@ -35,6 +35,7 @@ import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.core.transform.PayloadTransformer;
 import org.jwcarman.substrate.journal.JournalEntry;
+import org.jwcarman.substrate.journal.JournalNotFoundException;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -68,6 +69,69 @@ class DefaultJournalTest {
             notifier,
             JournalLimits.defaults(),
             coordinator);
+  }
+
+  private DefaultJournal<String> connectedJournal() {
+    return new DefaultJournal<>(
+        spi,
+        KEY,
+        codec,
+        PayloadTransformer.IDENTITY,
+        notifier,
+        JournalLimits.defaults(),
+        coordinator,
+        true);
+  }
+
+  @Test
+  void connectSourcedSubscribeOnNonexistentThrowsJournalNotFoundException() {
+    when(spi.exists(KEY)).thenReturn(false);
+    DefaultJournal<String> j = connectedJournal();
+    assertThrows(JournalNotFoundException.class, j::subscribe);
+  }
+
+  @Test
+  void connectSourcedAppendOnNonexistentThrows() {
+    when(spi.exists(KEY)).thenReturn(false);
+    DefaultJournal<String> j = connectedJournal();
+    assertThrows(JournalNotFoundException.class, () -> j.append("x", Duration.ofMinutes(1)));
+  }
+
+  @Test
+  void createSourcedHandleDoesNotProbe() {
+    when(spi.readLast(KEY, 1)).thenReturn(List.of());
+    BlockingSubscription<JournalEntry<String>> sub = journal.subscribe();
+    try {
+      verify(spi, never()).exists(anyString());
+    } finally {
+      sub.cancel();
+    }
+  }
+
+  @Test
+  void probeFiresExactlyOnceAcrossManyOperations() {
+    when(spi.exists(KEY)).thenReturn(true);
+    when(spi.readLast(KEY, 1)).thenReturn(List.of());
+    when(spi.append(eq(KEY), any(), any())).thenReturn("entry-1");
+    DefaultJournal<String> j = connectedJournal();
+
+    BlockingSubscription<JournalEntry<String>> s1 = j.subscribe();
+    try {
+      j.append("x", Duration.ofMinutes(1));
+      BlockingSubscription<JournalEntry<String>> s2 = j.subscribe();
+      s2.cancel();
+    } finally {
+      s1.cancel();
+    }
+    verify(spi, times(1)).exists(KEY);
+  }
+
+  @Test
+  void connectSourcedDeleteDoesNotProbe() {
+    DefaultJournal<String> j = connectedJournal();
+    j.delete();
+    verify(spi, never()).exists(anyString());
+    verify(spi).delete(KEY);
   }
 
   @Test

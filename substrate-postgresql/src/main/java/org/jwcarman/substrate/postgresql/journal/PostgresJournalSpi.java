@@ -96,6 +96,18 @@ public class PostgresJournalSpi extends AbstractJournalSpi {
   }
 
   @Override
+  public boolean exists(String key) {
+    Boolean result =
+        jdbcTemplate.queryForObject(
+            "SELECT EXISTS(SELECT 1 FROM substrate_journal_entries WHERE key = ?)"
+                + " OR EXISTS(SELECT 1 FROM substrate_journal_completed WHERE key = ?)",
+            Boolean.class,
+            key,
+            key);
+    return Boolean.TRUE.equals(result);
+  }
+
+  @Override
   public void delete(String key) {
     jdbcTemplate.update("DELETE FROM substrate_journal_entries WHERE key = ?", key);
     jdbcTemplate.update("DELETE FROM substrate_journal_completed WHERE key = ?", key);

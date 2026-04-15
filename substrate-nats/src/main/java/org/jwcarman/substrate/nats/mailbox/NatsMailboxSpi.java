@@ -107,6 +107,19 @@ public class NatsMailboxSpi extends AbstractMailboxSpi {
     }
   }
 
+  @Override
+  public boolean exists(String key) {
+    try {
+      var kv = connection.keyValue(bucketName);
+      KeyValueEntry entry = kv.get(toKvKey(key));
+      return entry != null && entry.getValue() != null;
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to check mailbox existence in NATS KV", e);
+    } catch (JetStreamApiException e) {
+      throw new IllegalStateException("Failed to check mailbox existence in NATS KV", e);
+    }
+  }
+
   private void ensureBucketExists() {
     try {
       createBucketIfMissing();

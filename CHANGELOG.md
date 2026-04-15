@@ -10,6 +10,34 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+### Breaking changes
+
+- `JournalFactory.connect`, `AtomFactory.connect`, and `MailboxFactory.connect`
+  now fail loudly when the named resource does not exist. The first operation on
+  a handle returned from `connect(...)` throws `JournalNotFoundException`,
+  `AtomNotFoundException`, or `MailboxNotFoundException` if no resource exists
+  at that name, instead of silently returning empty reads or parked
+  subscriptions.
+  - Source compatibility is preserved — no method signatures changed. Consumers
+    who previously relied on the silent-empty behavior will see the new
+    exception thrown from the first operation on a connect-sourced handle.
+  - `delete()` on a connect-sourced handle preserves its idempotent-no-op
+    semantics — no existence probe is performed, so retry-safe cleanup code
+    continues to work unchanged.
+  - Migration: get-or-create patterns remain expressible as
+    `try { create(...) } catch (*AlreadyExistsException) { connect(...) }`. The
+    TTL-conflict policy is now the consumer's choice (previously silently
+    dropped inside substrate).
+- New abstract method `boolean exists(String key)` on `JournalSpi`, `AtomSpi`,
+  and `MailboxSpi`. Backend implementers must add this method.
+
+### Added
+
+- `JournalNotFoundException`, `AtomNotFoundException`,
+  `MailboxNotFoundException` in `substrate-api`.
+- `exists(String key)` method on `JournalSpi`, `AtomSpi`, `MailboxSpi` for
+  backend implementers.
+
 ## [0.5.0] - 2026-04-15
 
 ### Changed

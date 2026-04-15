@@ -41,6 +41,23 @@ class InMemoryMailboxSpiTest {
   }
 
   @Test
+  void existsReturnsFalseForNeverCreatedKey() {
+    assertThat(mailbox.exists(KEY)).isFalse();
+  }
+
+  @Test
+  void existsReturnsTrueForCreatedKey() {
+    mailbox.create(KEY, Duration.ofMinutes(5));
+    assertThat(mailbox.exists(KEY)).isTrue();
+  }
+
+  @Test
+  void existsReturnsFalseAfterExpiry() {
+    mailbox.create(KEY, Duration.ofMillis(1));
+    await().atMost(Duration.ofSeconds(2)).until(() -> !mailbox.exists(KEY));
+  }
+
+  @Test
   void getOnCreatedButNotDeliveredMailboxReturnsEmpty() {
     mailbox.create(KEY, Duration.ofMinutes(5));
 

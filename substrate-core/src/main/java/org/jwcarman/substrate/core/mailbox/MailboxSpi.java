@@ -59,6 +59,17 @@ public interface MailboxSpi extends Sweepable {
   Optional<byte[]> get(String key);
 
   /**
+   * Returns whether a live mailbox exists at the given key.
+   *
+   * <p>A mailbox is "live" if it was created and has not expired, regardless of whether a value has
+   * been delivered.
+   *
+   * @param key the backend storage key
+   * @return {@code true} if a live mailbox exists at this key
+   */
+  boolean exists(String key);
+
+  /**
    * Removes the mailbox. This operation is idempotent — deleting a non-existent mailbox is a no-op.
    *
    * @param key the backend storage key

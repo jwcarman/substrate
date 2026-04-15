@@ -82,6 +82,18 @@ public interface JournalSpi extends Sweepable {
   void delete(String key);
 
   /**
+   * Returns whether a live journal exists at the given key.
+   *
+   * <p>A journal is "live" if it was created and has not expired. Completed journals within their
+   * retention window still count as existing — they can be attached to and read, even though they
+   * no longer accept appends.
+   *
+   * @param key the backend storage key
+   * @return {@code true} if a live journal exists at this key
+   */
+  boolean exists(String key);
+
+  /**
    * Returns whether the journal has been marked as completed.
    *
    * @param key the backend storage key for the journal

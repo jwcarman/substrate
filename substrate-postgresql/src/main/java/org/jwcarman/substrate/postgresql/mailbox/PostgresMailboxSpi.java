@@ -80,4 +80,14 @@ public class PostgresMailboxSpi extends AbstractMailboxSpi {
   public void delete(String key) {
     jdbcTemplate.update("DELETE FROM substrate_mailbox WHERE key = ?", key);
   }
+
+  @Override
+  public boolean exists(String key) {
+    Boolean result =
+        jdbcTemplate.queryForObject(
+            "SELECT EXISTS(SELECT 1 FROM substrate_mailbox WHERE key = ? AND expires_at > NOW())",
+            Boolean.class,
+            key);
+    return Boolean.TRUE.equals(result);
+  }
 }

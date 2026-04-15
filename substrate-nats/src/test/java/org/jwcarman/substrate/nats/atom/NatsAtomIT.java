@@ -145,6 +145,26 @@ class NatsAtomIT extends AbstractNatsIT {
   }
 
   @Test
+  void existsReturnsFalseForNeverCreatedKey() {
+    assertThat(atom.exists(atom.atomKey("never-" + System.nanoTime()))).isFalse();
+  }
+
+  @Test
+  void existsReturnsTrueAfterCreate() {
+    String key = atom.atomKey("exists-" + System.nanoTime());
+    atom.create(key, "v".getBytes(StandardCharsets.UTF_8), "tok", Duration.ofMinutes(5));
+    assertThat(atom.exists(key)).isTrue();
+  }
+
+  @Test
+  void existsReturnsFalseAfterDelete() {
+    String key = atom.atomKey("exists-del-" + System.nanoTime());
+    atom.create(key, "v".getBytes(StandardCharsets.UTF_8), "tok", Duration.ofMinutes(5));
+    atom.delete(key);
+    assertThat(atom.exists(key)).isFalse();
+  }
+
+  @Test
   void concurrentCreateExactlyOneSucceeds() {
     String key = atom.atomKey("concurrent-" + System.nanoTime());
     int threadCount = 8;

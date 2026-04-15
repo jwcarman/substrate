@@ -77,5 +77,10 @@ class AbstractMailboxSpiTest {
     public void delete(String key) {
       throw new UnsupportedOperationException();
     }
+
+    @Override
+    public boolean exists(String key) {
+      throw new UnsupportedOperationException();
+    }
   }
 }

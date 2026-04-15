@@ -132,4 +132,17 @@ public class DynamoDbMailboxSpi extends AbstractMailboxSpi {
             .key(Map.of(FIELD_KEY, AttributeValue.builder().s(key).build()))
             .build());
   }
+
+  @Override
+  public boolean exists(String key) {
+    GetItemResponse response =
+        client.getItem(
+            GetItemRequest.builder()
+                .tableName(tableName)
+                .key(Map.of(FIELD_KEY, AttributeValue.builder().s(key).build()))
+                .projectionExpression("#k")
+                .expressionAttributeNames(Map.of("#k", FIELD_KEY))
+                .build());
+    return response.hasItem() && !response.item().isEmpty();
+  }
 }

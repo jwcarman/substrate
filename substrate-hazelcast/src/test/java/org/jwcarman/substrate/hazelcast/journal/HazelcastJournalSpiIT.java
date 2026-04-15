@@ -37,6 +37,18 @@ class HazelcastJournalSpiIT extends AbstractHazelcastIT {
   }
 
   @Test
+  void existsReturnsFalseForNeverCreatedKey() {
+    assertThat(journal.exists(journal.journalKey("never-" + System.nanoTime()))).isFalse();
+  }
+
+  @Test
+  void existsReturnsTrueAfterAppend() {
+    String key = journal.journalKey("exists-" + System.nanoTime());
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    assertThat(journal.exists(key)).isTrue();
+  }
+
+  @Test
   void appendReturnsSequenceId() {
     String key = journal.journalKey("append-test-" + System.nanoTime());
     String id = journal.append(key, "hello".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));

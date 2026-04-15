@@ -387,4 +387,58 @@ class DefaultMailboxTest {
               assertThat(feederCount).isZero();
             });
   }
+
+  private DefaultMailbox<String> connectedMailbox(MailboxSpi mockSpi) {
+    return new DefaultMailbox<>(
+        mockSpi, KEY, STRING_CODEC, PayloadTransformer.IDENTITY, notifier, coordinator, true);
+  }
+
+  @Test
+  void connectSourcedSubscribeOnNonexistentThrowsMailboxNotFoundException() {
+    MailboxSpi mockSpi = org.mockito.Mockito.mock(MailboxSpi.class);
+    org.mockito.Mockito.when(mockSpi.exists(KEY)).thenReturn(false);
+    DefaultMailbox<String> m = connectedMailbox(mockSpi);
+    assertThatThrownBy(m::subscribe)
+        .isInstanceOf(org.jwcarman.substrate.mailbox.MailboxNotFoundException.class);
+  }
+
+  @Test
+  void connectSourcedDeliverOnNonexistentThrows() {
+    MailboxSpi mockSpi = org.mockito.Mockito.mock(MailboxSpi.class);
+    org.mockito.Mockito.when(mockSpi.exists(KEY)).thenReturn(false);
+    DefaultMailbox<String> m = connectedMailbox(mockSpi);
+    assertThatThrownBy(() -> m.deliver("x"))
+        .isInstanceOf(org.jwcarman.substrate.mailbox.MailboxNotFoundException.class);
+  }
+
+  @Test
+  void createSourcedHandleDoesNotProbe() {
+    MailboxSpi mockSpi = org.mockito.Mockito.mock(MailboxSpi.class);
+    DefaultMailbox<String> m =
+        new DefaultMailbox<>(
+            mockSpi, KEY, STRING_CODEC, PayloadTransformer.IDENTITY, notifier, coordinator);
+    m.deliver("x");
+    org.mockito.Mockito.verify(mockSpi, org.mockito.Mockito.never())
+        .exists(org.mockito.ArgumentMatchers.anyString());
+  }
+
+  @Test
+  void probeFiresExactlyOnceAcrossManyOperations() {
+    MailboxSpi mockSpi = org.mockito.Mockito.mock(MailboxSpi.class);
+    org.mockito.Mockito.when(mockSpi.exists(KEY)).thenReturn(true);
+    DefaultMailbox<String> m = connectedMailbox(mockSpi);
+    m.deliver("x");
+    m.deliver("y");
+    org.mockito.Mockito.verify(mockSpi, org.mockito.Mockito.times(1)).exists(KEY);
+  }
+
+  @Test
+  void connectSourcedDeleteDoesNotProbe() {
+    MailboxSpi mockSpi = org.mockito.Mockito.mock(MailboxSpi.class);
+    DefaultMailbox<String> m = connectedMailbox(mockSpi);
+    m.delete();
+    org.mockito.Mockito.verify(mockSpi, org.mockito.Mockito.never())
+        .exists(org.mockito.ArgumentMatchers.anyString());
+    org.mockito.Mockito.verify(mockSpi).delete(KEY);
+  }
 }

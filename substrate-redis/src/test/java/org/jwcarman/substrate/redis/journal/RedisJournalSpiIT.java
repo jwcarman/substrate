@@ -130,6 +130,18 @@ class RedisJournalSpiIT {
   }
 
   @Test
+  void existsReturnsFalseForNeverCreatedKey() {
+    assertThat(journal.exists(journal.journalKey("never-created"))).isFalse();
+  }
+
+  @Test
+  void existsReturnsTrueForCreatedKey() {
+    String key = journal.journalKey("exists-test");
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    assertThat(journal.exists(key)).isTrue();
+  }
+
+  @Test
   void journalKeyUsesConfiguredPrefix() {
     assertThat(journal.journalKey("my-stream")).isEqualTo("substrate:journal:my-stream");
   }

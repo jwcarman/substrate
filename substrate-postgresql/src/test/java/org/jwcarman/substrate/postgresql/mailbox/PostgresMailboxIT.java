@@ -55,6 +55,18 @@ class PostgresMailboxIT {
   }
 
   @Test
+  void existsReturnsFalseForNeverCreatedKey() {
+    assertThat(mailbox.exists(mailbox.mailboxKey("never"))).isFalse();
+  }
+
+  @Test
+  void existsReturnsTrueAfterCreate() {
+    String key = mailbox.mailboxKey("exists-test");
+    mailbox.create(key, Duration.ofMinutes(5));
+    assertThat(mailbox.exists(key)).isTrue();
+  }
+
+  @Test
   void deliverThenGetReturnsValue() {
     String key = mailbox.mailboxKey("deliver-first");
     mailbox.create(key, Duration.ofMinutes(5));

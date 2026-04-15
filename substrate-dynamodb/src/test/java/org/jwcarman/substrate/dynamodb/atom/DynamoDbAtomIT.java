@@ -54,6 +54,18 @@ class DynamoDbAtomIT extends AbstractDynamoDbIT {
   }
 
   @Test
+  void existsReturnsFalseForNeverCreatedKey() {
+    assertThat(atom.exists(atom.atomKey("never-" + System.nanoTime()))).isFalse();
+  }
+
+  @Test
+  void existsReturnsTrueAfterCreate() {
+    String key = atom.atomKey("exists-" + System.nanoTime());
+    atom.create(key, "v".getBytes(StandardCharsets.UTF_8), "tok", Duration.ofMinutes(5));
+    assertThat(atom.exists(key)).isTrue();
+  }
+
+  @Test
   void createAndRead() {
     String key = atom.atomKey("test-" + System.nanoTime());
     atom.create(key, "hello".getBytes(StandardCharsets.UTF_8), "tok1", Duration.ofMinutes(5));

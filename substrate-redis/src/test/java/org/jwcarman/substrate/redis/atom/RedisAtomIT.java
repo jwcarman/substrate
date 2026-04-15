@@ -162,6 +162,18 @@ class RedisAtomIT {
   }
 
   @Test
+  void existsReturnsFalseForNeverCreatedKey() {
+    assertThat(atom.exists(atom.atomKey("never-created"))).isFalse();
+  }
+
+  @Test
+  void existsReturnsTrueForCreatedKey() {
+    String key = atom.atomKey("exists-test");
+    atom.create(key, "v".getBytes(StandardCharsets.UTF_8), "tok", Duration.ofMinutes(5));
+    assertThat(atom.exists(key)).isTrue();
+  }
+
+  @Test
   void ttlExpiryMakesKeyDisappear() {
     String key = atom.atomKey("ttl-expiry");
     atom.create(key, "ephemeral".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofSeconds(1));

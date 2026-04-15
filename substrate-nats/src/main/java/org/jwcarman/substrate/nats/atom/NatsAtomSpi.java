@@ -119,6 +119,19 @@ public class NatsAtomSpi extends AbstractAtomSpi {
     }
   }
 
+  @Override
+  public boolean exists(String key) {
+    try {
+      var kv = connection.keyValue(bucketName);
+      KeyValueEntry entry = kv.get(toKvKey(key));
+      return entry != null && entry.getOperation() == KeyValueOperation.PUT;
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to check atom existence in NATS KV", e);
+    } catch (JetStreamApiException e) {
+      throw new IllegalStateException("Failed to check atom existence in NATS KV", e);
+    }
+  }
+
   private void ensureBucketExists(Duration defaultTtl) {
     try {
       createBucketIfMissing(defaultTtl);

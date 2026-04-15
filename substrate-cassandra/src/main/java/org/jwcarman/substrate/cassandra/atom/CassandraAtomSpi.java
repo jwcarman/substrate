@@ -168,6 +168,12 @@ public class CassandraAtomSpi extends AbstractAtomSpi {
     session.execute(deleteIfExists.bind(key));
   }
 
+  @Override
+  public boolean exists(String key) {
+    Row row = session.execute(selectByKey.bind(key)).one();
+    return row != null && row.getByteBuffer(FIELD_VALUE) != null;
+  }
+
   private static int ttlSeconds(Duration ttl) {
     return Math.max((int) ttl.toSeconds(), 1);
   }

@@ -80,7 +80,7 @@ public class DefaultAtomFactory implements AtomFactory {
     Codec<T> codec = codecFactory.create(type);
     String key = atomSpi.atomKey(name);
     return new DefaultAtom<>(
-        atomSpi, key, codec, transformer, notifier, maxTtl, shutdownCoordinator);
+        atomSpi, key, codec, transformer, notifier, maxTtl, shutdownCoordinator, true);
   }
 
   @Override
@@ -88,7 +88,7 @@ public class DefaultAtomFactory implements AtomFactory {
     Codec<T> codec = codecFactory.create(typeRef);
     String key = atomSpi.atomKey(name);
     return new DefaultAtom<>(
-        atomSpi, key, codec, transformer, notifier, maxTtl, shutdownCoordinator);
+        atomSpi, key, codec, transformer, notifier, maxTtl, shutdownCoordinator, true);
   }
 
   private void validateTtl(Duration ttl) {

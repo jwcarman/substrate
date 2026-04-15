@@ -26,11 +26,17 @@ import org.jwcarman.codec.spi.TypeRef;
  * <ul>
  *   <li><strong>{@link #create} (eager)</strong> — performs backend I/O immediately to write the
  *       initial value and establish the lease. Throws {@link AtomAlreadyExistsException} if an atom
- *       with the given name already exists.
- *   <li><strong>{@link #connect} (lazy)</strong> — returns an {@link Atom} handle without
- *       performing any backend I/O. A dead or non-existent atom is discovered only when the first
- *       operation ({@link Atom#get}, {@link Atom#set}, {@link Atom#touch}, or {@link
- *       Atom#subscribe}) is invoked.
+ *       with the given name already exists. Name collision is the sole trigger — the TTL and
+ *       initial value passed here are not compared against the pre-existing atom; policy
+ *       reconciliation is the caller's responsibility.
+ *   <li><strong>{@link #connect}</strong> — returns an {@link Atom} handle without performing
+ *       backend I/O at factory call time. The first read/write/subscribe operation ({@link
+ *       Atom#get}, {@link Atom#set}, {@link Atom#touch}, or {@link Atom#subscribe}) probes the
+ *       backend once: if no atom exists at {@code name}, that first operation throws {@link
+ *       AtomNotFoundException}. {@link Atom#delete()} does not probe and remains a retry-safe no-op
+ *       when the atom is already gone. Once the one-shot probe passes, subsequent operations behave
+ *       exactly as they would on a {@code create}-sourced handle — terminal-state transitions
+ *       surface as {@link AtomExpiredException} in the normal way.
  * </ul>
  *
  * @see Atom
@@ -40,7 +46,10 @@ public interface AtomFactory {
   /**
    * Creates a new atom with the given name, initial value, and TTL.
    *
-   * <p>This is an eager operation that immediately writes to the backend.
+   * <p>This is an eager operation that immediately writes to the backend. Name collision is the
+   * sole trigger for {@link AtomAlreadyExistsException} — the {@code initialValue} and {@code ttl}
+   * passed here are not compared against any pre-existing atom's state; policy reconciliation is
+   * the caller's responsibility.
    *
    * @param <T> the value type
    * @param name the unique name for the atom
@@ -56,7 +65,10 @@ public interface AtomFactory {
    * Creates a new atom with the given name, initial value, and TTL, using a {@link TypeRef} for
    * generic or complex value types.
    *
-   * <p>This is an eager operation that immediately writes to the backend.
+   * <p>This is an eager operation that immediately writes to the backend. Name collision is the
+   * sole trigger for {@link AtomAlreadyExistsException} — the {@code initialValue} and {@code ttl}
+   * passed here are not compared against any pre-existing atom's state; policy reconciliation is
+   * the caller's responsibility.
    *
    * @param <T> the value type
    * @param name the unique name for the atom
@@ -71,14 +83,18 @@ public interface AtomFactory {
   /**
    * Connects to an existing atom by name.
    *
-   * <p>This is a lazy operation: no backend I/O is performed until the first operation on the
-   * returned {@link Atom}. If the atom does not exist or has expired, the failure is surfaced at
-   * that time.
+   * <p>No backend I/O is performed at factory call time. The first read/write/subscribe operation
+   * on the returned handle probes the backend once and throws {@link AtomNotFoundException} if no
+   * atom exists at {@code name}. {@link Atom#delete()} does not probe and remains a retry-safe
+   * no-op. Once the one-shot probe passes, the handle behaves exactly as one returned from {@code
+   * create} — subsequent terminal-state transitions surface as {@link AtomExpiredException}.
    *
    * @param <T> the value type
    * @param name the name of the atom to connect to
    * @param type the value's class
    * @return an {@link Atom} handle for the named atom
+   * @throws AtomNotFoundException at first operation, if no atom exists at {@code name} (surfaced
+   *     on the first read/write/subscribe call, not at {@code connect} time)
    */
   <T> Atom<T> connect(String name, Class<T> type);
 
@@ -86,14 +102,18 @@ public interface AtomFactory {
    * Connects to an existing atom by name, using a {@link TypeRef} for generic or complex value
    * types.
    *
-   * <p>This is a lazy operation: no backend I/O is performed until the first operation on the
-   * returned {@link Atom}. If the atom does not exist or has expired, the failure is surfaced at
-   * that time.
+   * <p>No backend I/O is performed at factory call time. The first read/write/subscribe operation
+   * on the returned handle probes the backend once and throws {@link AtomNotFoundException} if no
+   * atom exists at {@code name}. {@link Atom#delete()} does not probe and remains a retry-safe
+   * no-op. Once the one-shot probe passes, the handle behaves exactly as one returned from {@code
+   * create} — subsequent terminal-state transitions surface as {@link AtomExpiredException}.
    *
    * @param <T> the value type
    * @param name the name of the atom to connect to
    * @param typeRef a type reference describing the value's generic type
    * @return an {@link Atom} handle for the named atom
+   * @throws AtomNotFoundException at first operation, if no atom exists at {@code name} (surfaced
+   *     on the first read/write/subscribe call, not at {@code connect} time)
    */
   <T> Atom<T> connect(String name, TypeRef<T> typeRef);
 }

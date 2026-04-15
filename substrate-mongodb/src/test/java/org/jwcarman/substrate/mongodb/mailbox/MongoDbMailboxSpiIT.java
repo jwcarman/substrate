@@ -45,6 +45,18 @@ class MongoDbMailboxSpiIT extends AbstractMongoDbIT {
   }
 
   @Test
+  void existsReturnsFalseForNeverCreatedKey() {
+    assertThat(mailbox.exists(mailbox.mailboxKey("never-" + System.nanoTime()))).isFalse();
+  }
+
+  @Test
+  void existsReturnsTrueAfterCreate() {
+    String key = mailbox.mailboxKey("exists-" + System.nanoTime());
+    mailbox.create(key, Duration.ofMinutes(5));
+    assertThat(mailbox.exists(key)).isTrue();
+  }
+
+  @Test
   void deliverThenGetReturnsValue() {
     String key = mailbox.mailboxKey("test-" + System.nanoTime());
 
