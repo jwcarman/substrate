@@ -25,14 +25,11 @@ import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.Subscriber;
 import org.jwcarman.substrate.SubscriberConfig;
 import org.jwcarman.substrate.Subscription;
-import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
-import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.core.subscription.BoundedQueueHandoff;
 import org.jwcarman.substrate.core.subscription.CallbackPumpSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultSubscriberBuilder;
 import org.jwcarman.substrate.core.subscription.FeederSupport;
-import org.jwcarman.substrate.core.transform.PayloadTransformer;
 import org.jwcarman.substrate.journal.Journal;
 import org.jwcarman.substrate.journal.JournalEntry;
 import org.jwcarman.substrate.journal.JournalExpiredException;
@@ -40,47 +37,20 @@ import org.jwcarman.substrate.journal.JournalNotFoundException;
 
 public class DefaultJournal<T> implements Journal<T> {
 
-  private final JournalSpi journalSpi;
+  private final JournalContext context;
   private final String key;
   private final Codec<T> codec;
-  private final PayloadTransformer transformer;
-  private final Notifier notifier;
-  private final JournalLimits limits;
-  private final ShutdownCoordinator shutdownCoordinator;
   private final AtomicBoolean connected;
 
-  public DefaultJournal(
-      JournalSpi journalSpi,
-      String key,
-      Codec<T> codec,
-      PayloadTransformer transformer,
-      Notifier notifier,
-      JournalLimits limits,
-      ShutdownCoordinator shutdownCoordinator) {
-    this(journalSpi, key, codec, transformer, notifier, limits, shutdownCoordinator, false);
-  }
-
-  public DefaultJournal(
-      JournalSpi journalSpi,
-      String key,
-      Codec<T> codec,
-      PayloadTransformer transformer,
-      Notifier notifier,
-      JournalLimits limits,
-      ShutdownCoordinator shutdownCoordinator,
-      boolean connected) {
-    this.journalSpi = journalSpi;
+  public DefaultJournal(JournalContext context, String key, Codec<T> codec, boolean connected) {
+    this.context = context;
     this.key = key;
     this.codec = codec;
-    this.transformer = transformer;
-    this.notifier = notifier;
-    this.limits = limits;
-    this.shutdownCoordinator = shutdownCoordinator;
     this.connected = new AtomicBoolean(connected);
   }
 
   private void ensureExists() {
-    if (connected.compareAndSet(true, false) && !journalSpi.exists(key)) {
+    if (connected.compareAndSet(true, false) && !context.spi().exists(key)) {
       throw new JournalNotFoundException(key);
     }
   }
@@ -88,41 +58,44 @@ public class DefaultJournal<T> implements Journal<T> {
   @Override
   public String append(T data, Duration ttl) {
     ensureExists();
-    if (ttl.compareTo(limits.maxEntryTtl()) > 0) {
+    if (ttl.compareTo(context.limits().maxEntryTtl()) > 0) {
       throw new IllegalArgumentException(
-          "Journal entry TTL " + ttl + " exceeds configured maximum " + limits.maxEntryTtl());
+          "Journal entry TTL "
+              + ttl
+              + " exceeds configured maximum "
+              + context.limits().maxEntryTtl());
     }
     byte[] bytes = codec.encode(data);
-    String entryId = journalSpi.append(key, transformer.encode(bytes), ttl);
-    notifier.notifyJournalChanged(key);
+    String entryId = context.spi().append(key, context.transformer().encode(bytes), ttl);
+    context.notifier().notifyJournalChanged(key);
     return entryId;
   }
 
   @Override
   public void complete(Duration retentionTtl) {
     ensureExists();
-    if (retentionTtl.compareTo(limits.maxRetentionTtl()) > 0) {
+    if (retentionTtl.compareTo(context.limits().maxRetentionTtl()) > 0) {
       throw new IllegalArgumentException(
           "Journal retention TTL "
               + retentionTtl
               + " exceeds configured maximum "
-              + limits.maxRetentionTtl());
+              + context.limits().maxRetentionTtl());
     }
-    journalSpi.complete(key, retentionTtl);
-    notifier.notifyJournalCompleted(key);
+    context.spi().complete(key, retentionTtl);
+    context.notifier().notifyJournalCompleted(key);
   }
 
   @Override
   public void delete() {
     // delete() is idempotent — no existence probe, even for connected handles
-    journalSpi.delete(key);
-    notifier.notifyJournalDeleted(key);
+    context.spi().delete(key);
+    context.notifier().notifyJournalDeleted(key);
   }
 
   @Override
   public BlockingSubscription<JournalEntry<T>> subscribe() {
     ensureExists();
-    List<RawJournalEntry> lastEntries = journalSpi.readLast(key, 1);
+    List<RawJournalEntry> lastEntries = context.spi().readLast(key, 1);
     String startingCheckpoint = lastEntries.isEmpty() ? null : lastEntries.getLast().id();
     return buildBlockingSubscription(startingCheckpoint, List.of());
   }
@@ -136,7 +109,7 @@ public class DefaultJournal<T> implements Journal<T> {
   @Override
   public BlockingSubscription<JournalEntry<T>> subscribeLast(int count) {
     ensureExists();
-    List<RawJournalEntry> preload = journalSpi.readLast(key, count);
+    List<RawJournalEntry> preload = context.spi().readLast(key, count);
     String startingCheckpoint = preload.isEmpty() ? null : preload.getLast().id();
     return buildBlockingSubscription(startingCheckpoint, preload);
   }
@@ -144,7 +117,7 @@ public class DefaultJournal<T> implements Journal<T> {
   @Override
   public Subscription subscribe(Subscriber<JournalEntry<T>> subscriber) {
     ensureExists();
-    List<RawJournalEntry> lastEntries = journalSpi.readLast(key, 1);
+    List<RawJournalEntry> lastEntries = context.spi().readLast(key, 1);
     String startingCheckpoint = lastEntries.isEmpty() ? null : lastEntries.getLast().id();
     return buildCallbackSubscription(startingCheckpoint, List.of(), subscriber);
   }
@@ -171,7 +144,7 @@ public class DefaultJournal<T> implements Journal<T> {
   @Override
   public Subscription subscribeLast(int count, Subscriber<JournalEntry<T>> subscriber) {
     ensureExists();
-    List<RawJournalEntry> preload = journalSpi.readLast(key, count);
+    List<RawJournalEntry> preload = context.spi().readLast(key, count);
     String startingCheckpoint = preload.isEmpty() ? null : preload.getLast().id();
     return buildCallbackSubscription(startingCheckpoint, preload, subscriber);
   }
@@ -191,9 +164,9 @@ public class DefaultJournal<T> implements Journal<T> {
   private BlockingSubscription<JournalEntry<T>> buildBlockingSubscription(
       String startingCheckpoint, List<RawJournalEntry> preload) {
     BoundedQueueHandoff<JournalEntry<T>> handoff =
-        new BoundedQueueHandoff<>(limits.subscriptionQueueCapacity());
+        new BoundedQueueHandoff<>(context.limits().subscriptionQueueCapacity());
     Runnable canceller = startFeeder(handoff, startingCheckpoint, preload);
-    return new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
+    return new DefaultBlockingSubscription<>(handoff, canceller, context.shutdownCoordinator());
   }
 
   private Subscription buildCallbackSubscription(
@@ -201,9 +174,10 @@ public class DefaultJournal<T> implements Journal<T> {
       List<RawJournalEntry> preload,
       Subscriber<JournalEntry<T>> subscriber) {
     BoundedQueueHandoff<JournalEntry<T>> handoff =
-        new BoundedQueueHandoff<>(limits.subscriptionQueueCapacity());
+        new BoundedQueueHandoff<>(context.limits().subscriptionQueueCapacity());
     Runnable canceller = startFeeder(handoff, startingCheckpoint, preload);
-    var source = new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
+    var source =
+        new DefaultBlockingSubscription<>(handoff, canceller, context.shutdownCoordinator());
     return new CallbackPumpSubscription<>(source, subscriber);
   }
 
@@ -216,7 +190,7 @@ public class DefaultJournal<T> implements Journal<T> {
 
     return FeederSupport.start(
         key,
-        notifier::subscribeToJournal,
+        context.notifier()::subscribeToJournal,
         handoff,
         "substrate-journal-feeder",
         () -> runOneIteration(handoff, checkpoint, preloaded, preload));
@@ -265,7 +239,7 @@ public class DefaultJournal<T> implements Journal<T> {
 
   private boolean drainIfCompleted(
       BoundedQueueHandoff<JournalEntry<T>> handoff, AtomicReference<String> checkpoint) {
-    if (!journalSpi.isComplete(key)) {
+    if (!context.spi().isComplete(key)) {
       return false;
     }
     try {
@@ -284,13 +258,16 @@ public class DefaultJournal<T> implements Journal<T> {
 
   private List<RawJournalEntry> readAfterCheckpoint(String cp) {
     if (cp != null) {
-      return journalSpi.readAfter(key, cp);
+      return context.spi().readAfter(key, cp);
     }
-    return journalSpi.readLast(key, Integer.MAX_VALUE);
+    return context.spi().readLast(key, Integer.MAX_VALUE);
   }
 
   private JournalEntry<T> decode(RawJournalEntry raw) {
     return new JournalEntry<>(
-        raw.id(), raw.key(), codec.decode(transformer.decode(raw.data())), raw.timestamp());
+        raw.id(),
+        raw.key(),
+        codec.decode(context.transformer().decode(raw.data())),
+        raw.timestamp());
   }
 }

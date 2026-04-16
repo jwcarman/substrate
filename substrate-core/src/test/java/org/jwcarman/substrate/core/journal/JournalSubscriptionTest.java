@@ -72,15 +72,9 @@ class JournalSubscriptionTest {
     journalSpi = new InMemoryJournalSpi();
     notifier = new DefaultNotifier(new InMemoryNotifier(), CODEC_FACTORY);
     journalSpi.create("substrate:journal:test", Duration.ofHours(24));
-    journal =
-        new DefaultJournal<>(
-            journalSpi,
-            "substrate:journal:test",
-            STRING_CODEC,
-            PayloadTransformer.IDENTITY,
-            notifier,
-            limits,
-            coordinator);
+    JournalContext context =
+        new JournalContext(journalSpi, PayloadTransformer.IDENTITY, notifier, limits, coordinator);
+    journal = new DefaultJournal<>(context, "substrate:journal:test", STRING_CODEC, false);
   }
 
   @Test
@@ -516,15 +510,11 @@ class JournalSubscriptionTest {
   void checkpointAdvancesMonotonically() {
     var smallLimits =
         new JournalLimits(1, Duration.ofHours(24), Duration.ofDays(7), Duration.ofDays(30));
+    JournalContext smallContext =
+        new JournalContext(
+            journalSpi, PayloadTransformer.IDENTITY, notifier, smallLimits, coordinator);
     DefaultJournal<String> smallJournal =
-        new DefaultJournal<>(
-            journalSpi,
-            "substrate:journal:test",
-            STRING_CODEC,
-            PayloadTransformer.IDENTITY,
-            notifier,
-            smallLimits,
-            coordinator);
+        new DefaultJournal<>(smallContext, "substrate:journal:test", STRING_CODEC, false);
 
     journal.append("e1", Duration.ofHours(1));
     journal.append("e2", Duration.ofHours(1));

@@ -26,12 +26,8 @@ import org.jwcarman.substrate.journal.JournalFactory;
 
 public class DefaultJournalFactory implements JournalFactory {
 
-  private final JournalSpi journalSpi;
   private final CodecFactory codecFactory;
-  private final PayloadTransformer transformer;
-  private final Notifier notifier;
-  private final JournalLimits limits;
-  private final ShutdownCoordinator shutdownCoordinator;
+  private final JournalContext context;
 
   public DefaultJournalFactory(
       JournalSpi journalSpi,
@@ -40,79 +36,46 @@ public class DefaultJournalFactory implements JournalFactory {
       Notifier notifier,
       JournalLimits limits,
       ShutdownCoordinator shutdownCoordinator) {
-    this.journalSpi = journalSpi;
     this.codecFactory = codecFactory;
-    this.transformer = transformer;
-    this.notifier = notifier;
-    this.limits = limits;
-    this.shutdownCoordinator = shutdownCoordinator;
+    this.context =
+        new JournalContext(journalSpi, transformer, notifier, limits, shutdownCoordinator);
   }
 
   @Override
   public <T> Journal<T> create(String name, Class<T> type, Duration inactivityTtl) {
     validateInactivityTtl(inactivityTtl);
-    String key = journalSpi.journalKey(name);
-    journalSpi.create(key, inactivityTtl);
-    return new DefaultJournal<>(
-        journalSpi,
-        key,
-        codecFactory.create(type),
-        transformer,
-        notifier,
-        limits,
-        shutdownCoordinator);
+    String key = context.spi().journalKey(name);
+    context.spi().create(key, inactivityTtl);
+    return new DefaultJournal<>(context, key, codecFactory.create(type), false);
   }
 
   @Override
   public <T> Journal<T> create(String name, TypeRef<T> typeRef, Duration inactivityTtl) {
     validateInactivityTtl(inactivityTtl);
-    String key = journalSpi.journalKey(name);
-    journalSpi.create(key, inactivityTtl);
-    return new DefaultJournal<>(
-        journalSpi,
-        key,
-        codecFactory.create(typeRef),
-        transformer,
-        notifier,
-        limits,
-        shutdownCoordinator);
+    String key = context.spi().journalKey(name);
+    context.spi().create(key, inactivityTtl);
+    return new DefaultJournal<>(context, key, codecFactory.create(typeRef), false);
   }
 
   @Override
   public <T> Journal<T> connect(String name, Class<T> type) {
-    String key = journalSpi.journalKey(name);
-    return new DefaultJournal<>(
-        journalSpi,
-        key,
-        codecFactory.create(type),
-        transformer,
-        notifier,
-        limits,
-        shutdownCoordinator,
-        true);
+    String key = context.spi().journalKey(name);
+    return new DefaultJournal<>(context, key, codecFactory.create(type), true);
   }
 
   @Override
   public <T> Journal<T> connect(String name, TypeRef<T> typeRef) {
-    String key = journalSpi.journalKey(name);
-    return new DefaultJournal<>(
-        journalSpi,
-        key,
-        codecFactory.create(typeRef),
-        transformer,
-        notifier,
-        limits,
-        shutdownCoordinator,
-        true);
+    String key = context.spi().journalKey(name);
+    return new DefaultJournal<>(context, key, codecFactory.create(typeRef), true);
   }
 
   private void validateInactivityTtl(Duration inactivityTtl) {
-    if (inactivityTtl.compareTo(limits.maxInactivityTtl()) > 0) {
+    if (inactivityTtl.compareTo(context.limits().maxInactivityTtl()) > 0) {
       throw new IllegalArgumentException(
           "Journal inactivity TTL "
               + inactivityTtl
               + " exceeds configured maximum "
-              + limits.maxInactivityTtl());
+              + context.limits().maxInactivityTtl());
     }
   }
 }

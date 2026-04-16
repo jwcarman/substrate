@@ -60,27 +60,16 @@ class DefaultJournalTest {
         .when(codec.decode(any(byte[].class)))
         .thenAnswer(inv -> new String((byte[]) inv.getArgument(0), UTF_8));
     lenient().when(notifier.subscribeToJournal(anyString(), any())).thenReturn(() -> {});
-    journal =
-        new DefaultJournal<>(
-            spi,
-            KEY,
-            codec,
-            PayloadTransformer.IDENTITY,
-            notifier,
-            JournalLimits.defaults(),
-            coordinator);
+    journal = new DefaultJournal<>(context(), KEY, codec, false);
+  }
+
+  private JournalContext context() {
+    return new JournalContext(
+        spi, PayloadTransformer.IDENTITY, notifier, JournalLimits.defaults(), coordinator);
   }
 
   private DefaultJournal<String> connectedJournal() {
-    return new DefaultJournal<>(
-        spi,
-        KEY,
-        codec,
-        PayloadTransformer.IDENTITY,
-        notifier,
-        JournalLimits.defaults(),
-        coordinator,
-        true);
+    return new DefaultJournal<>(context(), KEY, codec, true);
   }
 
   @Test
@@ -94,7 +83,8 @@ class DefaultJournalTest {
   void connectSourcedAppendOnNonexistentThrows() {
     when(spi.exists(KEY)).thenReturn(false);
     DefaultJournal<String> j = connectedJournal();
-    assertThrows(JournalNotFoundException.class, () -> j.append("x", Duration.ofMinutes(1)));
+    Duration ttl = Duration.ofMinutes(1);
+    assertThrows(JournalNotFoundException.class, () -> j.append("x", ttl));
   }
 
   @Test

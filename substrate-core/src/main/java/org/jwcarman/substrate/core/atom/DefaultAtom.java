@@ -33,58 +33,28 @@ import org.jwcarman.substrate.atom.Atom;
 import org.jwcarman.substrate.atom.AtomExpiredException;
 import org.jwcarman.substrate.atom.AtomNotFoundException;
 import org.jwcarman.substrate.atom.Snapshot;
-import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
-import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.core.subscription.CallbackPumpSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultSubscriberBuilder;
 import org.jwcarman.substrate.core.subscription.FeederSupport;
 import org.jwcarman.substrate.core.subscription.SingleSlotHandoff;
-import org.jwcarman.substrate.core.transform.PayloadTransformer;
 
 public class DefaultAtom<T> implements Atom<T> {
 
-  private final AtomSpi atomSpi;
+  private final AtomContext context;
   private final String key;
   private final Codec<T> codec;
-  private final PayloadTransformer transformer;
-  private final Notifier notifier;
-  private final Duration maxTtl;
-  private final ShutdownCoordinator shutdownCoordinator;
   private final AtomicBoolean connected;
 
-  public DefaultAtom(
-      AtomSpi atomSpi,
-      String key,
-      Codec<T> codec,
-      PayloadTransformer transformer,
-      Notifier notifier,
-      Duration maxTtl,
-      ShutdownCoordinator shutdownCoordinator) {
-    this(atomSpi, key, codec, transformer, notifier, maxTtl, shutdownCoordinator, false);
-  }
-
-  public DefaultAtom(
-      AtomSpi atomSpi,
-      String key,
-      Codec<T> codec,
-      PayloadTransformer transformer,
-      Notifier notifier,
-      Duration maxTtl,
-      ShutdownCoordinator shutdownCoordinator,
-      boolean connected) {
-    this.atomSpi = atomSpi;
+  public DefaultAtom(AtomContext context, String key, Codec<T> codec, boolean connected) {
+    this.context = context;
     this.key = key;
     this.codec = codec;
-    this.transformer = transformer;
-    this.notifier = notifier;
-    this.maxTtl = maxTtl;
-    this.shutdownCoordinator = shutdownCoordinator;
     this.connected = new AtomicBoolean(connected);
   }
 
   private void ensureExists() {
-    if (connected.compareAndSet(true, false) && !atomSpi.exists(key)) {
+    if (connected.compareAndSet(true, false) && !context.spi().exists(key)) {
       throw new AtomNotFoundException(key);
     }
   }
@@ -95,32 +65,32 @@ public class DefaultAtom<T> implements Atom<T> {
     validateTtl(ttl);
     byte[] bytes = codec.encode(data);
     String newToken = token(bytes);
-    boolean alive = atomSpi.set(key, transformer.encode(bytes), newToken, ttl);
+    boolean alive = context.spi().set(key, context.transformer().encode(bytes), newToken, ttl);
     if (!alive) {
       throw new AtomExpiredException(key);
     }
-    notifier.notifyAtomChanged(key);
+    context.notifier().notifyAtomChanged(key);
   }
 
   @Override
   public boolean touch(Duration ttl) {
     ensureExists();
     validateTtl(ttl);
-    return atomSpi.touch(key, ttl);
+    return context.spi().touch(key, ttl);
   }
 
   @Override
   public Snapshot<T> get() {
     ensureExists();
-    RawAtom raw = atomSpi.read(key).orElseThrow(() -> new AtomExpiredException(key));
-    return new Snapshot<>(codec.decode(transformer.decode(raw.value())), raw.token());
+    RawAtom raw = context.spi().read(key).orElseThrow(() -> new AtomExpiredException(key));
+    return new Snapshot<>(codec.decode(context.transformer().decode(raw.value())), raw.token());
   }
 
   @Override
   public void delete() {
     // delete() is idempotent — no existence probe, even for connected handles
-    atomSpi.delete(key);
-    notifier.notifyAtomDeleted(key);
+    context.spi().delete(key);
+    context.notifier().notifyAtomDeleted(key);
   }
 
   @Override
@@ -168,14 +138,15 @@ public class DefaultAtom<T> implements Atom<T> {
   private BlockingSubscription<Snapshot<T>> buildBlockingSubscription(Snapshot<T> lastSeen) {
     SingleSlotHandoff<Snapshot<T>> handoff = new SingleSlotHandoff<>();
     Runnable canceller = startFeeder(handoff, lastSeen);
-    return new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
+    return new DefaultBlockingSubscription<>(handoff, canceller, context.shutdownCoordinator());
   }
 
   private Subscription buildCallbackPumpSubscription(
       Snapshot<T> lastSeen, Subscriber<Snapshot<T>> subscriber) {
     SingleSlotHandoff<Snapshot<T>> handoff = new SingleSlotHandoff<>();
     Runnable canceller = startFeeder(handoff, lastSeen);
-    var source = new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
+    var source =
+        new DefaultBlockingSubscription<>(handoff, canceller, context.shutdownCoordinator());
     return new CallbackPumpSubscription<>(source, subscriber);
   }
 
@@ -185,11 +156,11 @@ public class DefaultAtom<T> implements Atom<T> {
 
     return FeederSupport.start(
         key,
-        notifier::subscribeToAtom,
+        context.notifier()::subscribeToAtom,
         handoff,
         "substrate-atom-feeder",
         () -> {
-          Optional<RawAtom> raw = atomSpi.read(key);
+          Optional<RawAtom> raw = context.spi().read(key);
           if (raw.isEmpty()) {
             handoff.markExpired();
             return false;
@@ -197,7 +168,8 @@ public class DefaultAtom<T> implements Atom<T> {
           String currentToken = raw.get().token();
           if (!currentToken.equals(lastToken.get())) {
             Snapshot<T> snap =
-                new Snapshot<>(codec.decode(transformer.decode(raw.get().value())), currentToken);
+                new Snapshot<>(
+                    codec.decode(context.transformer().decode(raw.get().value())), currentToken);
             handoff.deliver(snap);
             lastToken.set(currentToken);
           }
@@ -225,9 +197,9 @@ public class DefaultAtom<T> implements Atom<T> {
   }
 
   private void validateTtl(Duration ttl) {
-    if (ttl.compareTo(maxTtl) > 0) {
+    if (ttl.compareTo(context.maxTtl()) > 0) {
       throw new IllegalArgumentException(
-          "Atom TTL " + ttl + " exceeds configured maximum " + maxTtl);
+          "Atom TTL " + ttl + " exceeds configured maximum " + context.maxTtl());
     }
   }
 }

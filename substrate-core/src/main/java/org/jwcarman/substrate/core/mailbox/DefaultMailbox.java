@@ -23,57 +23,31 @@ import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.Subscriber;
 import org.jwcarman.substrate.SubscriberConfig;
 import org.jwcarman.substrate.Subscription;
-import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
-import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.core.subscription.CallbackPumpSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultSubscriberBuilder;
 import org.jwcarman.substrate.core.subscription.FeederSupport;
 import org.jwcarman.substrate.core.subscription.SingleSlotHandoff;
-import org.jwcarman.substrate.core.transform.PayloadTransformer;
 import org.jwcarman.substrate.mailbox.Mailbox;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 import org.jwcarman.substrate.mailbox.MailboxNotFoundException;
 
 public class DefaultMailbox<T> implements Mailbox<T> {
 
-  private final MailboxSpi mailboxSpi;
+  private final MailboxContext context;
   private final String key;
   private final Codec<T> codec;
-  private final PayloadTransformer transformer;
-  private final Notifier notifier;
-  private final ShutdownCoordinator shutdownCoordinator;
   private final AtomicBoolean connected;
 
-  public DefaultMailbox(
-      MailboxSpi mailboxSpi,
-      String key,
-      Codec<T> codec,
-      PayloadTransformer transformer,
-      Notifier notifier,
-      ShutdownCoordinator shutdownCoordinator) {
-    this(mailboxSpi, key, codec, transformer, notifier, shutdownCoordinator, false);
-  }
-
-  public DefaultMailbox(
-      MailboxSpi mailboxSpi,
-      String key,
-      Codec<T> codec,
-      PayloadTransformer transformer,
-      Notifier notifier,
-      ShutdownCoordinator shutdownCoordinator,
-      boolean connected) {
-    this.mailboxSpi = mailboxSpi;
+  public DefaultMailbox(MailboxContext context, String key, Codec<T> codec, boolean connected) {
+    this.context = context;
     this.key = key;
     this.codec = codec;
-    this.transformer = transformer;
-    this.notifier = notifier;
-    this.shutdownCoordinator = shutdownCoordinator;
     this.connected = new AtomicBoolean(connected);
   }
 
   private void ensureExists() {
-    if (connected.compareAndSet(true, false) && !mailboxSpi.exists(key)) {
+    if (connected.compareAndSet(true, false) && !context.spi().exists(key)) {
       throw new MailboxNotFoundException(key);
     }
   }
@@ -81,15 +55,15 @@ public class DefaultMailbox<T> implements Mailbox<T> {
   @Override
   public void deliver(T value) {
     ensureExists();
-    mailboxSpi.deliver(key, transformer.encode(codec.encode(value)));
-    notifier.notifyMailboxChanged(key);
+    context.spi().deliver(key, context.transformer().encode(codec.encode(value)));
+    context.notifier().notifyMailboxChanged(key);
   }
 
   @Override
   public void delete() {
     // delete() is idempotent — no existence probe, even for connected handles
-    mailboxSpi.delete(key);
-    notifier.notifyMailboxDeleted(key);
+    context.spi().delete(key);
+    context.notifier().notifyMailboxDeleted(key);
   }
 
   @Override
@@ -97,7 +71,7 @@ public class DefaultMailbox<T> implements Mailbox<T> {
     ensureExists();
     SingleSlotHandoff<T> handoff = new SingleSlotHandoff<>();
     Runnable canceller = startFeeder(handoff);
-    return new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
+    return new DefaultBlockingSubscription<>(handoff, canceller, context.shutdownCoordinator());
   }
 
   @Override
@@ -105,7 +79,8 @@ public class DefaultMailbox<T> implements Mailbox<T> {
     ensureExists();
     SingleSlotHandoff<T> handoff = new SingleSlotHandoff<>();
     Runnable canceller = startFeeder(handoff);
-    var source = new DefaultBlockingSubscription<>(handoff, canceller, shutdownCoordinator);
+    var source =
+        new DefaultBlockingSubscription<>(handoff, canceller, context.shutdownCoordinator());
     return new CallbackPumpSubscription<>(source, subscriber);
   }
 
@@ -118,14 +93,14 @@ public class DefaultMailbox<T> implements Mailbox<T> {
   private Runnable startFeeder(SingleSlotHandoff<T> handoff) {
     return FeederSupport.start(
         key,
-        notifier::subscribeToMailbox,
+        context.notifier()::subscribeToMailbox,
         handoff,
         "substrate-mailbox-feeder",
         () -> {
           try {
-            Optional<byte[]> value = mailboxSpi.get(key);
+            Optional<byte[]> value = context.spi().get(key);
             if (value.isPresent()) {
-              handoff.deliver(codec.decode(transformer.decode(value.get())));
+              handoff.deliver(codec.decode(context.transformer().decode(value.get())));
               // Mailbox semantics: exactly one delivery, then complete.
               handoff.markCompleted();
               return false;

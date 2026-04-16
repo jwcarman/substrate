@@ -82,15 +82,12 @@ class DefaultAtomTest {
     String token = DefaultAtom.token(bytes);
     spi.create(KEY, bytes, token, TTL);
 
-    atom =
-        new DefaultAtom<>(
-            spi,
-            KEY,
-            STRING_CODEC,
-            PayloadTransformer.IDENTITY,
-            notifier,
-            Duration.ofHours(24),
-            coordinator);
+    atom = new DefaultAtom<>(context(spi), KEY, STRING_CODEC, false);
+  }
+
+  private AtomContext context(AtomSpi atomSpi) {
+    return new AtomContext(
+        atomSpi, PayloadTransformer.IDENTITY, notifier, Duration.ofHours(24), coordinator);
   }
 
   @Test
@@ -264,15 +261,7 @@ class DefaultAtomTest {
     Duration shortTtl = Duration.ofMillis(200);
     shortSpi.create(KEY, bytes, token, shortTtl);
 
-    DefaultAtom<String> shortAtom =
-        new DefaultAtom<>(
-            shortSpi,
-            KEY,
-            STRING_CODEC,
-            PayloadTransformer.IDENTITY,
-            notifier,
-            Duration.ofHours(24),
-            coordinator);
+    DefaultAtom<String> shortAtom = new DefaultAtom<>(context(shortSpi), KEY, STRING_CODEC, false);
 
     Snapshot<String> current = shortAtom.get();
 
@@ -376,15 +365,7 @@ class DefaultAtomTest {
     Duration shortTtl = Duration.ofMillis(200);
     shortSpi.create(KEY, bytes, token, shortTtl);
 
-    DefaultAtom<String> shortAtom =
-        new DefaultAtom<>(
-            shortSpi,
-            KEY,
-            STRING_CODEC,
-            PayloadTransformer.IDENTITY,
-            notifier,
-            Duration.ofHours(24),
-            coordinator);
+    DefaultAtom<String> shortAtom = new DefaultAtom<>(context(shortSpi), KEY, STRING_CODEC, false);
 
     Snapshot<String> current = shortAtom.get();
     AtomicBoolean expirationFired = new AtomicBoolean(false);
@@ -495,15 +476,7 @@ class DefaultAtomTest {
   }
 
   private DefaultAtom<String> connectedAtom(AtomSpi mockSpi) {
-    return new DefaultAtom<>(
-        mockSpi,
-        KEY,
-        STRING_CODEC,
-        PayloadTransformer.IDENTITY,
-        notifier,
-        Duration.ofHours(24),
-        coordinator,
-        true);
+    return new DefaultAtom<>(context(mockSpi), KEY, STRING_CODEC, true);
   }
 
   @Test
@@ -527,15 +500,7 @@ class DefaultAtomTest {
   @Test
   void createSourcedHandleDoesNotProbe() {
     AtomSpi mockSpi = org.mockito.Mockito.mock(AtomSpi.class);
-    DefaultAtom<String> a =
-        new DefaultAtom<>(
-            mockSpi,
-            KEY,
-            STRING_CODEC,
-            PayloadTransformer.IDENTITY,
-            notifier,
-            Duration.ofHours(24),
-            coordinator);
+    DefaultAtom<String> a = new DefaultAtom<>(context(mockSpi), KEY, STRING_CODEC, false);
     org.mockito.Mockito.when(mockSpi.read(KEY))
         .thenReturn(java.util.Optional.of(new RawAtom("v".getBytes(UTF_8), "tok")));
     a.get();

@@ -63,15 +63,14 @@ class ConsumerEscapeHatchTest {
 
     spi.create(key, Duration.ofMillis(200));
 
-    DefaultJournal<String> journal =
-        new DefaultJournal<>(
+    JournalContext context =
+        new JournalContext(
             spi,
-            key,
-            STRING_CODEC,
             PayloadTransformer.IDENTITY,
             notifier,
             JournalLimits.defaults(),
             new ShutdownCoordinator());
+    DefaultJournal<String> journal = new DefaultJournal<>(context, key, STRING_CODEC, false);
 
     journal.append("one-entry", Duration.ofHours(1));
 

@@ -73,9 +73,11 @@ class DefaultMailboxTest {
     spi = new InMemoryMailboxSpi();
     notifier = new DefaultNotifier(new InMemoryNotifier(), CODEC_FACTORY);
     spi.create(KEY, Duration.ofMinutes(5));
-    mailbox =
-        new DefaultMailbox<>(
-            spi, KEY, STRING_CODEC, PayloadTransformer.IDENTITY, notifier, coordinator);
+    mailbox = new DefaultMailbox<>(context(spi), KEY, STRING_CODEC, false);
+  }
+
+  private MailboxContext context(MailboxSpi mailboxSpi) {
+    return new MailboxContext(mailboxSpi, PayloadTransformer.IDENTITY, notifier, coordinator);
   }
 
   @Test
@@ -305,13 +307,7 @@ class DefaultMailboxTest {
     String shortKey = "substrate:mailbox:short";
     shortTtlSpi.create(shortKey, Duration.ofMillis(100));
     DefaultMailbox<String> shortMailbox =
-        new DefaultMailbox<>(
-            shortTtlSpi,
-            shortKey,
-            STRING_CODEC,
-            PayloadTransformer.IDENTITY,
-            notifier,
-            coordinator);
+        new DefaultMailbox<>(context(shortTtlSpi), shortKey, STRING_CODEC, false);
 
     CountDownLatch expirationLatch = new CountDownLatch(1);
     AtomicReference<Boolean> onNextFired = new AtomicReference<>(false);
@@ -331,13 +327,7 @@ class DefaultMailboxTest {
     String shortKey = "substrate:mailbox:short";
     shortTtlSpi.create(shortKey, Duration.ofMillis(100));
     DefaultMailbox<String> shortMailbox =
-        new DefaultMailbox<>(
-            shortTtlSpi,
-            shortKey,
-            STRING_CODEC,
-            PayloadTransformer.IDENTITY,
-            notifier,
-            coordinator);
+        new DefaultMailbox<>(context(shortTtlSpi), shortKey, STRING_CODEC, false);
 
     BlockingSubscription<String> sub = shortMailbox.subscribe();
     await()
@@ -389,8 +379,7 @@ class DefaultMailboxTest {
   }
 
   private DefaultMailbox<String> connectedMailbox(MailboxSpi mockSpi) {
-    return new DefaultMailbox<>(
-        mockSpi, KEY, STRING_CODEC, PayloadTransformer.IDENTITY, notifier, coordinator, true);
+    return new DefaultMailbox<>(context(mockSpi), KEY, STRING_CODEC, true);
   }
 
   @Test
@@ -414,9 +403,7 @@ class DefaultMailboxTest {
   @Test
   void createSourcedHandleDoesNotProbe() {
     MailboxSpi mockSpi = org.mockito.Mockito.mock(MailboxSpi.class);
-    DefaultMailbox<String> m =
-        new DefaultMailbox<>(
-            mockSpi, KEY, STRING_CODEC, PayloadTransformer.IDENTITY, notifier, coordinator);
+    DefaultMailbox<String> m = new DefaultMailbox<>(context(mockSpi), KEY, STRING_CODEC, false);
     m.deliver("x");
     org.mockito.Mockito.verify(mockSpi, org.mockito.Mockito.never())
         .exists(org.mockito.ArgumentMatchers.anyString());

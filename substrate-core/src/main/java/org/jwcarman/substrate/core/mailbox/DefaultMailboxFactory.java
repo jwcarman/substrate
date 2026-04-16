@@ -26,12 +26,9 @@ import org.jwcarman.substrate.mailbox.MailboxFactory;
 
 public class DefaultMailboxFactory implements MailboxFactory {
 
-  private final MailboxSpi mailboxSpi;
   private final CodecFactory codecFactory;
-  private final PayloadTransformer transformer;
-  private final Notifier notifier;
   private final Duration maxTtl;
-  private final ShutdownCoordinator shutdownCoordinator;
+  private final MailboxContext context;
 
   public DefaultMailboxFactory(
       MailboxSpi mailboxSpi,
@@ -40,61 +37,43 @@ public class DefaultMailboxFactory implements MailboxFactory {
       Notifier notifier,
       Duration maxTtl,
       ShutdownCoordinator shutdownCoordinator) {
-    this.mailboxSpi = mailboxSpi;
     this.codecFactory = codecFactory;
-    this.transformer = transformer;
-    this.notifier = notifier;
     this.maxTtl = maxTtl;
-    this.shutdownCoordinator = shutdownCoordinator;
+    this.context = new MailboxContext(mailboxSpi, transformer, notifier, shutdownCoordinator);
   }
 
   @Override
   public <T> Mailbox<T> create(String name, Class<T> type, Duration ttl) {
-    if (ttl.compareTo(maxTtl) > 0) {
-      throw new IllegalArgumentException(
-          "Mailbox TTL " + ttl + " exceeds configured maximum " + maxTtl);
-    }
-    String key = mailboxSpi.mailboxKey(name);
-    mailboxSpi.create(key, ttl);
-    return new DefaultMailbox<>(
-        mailboxSpi, key, codecFactory.create(type), transformer, notifier, shutdownCoordinator);
+    validateTtl(ttl);
+    String key = context.spi().mailboxKey(name);
+    context.spi().create(key, ttl);
+    return new DefaultMailbox<>(context, key, codecFactory.create(type), false);
   }
 
   @Override
   public <T> Mailbox<T> create(String name, TypeRef<T> typeRef, Duration ttl) {
-    if (ttl.compareTo(maxTtl) > 0) {
-      throw new IllegalArgumentException(
-          "Mailbox TTL " + ttl + " exceeds configured maximum " + maxTtl);
-    }
-    String key = mailboxSpi.mailboxKey(name);
-    mailboxSpi.create(key, ttl);
-    return new DefaultMailbox<>(
-        mailboxSpi, key, codecFactory.create(typeRef), transformer, notifier, shutdownCoordinator);
+    validateTtl(ttl);
+    String key = context.spi().mailboxKey(name);
+    context.spi().create(key, ttl);
+    return new DefaultMailbox<>(context, key, codecFactory.create(typeRef), false);
   }
 
   @Override
   public <T> Mailbox<T> connect(String name, Class<T> type) {
-    String key = mailboxSpi.mailboxKey(name);
-    return new DefaultMailbox<>(
-        mailboxSpi,
-        key,
-        codecFactory.create(type),
-        transformer,
-        notifier,
-        shutdownCoordinator,
-        true);
+    String key = context.spi().mailboxKey(name);
+    return new DefaultMailbox<>(context, key, codecFactory.create(type), true);
   }
 
   @Override
   public <T> Mailbox<T> connect(String name, TypeRef<T> typeRef) {
-    String key = mailboxSpi.mailboxKey(name);
-    return new DefaultMailbox<>(
-        mailboxSpi,
-        key,
-        codecFactory.create(typeRef),
-        transformer,
-        notifier,
-        shutdownCoordinator,
-        true);
+    String key = context.spi().mailboxKey(name);
+    return new DefaultMailbox<>(context, key, codecFactory.create(typeRef), true);
+  }
+
+  private void validateTtl(Duration ttl) {
+    if (ttl.compareTo(maxTtl) > 0) {
+      throw new IllegalArgumentException(
+          "Mailbox TTL " + ttl + " exceeds configured maximum " + maxTtl);
+    }
   }
 }

@@ -29,9 +29,11 @@ import org.jwcarman.substrate.NextResult;
 import org.jwcarman.substrate.atom.Atom;
 import org.jwcarman.substrate.core.atom.DefaultAtomFactory;
 import org.jwcarman.substrate.core.journal.DefaultJournal;
+import org.jwcarman.substrate.core.journal.JournalContext;
 import org.jwcarman.substrate.core.journal.JournalLimits;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.mailbox.DefaultMailbox;
+import org.jwcarman.substrate.core.mailbox.MailboxContext;
 import org.jwcarman.substrate.core.memory.atom.InMemoryAtomSpi;
 import org.jwcarman.substrate.core.memory.journal.InMemoryJournalSpi;
 import org.jwcarman.substrate.core.memory.mailbox.InMemoryMailboxSpi;
@@ -124,15 +126,9 @@ class PayloadTransformerRoundTripTest {
     String key = spi.journalKey("xor-test");
     spi.create(key, Duration.ofHours(1));
 
-    DefaultJournal<String> journal =
-        new DefaultJournal<>(
-            spi,
-            key,
-            STRING_CODEC,
-            XOR_TRANSFORMER,
-            notifier,
-            JournalLimits.defaults(),
-            coordinator);
+    JournalContext journalContext =
+        new JournalContext(spi, XOR_TRANSFORMER, notifier, JournalLimits.defaults(), coordinator);
+    DefaultJournal<String> journal = new DefaultJournal<>(journalContext, key, STRING_CODEC, false);
 
     journal.append("event-1", Duration.ofMinutes(5));
 
@@ -154,8 +150,8 @@ class PayloadTransformerRoundTripTest {
     String key = spi.mailboxKey("xor-test");
     spi.create(key, Duration.ofMinutes(5));
 
-    DefaultMailbox<String> mailbox =
-        new DefaultMailbox<>(spi, key, STRING_CODEC, XOR_TRANSFORMER, notifier, coordinator);
+    MailboxContext mailboxContext = new MailboxContext(spi, XOR_TRANSFORMER, notifier, coordinator);
+    DefaultMailbox<String> mailbox = new DefaultMailbox<>(mailboxContext, key, STRING_CODEC, false);
 
     mailbox.deliver("payload");
 
