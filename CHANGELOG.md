@@ -10,6 +10,14 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+### Added
+
+- GraalVM native-image support: `substrate-core` now ships
+  `META-INF/spring/aot.factories` registering `SubstrateRuntimeHints`, which
+  declares Jackson binding hints for the internal `RawNotification` wire
+  envelope (and its nested `PrimitiveType` / `EventType` enums). Consumer
+  payload types remain the consumer's responsibility.
+
 ## [0.6.0] - 2026-04-15
 
 ### Breaking changes
