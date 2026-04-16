@@ -10,6 +10,8 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-04-16
+
 ### Added
 
 - GraalVM native-image support: `substrate-core` now ships
@@ -17,6 +19,26 @@ occur between minor versions. The 1.0.0 release will mark API stability.
   declares Jackson binding hints for the internal `RawNotification` wire
   envelope (and its nested `PrimitiveType` / `EventType` enums). Consumer
   payload types remain the consumer's responsibility.
+- `substrate-crypto` now logs an INFO message at startup when AES-GCM
+  encryption-at-rest is activated via the `substrate.crypto.shared-key`
+  property, so operators can confirm at boot which key length and `kid` are
+  in effect (e.g., `Substrate encryption-at-rest enabled: AES-256-GCM with
+  shared key (kid=0)`).
+
+### Changed
+
+- Internal refactor: `DefaultJournal`, `DefaultAtom`, and `DefaultMailbox`
+  constructors now accept a single `JournalContext` / `AtomContext` /
+  `MailboxContext` record bundling the shared infrastructure dependencies
+  (SPI, transformer, notifier, limits, shutdown coordinator), dropping
+  constructor parameter counts to four. Consumers using the public factory
+  API (`JournalFactory`, `AtomFactory`, `MailboxFactory`) are unaffected;
+  only direct instantiators of the impl classes will see source-level
+  changes.
+- Internal cleanup: extracted shared NATS KV bucket provisioning and key
+  sanitization from `NatsAtomSpi` and `NatsMailboxSpi` into a
+  `NatsKvSupport` helper, eliminating ~17 lines of duplication on each
+  file. No behavior change.
 
 ## [0.6.0] - 2026-04-15
 
@@ -600,6 +622,7 @@ abstractions:
 
 - **BOM** (`substrate-bom`) for version alignment across all modules
 
+[0.7.0]: https://github.com/jwcarman/substrate/releases/tag/0.7.0
 [0.6.0]: https://github.com/jwcarman/substrate/releases/tag/0.6.0
 [0.5.0]: https://github.com/jwcarman/substrate/releases/tag/0.5.0
 [0.4.0]: https://github.com/jwcarman/substrate/releases/tag/0.4.0
