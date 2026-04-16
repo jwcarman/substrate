@@ -17,7 +17,6 @@ package org.jwcarman.substrate.nats.atom;
 
 import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;
-import io.nats.client.api.KeyValueConfiguration;
 import io.nats.client.api.KeyValueEntry;
 import io.nats.client.api.KeyValueOperation;
 import java.io.IOException;
@@ -29,6 +28,7 @@ import java.util.Optional;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
 import org.jwcarman.substrate.core.atom.AbstractAtomSpi;
 import org.jwcarman.substrate.core.atom.RawAtom;
+import org.jwcarman.substrate.nats.NatsKvSupport;
 
 public class NatsAtomSpi extends AbstractAtomSpi {
 
@@ -39,7 +39,7 @@ public class NatsAtomSpi extends AbstractAtomSpi {
     super(prefix);
     this.connection = connection;
     this.bucketName = bucketName;
-    ensureBucketExists(defaultTtl);
+    NatsKvSupport.ensureBucketExists(connection, bucketName, defaultTtl);
   }
 
   @Override
@@ -132,33 +132,8 @@ public class NatsAtomSpi extends AbstractAtomSpi {
     }
   }
 
-  private void ensureBucketExists(Duration defaultTtl) {
-    try {
-      createBucketIfMissing(defaultTtl);
-    } catch (IOException e) {
-      throw new UncheckedIOException("Failed to create NATS KV bucket", e);
-    } catch (JetStreamApiException e) {
-      throw new IllegalStateException("Failed to create NATS KV bucket", e);
-    }
-  }
-
-  private void createBucketIfMissing(Duration defaultTtl)
-      throws IOException, JetStreamApiException {
-    var kvm = connection.keyValueManagement();
-    try {
-      kvm.getStatus(bucketName);
-    } catch (JetStreamApiException _) {
-      kvm.create(
-          KeyValueConfiguration.builder()
-              .name(bucketName)
-              .ttl(defaultTtl)
-              .maxHistoryPerKey(1)
-              .build());
-    }
-  }
-
-  private String toKvKey(String key) {
-    return key.replace(':', '-').replace('.', '-');
+  private static String toKvKey(String key) {
+    return NatsKvSupport.toKvKey(key);
   }
 
   private static boolean isKeyExists(JetStreamApiException e) {

@@ -47,6 +47,7 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
   private static final String COMPLETED_ENTRY_ID = "COMPLETED";
   private static final String EXPR_KEY_ALIAS = "#k";
   private static final String EXPR_KEY_PARAM = ":k";
+  private static final String KEY_CONDITION_EXPRESSION = EXPR_KEY_ALIAS + " = " + EXPR_KEY_PARAM;
 
   private final DynamoDbClient client;
   private final String tableName;
@@ -136,7 +137,7 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
         client.query(
             QueryRequest.builder()
                 .tableName(tableName)
-                .keyConditionExpression("#k = :k")
+                .keyConditionExpression(KEY_CONDITION_EXPRESSION)
                 .expressionAttributeNames(Map.of(EXPR_KEY_ALIAS, FIELD_KEY))
                 .expressionAttributeValues(
                     Map.of(EXPR_KEY_PARAM, AttributeValue.builder().s(key).build()))
@@ -201,7 +202,7 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
       QueryRequest.Builder queryBuilder =
           QueryRequest.builder()
               .tableName(tableName)
-              .keyConditionExpression("#k = :k")
+              .keyConditionExpression(KEY_CONDITION_EXPRESSION)
               .expressionAttributeValues(
                   Map.of(EXPR_KEY_PARAM, AttributeValue.builder().s(key).build()))
               .projectionExpression("#k, " + FIELD_ENTRY_ID)
@@ -244,7 +245,7 @@ public class DynamoDbJournalSpi extends AbstractJournalSpi {
         client.query(
             QueryRequest.builder()
                 .tableName(tableName)
-                .keyConditionExpression("#k = :k")
+                .keyConditionExpression(KEY_CONDITION_EXPRESSION)
                 .expressionAttributeNames(Map.of(EXPR_KEY_ALIAS, FIELD_KEY))
                 .expressionAttributeValues(
                     Map.of(EXPR_KEY_PARAM, AttributeValue.builder().s(key).build()))

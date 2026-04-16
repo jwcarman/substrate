@@ -17,7 +17,6 @@ package org.jwcarman.substrate.nats.mailbox;
 
 import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;
-import io.nats.client.api.KeyValueConfiguration;
 import io.nats.client.api.KeyValueEntry;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -26,6 +25,7 @@ import java.util.Optional;
 import org.jwcarman.substrate.core.mailbox.AbstractMailboxSpi;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 import org.jwcarman.substrate.mailbox.MailboxFullException;
+import org.jwcarman.substrate.nats.NatsKvSupport;
 
 public class NatsMailboxSpi extends AbstractMailboxSpi {
 
@@ -33,15 +33,13 @@ public class NatsMailboxSpi extends AbstractMailboxSpi {
 
   private final Connection connection;
   private final String bucketName;
-  private final Duration defaultTtl;
 
   public NatsMailboxSpi(
       Connection connection, String prefix, String bucketName, Duration defaultTtl) {
     super(prefix);
     this.connection = connection;
     this.bucketName = bucketName;
-    this.defaultTtl = defaultTtl;
-    ensureBucketExists();
+    NatsKvSupport.ensureBucketExists(connection, bucketName, defaultTtl);
   }
 
   @Override
@@ -120,31 +118,7 @@ public class NatsMailboxSpi extends AbstractMailboxSpi {
     }
   }
 
-  private void ensureBucketExists() {
-    try {
-      createBucketIfMissing();
-    } catch (IOException e) {
-      throw new UncheckedIOException("Failed to create NATS KV bucket", e);
-    } catch (JetStreamApiException e) {
-      throw new IllegalStateException("Failed to create NATS KV bucket", e);
-    }
-  }
-
-  private void createBucketIfMissing() throws IOException, JetStreamApiException {
-    var kvm = connection.keyValueManagement();
-    try {
-      kvm.getStatus(bucketName);
-    } catch (JetStreamApiException _) {
-      kvm.create(
-          KeyValueConfiguration.builder()
-              .name(bucketName)
-              .ttl(defaultTtl)
-              .maxHistoryPerKey(1)
-              .build());
-    }
-  }
-
-  private String toKvKey(String key) {
-    return key.replace(':', '-').replace('.', '-');
+  private static String toKvKey(String key) {
+    return NatsKvSupport.toKvKey(key);
   }
 }
