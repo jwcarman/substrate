@@ -185,19 +185,19 @@ Notifications fire only on `COMMITTED`.
 
 ### 4. Backend implementations
 
-Eight of nine backends can produce all three outcomes from a single atomic
+Seven of nine backends can produce all three outcomes from a single atomic
 operation.
 
 | Backend | Mechanism | Exact |
 | --- | --- | --- |
 | in-memory | `ConcurrentHashMap.compute`, inspecting the existing entry | yes |
-| postgresql | One CTE statement: a `SELECT` of the current token beside the guarded `UPDATE ... AND token = ?`, both on the same snapshot | yes |
+| postgresql | One CTE statement: a `SELECT` of the current token beside the guarded `UPDATE ... AND token = ?` | yes⁴ |
 | cassandra | The already-prepared `updateIfToken` LWT (`UPDATE ... USING TTL ? SET value=?, token=? WHERE key=? IF token=?`); on `[applied]=false` the result row carries the current token, and a null token column means absent | yes |
 | dynamodb | Extend the existing `conditionExpression` with `AND #tok = :expected` and set `ReturnValuesOnConditionCheckFailure=ALL_OLD`; the thrown `ConditionalCheckFailedException` carries the old item — no item (or a lapsed `ttl` attribute, since DynamoDB reaps lazily) means absent | yes |
 | mongodb | `findAndModify` with an aggregation-pipeline update whose `$set` stages are wrapped in `$cond` on the token, filtered on key + not-expired, returning the BEFORE document: null → absent, token mismatch → unchanged, match → committed | yes |
 | hazelcast | An `EntryProcessor` — see §4a | yes |
 | redis | A Lua `EVAL`, which Redis runs atomically, returning a status code | yes¹ |
-| etcd | A txn comparing `ModRevision` against the revision observed by a preceding read, with `Else(Get(key))` to classify a failed compare | yes |
+| etcd | A txn comparing `ModRevision` against the revision observed by a preceding read; a failed compare is classified by a *separate* follow-up existence read | **no³** |
 | nats | KV `update(key, value, expectedRevision)` after a read that maps token → revision | **no²** |
 
 ¹ **Redis changes storage format.** `AtomPayload` currently encodes
@@ -226,6 +226,24 @@ window between the failed update and that read, the failure is reported as
 `TOKEN_MISMATCH`. Both outcomes mean the caller lost, and `ABSENT` is a truthful
 statement about the atom at the moment it is read, so the misclassification is
 benign. It is documented in `NatsAtomSpi`.
+
+³ **etcd was built with a separate read, not `Else(Get(key))`.** The txn
+compares `ModRevision` against the revision observed by a preceding read, so
+the *write* is exact and no lost update is possible. The implementation does
+not carry an `Else(Get(key))` branch inside the txn: it reads the key first to
+map token → revision, and on a failed compare it issues a separate
+`atomExists` read to classify the failure. That gives etcd exactly the same
+benign misclassification NATS has — a delete landing between the failed txn and
+the follow-up read turns a `TOKEN_MISMATCH` into an `ABSENT`. Both outcomes
+mean the caller lost the race. It is documented in `EtcdAtomSpi`.
+
+⁴ **PostgreSQL's two CTE legs are not one snapshot.** Under the default
+`READ COMMITTED` isolation level the `current` and `updated` legs of the CTE do
+not share a statement snapshot for the purposes of the classification: a
+concurrent `DELETE` landing between them can leave `present_count > 0` while
+`updated_count = 0`, reporting `TOKEN_MISMATCH` where `ABSENT` is truer. The
+guarded `UPDATE` itself is still exact, so no lost update is possible, and the
+caller lost the race either way. It is documented in `PostgresAtomSpi`.
 
 ### 4a. Hazelcast: fixing a confirmed TTL bug
 

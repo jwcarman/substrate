@@ -103,6 +103,16 @@ public class EtcdAtomSpi extends AbstractAtomSpi {
         "set atom in etcd");
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>The write itself is exact: the txn compares {@code ModRevision} against the revision
+   * observed by the preceding read, so no lost update is possible. Classifying a <em>failed</em>
+   * txn requires a separate follow-up read, and if the atom is deleted between the failed txn and
+   * that read, the failure is reported as {@link CasResult#ABSENT} rather than {@link
+   * CasResult#TOKEN_MISMATCH}. Both outcomes mean the caller lost the race, and {@code ABSENT} is a
+   * true statement about the atom at the moment it was read.
+   */
   @Override
   public CasResult compareAndSet(
       String key, String expectedToken, byte[] value, String newToken, Duration ttl) {

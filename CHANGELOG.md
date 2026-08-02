@@ -52,14 +52,36 @@ occur between minor versions. The 1.0.0 release will mark API stability.
   extended, false if the atom is already dead"). It is reachable from the
   public API because TTL is validated only against an upper bound. All Redis
   TTL paths now share a one-second floor.
+- `substrate-dynamodb`: every write computed its expiry as
+  `Instant.now().plus(ttl).getEpochSecond()` with no floor. DynamoDB expiry is
+  second-granular, so `touch(Duration.ofMillis(500))` stamped the expiry on the
+  current epoch second and returned `true`, after which the next `read()`
+  reported the atom expired and `get()` threw `AtomExpiredException`. All four
+  write paths now share a one-second floor, as Redis, Cassandra and etcd
+  already did.
+- `substrate-dynamodb`: the `compareAndSet` failure classifier threw
+  `NullPointerException` when the returned `ALL_OLD` image carried no `ttl`
+  attribute, as a hand-written or legacy row would. A missing `ttl` is now
+  treated as expired, i.e. `ABSENT`.
 
 ### Breaking changes
 
 - The `Snapshot` token is now a per-write random nonce rather than a hash of
   the value. As a result, `set()` with an unchanged value now moves the token
   and notifies subscribers, where previously it was silently invisible.
+- `Atom<T>` gained an abstract `compareAndSet(Snapshot<T>, T, Duration)` method.
+  `Atom` is a public API interface, so any consumer test double, decorator or
+  delegating wrapper that implements it fails to compile until the method is
+  added.
 - `AtomSpi` gained an abstract `compareAndSet` method. Third-party `AtomSpi`
   implementations must implement it.
+- Atom TTLs must now be strictly positive. `Duration.ZERO` and negative
+  durations throw `IllegalArgumentException` from `AtomFactory.create`,
+  `Atom.set`, `Atom.compareAndSet` and `Atom.touch`, where previously they were
+  passed to the backend — which interpreted them inconsistently (Hazelcast read
+  a zero TTL as *infinite*, producing an atom that never expired and was never
+  swept; other backends read it as already expired or floored it at one
+  second).
 - `substrate-redis` changed its Atom storage format from a single packed
   Base64 string to a hash with separate `token` and `value` fields. Atoms are
   ephemeral leased state, so no migration path is provided — existing atoms

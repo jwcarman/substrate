@@ -125,7 +125,10 @@ public interface NotificationHandler {
 ### Atom — single-value, TTL-governed, optimistic-concurrency cell
 
 The 0-ary case. A single named value with built-in TTL, CAS-style updates via
-content-based tokens, and a blocking `watch` for change detection.
+per-write nonce tokens, and a blocking `watch` for change detection. Each write
+mints a fresh random token, so a token identifies the write that produced it
+rather than the value it wrote — a value that goes A → B → A does not resurrect
+its original token.
 
 ```java
 public interface Atom<T> {

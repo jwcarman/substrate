@@ -76,6 +76,16 @@ public class PostgresAtomSpi extends AbstractAtomSpi {
         > 0;
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>The guarded {@code UPDATE} is exact: it commits only when the stored token still matches, so
+   * no lost update is possible. Classifying a <em>failed</em> update is approximate under the
+   * default {@code READ COMMITTED} isolation level — a concurrent {@code DELETE} landing between
+   * the CTE's two legs can leave the presence probe non-empty while the update matched nothing,
+   * reporting {@link CasResult#TOKEN_MISMATCH} where {@link CasResult#ABSENT} is truer. Both
+   * outcomes mean the caller lost the race.
+   */
   @Override
   public CasResult compareAndSet(
       String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
