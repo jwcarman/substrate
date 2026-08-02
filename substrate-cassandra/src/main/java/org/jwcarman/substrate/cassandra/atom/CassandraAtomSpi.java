@@ -151,7 +151,22 @@ public class CassandraAtomSpi extends AbstractAtomSpi {
   @Override
   public CasResult compareAndSet(
       String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
-    throw new UnsupportedOperationException("compareAndSet not yet implemented");
+    Row row =
+        session
+            .execute(
+                updateIfToken.bind(
+                    ttlSeconds(ttl), ByteBuffer.wrap(value), newToken, key, expectedToken))
+            .one();
+    if (row == null) {
+      return CasResult.ABSENT;
+    }
+    if (row.getBoolean(APPLIED_COLUMN)) {
+      return CasResult.COMMITTED;
+    }
+    if (!row.getColumnDefinitions().contains(FIELD_TOKEN)) {
+      return CasResult.ABSENT;
+    }
+    return row.getString(FIELD_TOKEN) == null ? CasResult.ABSENT : CasResult.TOKEN_MISMATCH;
   }
 
   @Override
