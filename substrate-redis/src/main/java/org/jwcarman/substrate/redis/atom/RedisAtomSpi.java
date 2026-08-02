@@ -16,19 +16,57 @@
 package org.jwcarman.substrate.redis.atom;
 
 import io.lettuce.core.ExpireArgs;
-import io.lettuce.core.SetArgs;
+import io.lettuce.core.ScriptOutputType;
 import io.lettuce.core.api.sync.RedisCommands;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Base64;
+import java.util.Map;
 import java.util.Optional;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
 import org.jwcarman.substrate.core.atom.AbstractAtomSpi;
 import org.jwcarman.substrate.core.atom.CasResult;
 import org.jwcarman.substrate.core.atom.RawAtom;
 
+/**
+ * Atom storage backed by Redis. Each atom is a hash with a {@code token} field and a Base64-encoded
+ * {@code value} field, with the key's TTL carrying the lease. Writes go through Lua scripts so the
+ * field update and the {@code EXPIRE} are applied atomically — an atom can never exist without an
+ * expiration — and so {@code compareAndSet} can compare the token server-side.
+ */
 public class RedisAtomSpi extends AbstractAtomSpi {
+
+  private static final String FIELD_TOKEN = "token";
+  private static final String FIELD_VALUE = "value";
+
+  private static final String CREATE_SCRIPT =
+      "if redis.call('EXISTS', KEYS[1]) == 1 then return 0 end "
+          + "redis.call('HSET', KEYS[1], 'token', ARGV[1], 'value', ARGV[2]) "
+          + "redis.call('EXPIRE', KEYS[1], ARGV[3]) "
+          + "return 1";
+
+  private static final String SET_SCRIPT =
+      "if redis.call('EXISTS', KEYS[1]) == 0 then return 0 end "
+          + "redis.call('HSET', KEYS[1], 'token', ARGV[1], 'value', ARGV[2]) "
+          + "redis.call('EXPIRE', KEYS[1], ARGV[3]) "
+          + "return 1";
+
+  private static final String CAS_SCRIPT =
+      "local current = redis.call('HGET', KEYS[1], 'token') "
+          + "if not current then return -1 end "
+          + "if current ~= ARGV[1] then return 0 end "
+          + "redis.call('HSET', KEYS[1], 'token', ARGV[2], 'value', ARGV[3]) "
+          + "redis.call('EXPIRE', KEYS[1], ARGV[4]) "
+          + "return 1";
 
   private final RedisCommands<String, String> commands;
 
+  /**
+   * Creates a new Redis-backed atom SPI.
+   *
+   * @param commands the synchronous Redis command interface
+   * @param prefix the key prefix applied to atom names
+   */
   public RedisAtomSpi(RedisCommands<String, String> commands, String prefix) {
     super(prefix);
     this.commands = commands;
@@ -36,33 +74,61 @@ public class RedisAtomSpi extends AbstractAtomSpi {
 
   @Override
   public void create(String key, byte[] value, String token, Duration ttl) {
-    String payload = AtomPayload.encode(value, token);
-    String result = commands.set(key, payload, SetArgs.Builder.nx().ex(ttl.toSeconds()));
-    if (result == null) {
+    Long result =
+        commands.eval(
+            CREATE_SCRIPT,
+            ScriptOutputType.INTEGER,
+            new String[] {key},
+            token,
+            encode(value),
+            seconds(ttl));
+    if (result == null || result == 0L) {
       throw new AtomAlreadyExistsException(key);
     }
   }
 
   @Override
   public Optional<RawAtom> read(String key) {
-    String payload = commands.get(key);
-    if (payload == null) {
+    Map<String, String> fields = commands.hgetall(key);
+    if (fields.isEmpty()) {
       return Optional.empty();
     }
-    return Optional.of(AtomPayload.decode(payload));
+    return Optional.of(new RawAtom(decode(fields.get(FIELD_VALUE)), fields.get(FIELD_TOKEN)));
   }
 
   @Override
   public boolean set(String key, byte[] value, String token, Duration ttl) {
-    String payload = AtomPayload.encode(value, token);
-    String result = commands.set(key, payload, SetArgs.Builder.xx().ex(ttl.toSeconds()));
-    return result != null;
+    Long result =
+        commands.eval(
+            SET_SCRIPT,
+            ScriptOutputType.INTEGER,
+            new String[] {key},
+            token,
+            encode(value),
+            seconds(ttl));
+    return result != null && result == 1L;
   }
 
   @Override
   public CasResult compareAndSet(
       String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
-    throw new UnsupportedOperationException("compareAndSet not yet implemented");
+    Long result =
+        commands.eval(
+            CAS_SCRIPT,
+            ScriptOutputType.INTEGER,
+            new String[] {key},
+            expectedToken,
+            newToken,
+            encode(value),
+            seconds(ttl));
+    if (result == null) {
+      return CasResult.ABSENT;
+    }
+    return switch (result.intValue()) {
+      case 1 -> CasResult.COMMITTED;
+      case 0 -> CasResult.TOKEN_MISMATCH;
+      default -> CasResult.ABSENT;
+    };
   }
 
   @Override
@@ -78,5 +144,17 @@ public class RedisAtomSpi extends AbstractAtomSpi {
   @Override
   public boolean exists(String key) {
     return commands.exists(key) > 0;
+  }
+
+  private static String encode(byte[] value) {
+    return Base64.getEncoder().encodeToString(value);
+  }
+
+  private static byte[] decode(String encoded) {
+    return Base64.getDecoder().decode(encoded.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static String seconds(Duration ttl) {
+    return Long.toString(Math.max(1L, ttl.toSeconds()));
   }
 }
