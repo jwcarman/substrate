@@ -17,6 +17,7 @@ package org.jwcarman.substrate.core.atom;
 
 import java.time.Duration;
 import java.util.Base64;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -68,6 +69,27 @@ public class DefaultAtom<T> implements Atom<T> {
       throw new AtomExpiredException(key);
     }
     context.notifier().notifyAtomChanged(key);
+  }
+
+  @Override
+  public boolean compareAndSet(Snapshot<T> expected, T data, Duration ttl) {
+    Objects.requireNonNull(expected, "expected");
+    ensureExists();
+    validateTtl(ttl);
+    byte[] bytes = codec.encode(data);
+    CasResult result =
+        context
+            .spi()
+            .compareAndSet(
+                key, expected.token(), context.transformer().encode(bytes), nextToken(), ttl);
+    return switch (result) {
+      case COMMITTED -> {
+        context.notifier().notifyAtomChanged(key);
+        yield true;
+      }
+      case TOKEN_MISMATCH -> false;
+      case ABSENT -> throw new AtomExpiredException(key);
+    };
   }
 
   @Override

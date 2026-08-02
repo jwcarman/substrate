@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 import java.time.Duration;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -525,5 +526,73 @@ class DefaultAtomTest {
     org.mockito.Mockito.verify(mockSpi, org.mockito.Mockito.never())
         .exists(org.mockito.ArgumentMatchers.anyString());
     org.mockito.Mockito.verify(mockSpi).delete(KEY);
+  }
+
+  // ═══════════════ compareAndSet tests ═══════════════
+
+  @Test
+  void compareAndSetCommitsWhenTokenMatches() {
+    Snapshot<String> current = atom.get();
+
+    boolean committed = atom.compareAndSet(current, "updated", TTL);
+
+    assertThat(committed).isTrue();
+    assertThat(atom.get().value()).isEqualTo("updated");
+    assertThat(atom.get().token()).isNotEqualTo(current.token());
+  }
+
+  @Test
+  void compareAndSetReturnsFalseOnStaleToken() {
+    Snapshot<String> stale = atom.get();
+    atom.set("winner", TTL);
+
+    boolean committed = atom.compareAndSet(stale, "loser", TTL);
+
+    assertThat(committed).isFalse();
+    assertThat(atom.get().value()).isEqualTo("winner");
+  }
+
+  @Test
+  void compareAndSetNotifiesSubscribersOnlyWhenCommitted() throws Exception {
+    Snapshot<String> current = atom.get();
+    var delivered = new CopyOnWriteArrayList<String>();
+    Subscription sub =
+        atom.subscribe(
+            current,
+            (SubscriberConfig<Snapshot<String>> cfg) -> cfg.onNext(s -> delivered.add(s.value())));
+    try {
+      assertThat(atom.compareAndSet(current, "committed", TTL)).isTrue();
+      await().atMost(Duration.ofSeconds(5)).until(() -> delivered.contains("committed"));
+
+      int deliveredCount = delivered.size();
+      assertThat(atom.compareAndSet(current, "rejected", TTL)).isFalse();
+      Thread.sleep(300);
+      assertThat(delivered).hasSize(deliveredCount);
+    } finally {
+      sub.cancel();
+    }
+  }
+
+  @Test
+  void compareAndSetThrowsOnDeadAtom() {
+    Snapshot<String> current = atom.get();
+    atom.delete();
+
+    assertThatThrownBy(() -> atom.compareAndSet(current, "value", TTL))
+        .isInstanceOf(AtomExpiredException.class);
+  }
+
+  @Test
+  void compareAndSetRejectsNullExpected() {
+    assertThatThrownBy(() -> atom.compareAndSet(null, "value", TTL))
+        .isInstanceOf(NullPointerException.class);
+  }
+
+  @Test
+  void compareAndSetThrowsWhenTtlExceedsMaxTtl() {
+    Snapshot<String> current = atom.get();
+
+    assertThatThrownBy(() -> atom.compareAndSet(current, "value", Duration.ofHours(25)))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 }

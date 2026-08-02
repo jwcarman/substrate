@@ -86,6 +86,35 @@ public interface Atom<T> {
   void set(T data, Duration ttl);
 
   /**
+   * Atomically sets the value of this atom only if its current token matches the one carried by
+   * {@code expected}. On success the TTL is reset and subscribers are notified; on failure nothing
+   * is written and no notification is sent.
+   *
+   * <p>A {@code false} return is <em>retryable</em> — another writer won the race, so re-read and
+   * try again. {@link AtomExpiredException} is <em>terminal</em> — the atom is gone and retrying
+   * cannot succeed.
+   *
+   * <pre>{@code
+   * Snapshot<Session> current = atom.get();
+   * Session next = current.value().withCount(current.value().count() + 1);
+   * while (!atom.compareAndSet(current, next, Duration.ofHours(1))) {
+   *   current = atom.get();
+   *   next = current.value().withCount(current.value().count() + 1);
+   * }
+   * }</pre>
+   *
+   * @param expected the snapshot this write is conditioned on
+   * @param data the new value to store
+   * @param ttl the new time-to-live for this atom
+   * @return {@code true} if the write was committed, {@code false} if another writer changed the
+   *     atom first
+   * @throws AtomExpiredException if the atom's lease has already elapsed or it has been deleted
+   * @throws NullPointerException if {@code expected} is {@code null}
+   * @throws IllegalArgumentException if {@code ttl} exceeds the maximum allowed duration
+   */
+  boolean compareAndSet(Snapshot<T> expected, T data, Duration ttl);
+
+  /**
    * Extends the TTL of this atom without changing its value.
    *
    * @param ttl the new time-to-live to apply
