@@ -43,6 +43,7 @@ public class DynamoDbAtomSpi extends AbstractAtomSpi {
   private static final String FIELD_VALUE = "value";
   private static final String FIELD_TOKEN = "token";
   private static final String FIELD_TTL = "ttl";
+  private static final long MIN_TTL_SECONDS = 1L;
 
   private final DynamoDbClient client;
   private final String tableName;
@@ -67,9 +68,23 @@ public class DynamoDbAtomSpi extends AbstractAtomSpi {
     }
   }
 
+  /**
+   * Converts a requested TTL into the absolute epoch-second stored in the {@code ttl} attribute.
+   *
+   * <p>DynamoDB expiry is second-granular, so the TTL is floored at one second exactly as Redis
+   * ({@code Math.max(1, ttl.toSeconds())}), Cassandra and etcd do. The current instant is rounded
+   * <em>up</em> to the next whole second first, so a floored TTL always buys a full second of life
+   * rather than landing on the current second and reading back as already expired.
+   */
+  private static long expiresAt(Duration ttl) {
+    Instant now = Instant.now();
+    long nowCeiling = now.getNano() == 0 ? now.getEpochSecond() : now.getEpochSecond() + 1;
+    return nowCeiling + Math.max(MIN_TTL_SECONDS, ttl.toSeconds());
+  }
+
   @Override
   public void create(String key, byte[] value, String token, Duration ttl) {
-    long expiresAt = Instant.now().plus(ttl).getEpochSecond();
+    long expiresAt = expiresAt(ttl);
     try {
       client.putItem(
           PutItemRequest.builder()
@@ -115,7 +130,7 @@ public class DynamoDbAtomSpi extends AbstractAtomSpi {
 
   @Override
   public boolean set(String key, byte[] value, String token, Duration ttl) {
-    long expiresAt = Instant.now().plus(ttl).getEpochSecond();
+    long expiresAt = expiresAt(ttl);
     long now = Instant.now().getEpochSecond();
     try {
       client.putItem(
@@ -142,7 +157,7 @@ public class DynamoDbAtomSpi extends AbstractAtomSpi {
   @Override
   public CasResult compareAndSet(
       String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
-    long expiresAt = Instant.now().plus(ttl).getEpochSecond();
+    long expiresAt = expiresAt(ttl);
     long now = Instant.now().getEpochSecond();
     try {
       client.putItem(
@@ -169,14 +184,21 @@ public class DynamoDbAtomSpi extends AbstractAtomSpi {
       if (old == null || old.isEmpty()) {
         return CasResult.ABSENT;
       }
-      long oldTtl = Long.parseLong(old.get(FIELD_TTL).n());
-      return Instant.now().getEpochSecond() >= oldTtl ? CasResult.ABSENT : CasResult.TOKEN_MISMATCH;
+      AttributeValue oldTtl = old.get(FIELD_TTL);
+      if (oldTtl == null) {
+        // A hand-written or legacy row with no ttl attribute carries no proof of life; treat it
+        // the same way an expired row is treated.
+        return CasResult.ABSENT;
+      }
+      return Instant.now().getEpochSecond() >= Long.parseLong(oldTtl.n())
+          ? CasResult.ABSENT
+          : CasResult.TOKEN_MISMATCH;
     }
   }
 
   @Override
   public boolean touch(String key, Duration ttl) {
-    long expiresAt = Instant.now().plus(ttl).getEpochSecond();
+    long expiresAt = expiresAt(ttl);
     long now = Instant.now().getEpochSecond();
     try {
       client.updateItem(

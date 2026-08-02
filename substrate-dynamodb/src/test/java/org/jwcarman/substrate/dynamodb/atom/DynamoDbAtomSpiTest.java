@@ -29,6 +29,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
+import org.jwcarman.substrate.core.atom.CasResult;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -207,5 +208,124 @@ class DynamoDbAtomSpiTest {
   @Test
   void sweepReturnsZero() {
     assertThat(atom.sweep(100)).isZero();
+  }
+
+  @Test
+  void createFloorsSubSecondTtlAtOneSecond() {
+    long before = Instant.now().getEpochSecond();
+
+    atom.create("key1", "value".getBytes(StandardCharsets.UTF_8), "tok1", Duration.ofMillis(1));
+
+    ArgumentCaptor<PutItemRequest> captor = ArgumentCaptor.forClass(PutItemRequest.class);
+    verify(client).putItem(captor.capture());
+    assertThat(Long.parseLong(captor.getValue().item().get("ttl").n()))
+        .isGreaterThanOrEqualTo(before + 1);
+  }
+
+  @Test
+  void setFloorsSubSecondTtlAtOneSecond() {
+    long before = Instant.now().getEpochSecond();
+
+    atom.set("key1", "value".getBytes(StandardCharsets.UTF_8), "tok2", Duration.ofMillis(1));
+
+    ArgumentCaptor<PutItemRequest> captor = ArgumentCaptor.forClass(PutItemRequest.class);
+    verify(client).putItem(captor.capture());
+    assertThat(Long.parseLong(captor.getValue().item().get("ttl").n()))
+        .isGreaterThanOrEqualTo(before + 1);
+  }
+
+  @Test
+  void compareAndSetFloorsSubSecondTtlAtOneSecond() {
+    long before = Instant.now().getEpochSecond();
+
+    atom.compareAndSet(
+        "key1", "tok1", "value".getBytes(StandardCharsets.UTF_8), "tok2", Duration.ofMillis(1));
+
+    ArgumentCaptor<PutItemRequest> captor = ArgumentCaptor.forClass(PutItemRequest.class);
+    verify(client).putItem(captor.capture());
+    assertThat(Long.parseLong(captor.getValue().item().get("ttl").n()))
+        .isGreaterThanOrEqualTo(before + 1);
+  }
+
+  @Test
+  void touchFloorsSubSecondTtlAtOneSecond() {
+    long before = Instant.now().getEpochSecond();
+
+    atom.touch("key1", Duration.ofMillis(500));
+
+    ArgumentCaptor<UpdateItemRequest> captor = ArgumentCaptor.forClass(UpdateItemRequest.class);
+    verify(client).updateItem(captor.capture());
+    assertThat(Long.parseLong(captor.getValue().expressionAttributeValues().get(":newTtl").n()))
+        .isGreaterThanOrEqualTo(before + 1);
+  }
+
+  @Test
+  void compareAndSetReportsAbsentWhenOldItemHasNoTtlAttribute() {
+    when(client.putItem(any(PutItemRequest.class)))
+        .thenThrow(
+            ConditionalCheckFailedException.builder()
+                .item(
+                    Map.of(
+                        "pk", AttributeValue.builder().s("key1").build(),
+                        "token", AttributeValue.builder().s("other").build()))
+                .build());
+
+    CasResult result =
+        atom.compareAndSet(
+            "key1",
+            "tok1",
+            "value".getBytes(StandardCharsets.UTF_8),
+            "tok2",
+            Duration.ofMinutes(5));
+
+    assertThat(result).isEqualTo(CasResult.ABSENT);
+  }
+
+  @Test
+  void compareAndSetReportsAbsentWhenOldItemIsExpired() {
+    long pastEpoch = Instant.now().minusSeconds(60).getEpochSecond();
+    when(client.putItem(any(PutItemRequest.class)))
+        .thenThrow(
+            ConditionalCheckFailedException.builder()
+                .item(
+                    Map.of(
+                        "pk", AttributeValue.builder().s("key1").build(),
+                        "token", AttributeValue.builder().s("tok1").build(),
+                        "ttl", AttributeValue.builder().n(Long.toString(pastEpoch)).build()))
+                .build());
+
+    CasResult result =
+        atom.compareAndSet(
+            "key1",
+            "tok1",
+            "value".getBytes(StandardCharsets.UTF_8),
+            "tok2",
+            Duration.ofMinutes(5));
+
+    assertThat(result).isEqualTo(CasResult.ABSENT);
+  }
+
+  @Test
+  void compareAndSetReportsTokenMismatchWhenOldItemIsAlive() {
+    long futureEpoch = Instant.now().plusSeconds(300).getEpochSecond();
+    when(client.putItem(any(PutItemRequest.class)))
+        .thenThrow(
+            ConditionalCheckFailedException.builder()
+                .item(
+                    Map.of(
+                        "pk", AttributeValue.builder().s("key1").build(),
+                        "token", AttributeValue.builder().s("other").build(),
+                        "ttl", AttributeValue.builder().n(Long.toString(futureEpoch)).build()))
+                .build());
+
+    CasResult result =
+        atom.compareAndSet(
+            "key1",
+            "tok1",
+            "value".getBytes(StandardCharsets.UTF_8),
+            "tok2",
+            Duration.ofMinutes(5));
+
+    assertThat(result).isEqualTo(CasResult.TOKEN_MISMATCH);
   }
 }
