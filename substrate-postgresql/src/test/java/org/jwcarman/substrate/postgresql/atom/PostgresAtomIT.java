@@ -390,7 +390,29 @@ class PostgresAtomIT {
 
     assertThat(result).isEqualTo(CasResult.COMMITTED);
     assertThat(atom.read(key))
-        .hasValueSatisfying(raw -> assertThat(raw.token()).isEqualTo("tok-2"));
+        .hasValueSatisfying(
+            raw -> {
+              assertThat(raw.value()).isEqualTo("v2".getBytes(StandardCharsets.UTF_8));
+              assertThat(raw.token()).isEqualTo("tok-2");
+            });
+  }
+
+  @Test
+  void compareAndSetReportsAbsentForExpiredAtom() {
+    String key = atom.atomKey("cas-expired-" + System.nanoTime());
+    atom.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofMillis(50));
+
+    // Poll read() rather than compareAndSet(): a committed CAS would refresh the TTL.
+    await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> assertThat(atom.read(key)).isEmpty());
+
+    assertThat(
+            atom.compareAndSet(
+                key,
+                "tok-1",
+                "v2".getBytes(StandardCharsets.UTF_8),
+                "tok-2",
+                Duration.ofMinutes(5)))
+        .isEqualTo(CasResult.ABSENT);
   }
 
   @Test

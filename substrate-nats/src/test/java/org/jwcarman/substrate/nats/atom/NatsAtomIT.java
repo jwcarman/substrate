@@ -246,7 +246,38 @@ class NatsAtomIT extends AbstractNatsIT {
 
     assertThat(result).isEqualTo(CasResult.COMMITTED);
     assertThat(atom.read(key))
-        .hasValueSatisfying(raw -> assertThat(raw.token()).isEqualTo("tok-2"));
+        .hasValueSatisfying(
+            raw -> {
+              assertThat(raw.value()).isEqualTo("v2".getBytes(StandardCharsets.UTF_8));
+              assertThat(raw.token()).isEqualTo("tok-2");
+            });
+  }
+
+  @Test
+  void compareAndSetReportsAbsentForExpiredAtom() {
+    // NATS expiry is a bucket-level TTL, so this needs its own short-lived bucket.
+    NatsAtomSpi shortTtlAtom =
+        new NatsAtomSpi(
+            connection,
+            "substrate:atom:",
+            "substrate-atoms-cas-ttl-" + System.nanoTime(),
+            Duration.ofSeconds(2));
+    String key = shortTtlAtom.atomKey("cas-expired-" + System.nanoTime());
+    shortTtlAtom.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofSeconds(2));
+
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(500))
+        .untilAsserted(() -> assertThat(shortTtlAtom.read(key)).isEmpty());
+
+    assertThat(
+            shortTtlAtom.compareAndSet(
+                key,
+                "tok-1",
+                "v2".getBytes(StandardCharsets.UTF_8),
+                "tok-2",
+                Duration.ofMinutes(5)))
+        .isEqualTo(CasResult.ABSENT);
   }
 
   @Test

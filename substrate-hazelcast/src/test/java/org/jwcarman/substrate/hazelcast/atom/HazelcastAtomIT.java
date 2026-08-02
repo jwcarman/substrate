@@ -250,7 +250,33 @@ class HazelcastAtomIT extends AbstractHazelcastIT {
             key, "tok-1", "v2".getBytes(StandardCharsets.UTF_8), "tok-2", Duration.ofMinutes(5));
 
     assertThat(result).isEqualTo(CasResult.COMMITTED);
-    assertThat(spi.read(key)).hasValueSatisfying(raw -> assertThat(raw.token()).isEqualTo("tok-2"));
+    assertThat(spi.read(key))
+        .hasValueSatisfying(
+            raw -> {
+              assertThat(raw.value()).isEqualTo("v2".getBytes(StandardCharsets.UTF_8));
+              assertThat(raw.token()).isEqualTo("tok-2");
+            });
+  }
+
+  @Test
+  void compareAndSetReportsAbsentForExpiredAtom() {
+    String key = spi.atomKey("cas-expired-" + System.nanoTime());
+    spi.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofSeconds(1));
+
+    // Poll read() rather than compareAndSet(): a committed CAS would refresh the TTL.
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(200))
+        .untilAsserted(() -> assertThat(spi.read(key)).isEmpty());
+
+    assertThat(
+            spi.compareAndSet(
+                key,
+                "tok-1",
+                "v2".getBytes(StandardCharsets.UTF_8),
+                "tok-2",
+                Duration.ofMinutes(5)))
+        .isEqualTo(CasResult.ABSENT);
   }
 
   @Test
