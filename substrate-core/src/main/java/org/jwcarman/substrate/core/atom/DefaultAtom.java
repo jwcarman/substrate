@@ -61,7 +61,7 @@ public class DefaultAtom<T> implements Atom<T> {
   @Override
   public void set(T data, Duration ttl) {
     ensureExists();
-    validateTtl(ttl);
+    context.validateTtl(ttl);
     byte[] bytes = codec.encode(data);
     String newToken = nextToken();
     boolean alive = context.spi().set(key, context.transformer().encode(bytes), newToken, ttl);
@@ -75,7 +75,7 @@ public class DefaultAtom<T> implements Atom<T> {
   public boolean compareAndSet(Snapshot<T> expected, T data, Duration ttl) {
     Objects.requireNonNull(expected, "expected");
     ensureExists();
-    validateTtl(ttl);
+    context.validateTtl(ttl);
     byte[] bytes = codec.encode(data);
     CasResult result =
         context
@@ -95,7 +95,7 @@ public class DefaultAtom<T> implements Atom<T> {
   @Override
   public boolean touch(Duration ttl) {
     ensureExists();
-    validateTtl(ttl);
+    context.validateTtl(ttl);
     return context.spi().touch(key, ttl);
   }
 
@@ -209,12 +209,5 @@ public class DefaultAtom<T> implements Atom<T> {
     byte[] bytes = new byte[TOKEN_BYTES];
     ThreadLocalRandom.current().nextBytes(bytes);
     return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-  }
-
-  private void validateTtl(Duration ttl) {
-    if (ttl.compareTo(context.maxTtl()) > 0) {
-      throw new IllegalArgumentException(
-          "Atom TTL " + ttl + " exceeds configured maximum " + context.maxTtl());
-    }
   }
 }

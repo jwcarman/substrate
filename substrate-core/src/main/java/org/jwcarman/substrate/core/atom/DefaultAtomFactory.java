@@ -43,7 +43,7 @@ public class DefaultAtomFactory implements AtomFactory {
 
   @Override
   public <T> Atom<T> create(String name, Class<T> type, T initialValue, Duration ttl) {
-    validateTtl(ttl);
+    context.validateTtl(ttl);
     Codec<T> codec = codecFactory.create(type);
     String key = context.spi().atomKey(name);
     byte[] bytes = codec.encode(initialValue);
@@ -55,7 +55,7 @@ public class DefaultAtomFactory implements AtomFactory {
 
   @Override
   public <T> Atom<T> create(String name, TypeRef<T> typeRef, T initialValue, Duration ttl) {
-    validateTtl(ttl);
+    context.validateTtl(ttl);
     Codec<T> codec = codecFactory.create(typeRef);
     String key = context.spi().atomKey(name);
     byte[] bytes = codec.encode(initialValue);
@@ -77,12 +77,5 @@ public class DefaultAtomFactory implements AtomFactory {
     Codec<T> codec = codecFactory.create(typeRef);
     String key = context.spi().atomKey(name);
     return new DefaultAtom<>(context, key, codec, true);
-  }
-
-  private void validateTtl(Duration ttl) {
-    if (ttl.compareTo(context.maxTtl()) > 0) {
-      throw new IllegalArgumentException(
-          "Atom TTL " + ttl + " exceeds configured maximum " + context.maxTtl());
-    }
   }
 }

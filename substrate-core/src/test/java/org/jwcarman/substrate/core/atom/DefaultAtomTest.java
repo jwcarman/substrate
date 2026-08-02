@@ -465,6 +465,57 @@ class DefaultAtomTest {
         .hasMessageContaining("exceeds configured maximum");
   }
 
+  @Test
+  void setThrowsWhenTtlIsZero() {
+    assertThatThrownBy(() -> atom.set("value", Duration.ZERO))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must be positive");
+  }
+
+  @Test
+  void setThrowsWhenTtlIsNegative() {
+    Duration negative = Duration.ofSeconds(-1);
+
+    assertThatThrownBy(() -> atom.set("value", negative))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must be positive");
+  }
+
+  @Test
+  void touchThrowsWhenTtlIsZero() {
+    assertThatThrownBy(() -> atom.touch(Duration.ZERO))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must be positive");
+  }
+
+  @Test
+  void touchThrowsWhenTtlIsNegative() {
+    Duration negative = Duration.ofSeconds(-1);
+
+    assertThatThrownBy(() -> atom.touch(negative))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must be positive");
+  }
+
+  @Test
+  void compareAndSetThrowsWhenTtlIsZero() {
+    Snapshot<String> current = atom.get();
+
+    assertThatThrownBy(() -> atom.compareAndSet(current, "value", Duration.ZERO))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must be positive");
+  }
+
+  @Test
+  void compareAndSetThrowsWhenTtlIsNegative() {
+    Snapshot<String> current = atom.get();
+    Duration negative = Duration.ofSeconds(-1);
+
+    assertThatThrownBy(() -> atom.compareAndSet(current, "value", negative))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must be positive");
+  }
+
   private DefaultAtom<String> connectedAtom(AtomSpi mockSpi) {
     return new DefaultAtom<>(context(mockSpi), KEY, STRING_CODEC, true);
   }

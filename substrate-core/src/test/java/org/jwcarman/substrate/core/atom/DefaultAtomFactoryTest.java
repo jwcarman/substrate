@@ -254,4 +254,39 @@ class DefaultAtomFactoryTest {
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("exceeds configured maximum");
   }
+
+  @Test
+  void createThrowsWhenTtlIsZero() {
+    assertThatThrownBy(() -> factory.create("zero-ttl", String.class, "value", Duration.ZERO))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must be positive");
+  }
+
+  @Test
+  void createThrowsWhenTtlIsNegative() {
+    Duration negative = Duration.ofSeconds(-1);
+
+    assertThatThrownBy(() -> factory.create("negative-ttl", String.class, "value", negative))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must be positive");
+  }
+
+  @Test
+  void createWithTypeRefThrowsWhenTtlIsZero() {
+    TypeRef<String> typeRef = new TypeRef<>() {};
+
+    assertThatThrownBy(() -> factory.create("zero-ttl-ref", typeRef, "value", Duration.ZERO))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must be positive");
+  }
+
+  @Test
+  void createWithTypeRefThrowsWhenTtlIsNegative() {
+    TypeRef<String> typeRef = new TypeRef<>() {};
+    Duration negative = Duration.ofSeconds(-1);
+
+    assertThatThrownBy(() -> factory.create("negative-ttl-ref", typeRef, "value", negative))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must be positive");
+  }
 }
