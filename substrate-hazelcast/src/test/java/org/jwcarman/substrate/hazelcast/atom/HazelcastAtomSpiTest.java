@@ -34,6 +34,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
+import org.jwcarman.substrate.core.atom.CasResult;
 import org.jwcarman.substrate.core.atom.RawAtom;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -99,25 +100,34 @@ class HazelcastAtomSpiTest {
   @Test
   void setReturnsTrueWhenKeyExists() {
     byte[] value = "updated".getBytes(StandardCharsets.UTF_8);
-    when(map.replace(anyString(), any(AtomEntry.class)))
-        .thenReturn(new AtomEntry("old".getBytes(StandardCharsets.UTF_8), "old-token"));
-    when(map.setTtl(anyString(), anyLong(), any(TimeUnit.class))).thenReturn(true);
+    when(map.<Boolean>executeOnKey(anyString(), any())).thenReturn(true);
 
     boolean result = spi.set("test-key", value, "token-2", Duration.ofSeconds(60));
 
     assertThat(result).isTrue();
-    verify(map).replace(eq("test-key"), any(AtomEntry.class));
-    verify(map).setTtl("test-key", 60000L, TimeUnit.MILLISECONDS);
+    verify(map).executeOnKey(eq("test-key"), any(SetProcessor.class));
   }
 
   @Test
   void setReturnsFalseWhenKeyAbsent() {
     byte[] value = "updated".getBytes(StandardCharsets.UTF_8);
-    when(map.replace(anyString(), any(AtomEntry.class))).thenReturn(null);
+    when(map.<Boolean>executeOnKey(anyString(), any())).thenReturn(false);
 
     boolean result = spi.set("test-key", value, "token-2", Duration.ofSeconds(60));
 
     assertThat(result).isFalse();
+  }
+
+  @Test
+  void compareAndSetDelegatesToEntryProcessor() {
+    byte[] value = "updated".getBytes(StandardCharsets.UTF_8);
+    when(map.<CasResult>executeOnKey(anyString(), any())).thenReturn(CasResult.COMMITTED);
+
+    CasResult result =
+        spi.compareAndSet("test-key", "token-1", value, "token-2", Duration.ofSeconds(60));
+
+    assertThat(result).isEqualTo(CasResult.COMMITTED);
+    verify(map).executeOnKey(eq("test-key"), any(CompareAndSetProcessor.class));
   }
 
   @Test

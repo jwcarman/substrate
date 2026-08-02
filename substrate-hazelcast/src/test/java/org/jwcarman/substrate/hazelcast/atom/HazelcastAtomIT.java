@@ -17,6 +17,7 @@ package org.jwcarman.substrate.hazelcast.atom;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
+import static org.assertj.core.api.Assertions.within;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -28,6 +29,7 @@ import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
+import org.jwcarman.substrate.core.atom.CasResult;
 import org.jwcarman.substrate.core.atom.RawAtom;
 import org.jwcarman.substrate.hazelcast.AbstractHazelcastIT;
 
@@ -236,5 +238,97 @@ class HazelcastAtomIT extends AbstractHazelcastIT {
         .pollDelay(Duration.ofSeconds(3))
         .atMost(Duration.ofSeconds(5))
         .untilAsserted(() -> assertThat(spi.read(key)).isPresent());
+  }
+
+  @Test
+  void compareAndSetCommitsWhenTokenMatches() {
+    String key = spi.atomKey("cas-match-" + System.nanoTime());
+    spi.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofMinutes(5));
+
+    CasResult result =
+        spi.compareAndSet(
+            key, "tok-1", "v2".getBytes(StandardCharsets.UTF_8), "tok-2", Duration.ofMinutes(5));
+
+    assertThat(result).isEqualTo(CasResult.COMMITTED);
+    assertThat(spi.read(key)).hasValueSatisfying(raw -> assertThat(raw.token()).isEqualTo("tok-2"));
+  }
+
+  @Test
+  void compareAndSetReportsMismatchAndLeavesValueUntouched() {
+    String key = spi.atomKey("cas-mismatch-" + System.nanoTime());
+    spi.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofMinutes(5));
+
+    CasResult result =
+        spi.compareAndSet(
+            key, "stale", "v2".getBytes(StandardCharsets.UTF_8), "tok-2", Duration.ofMinutes(5));
+
+    assertThat(result).isEqualTo(CasResult.TOKEN_MISMATCH);
+    assertThat(spi.read(key))
+        .hasValueSatisfying(
+            raw -> {
+              assertThat(raw.value()).isEqualTo("v1".getBytes(StandardCharsets.UTF_8));
+              assertThat(raw.token()).isEqualTo("tok-1");
+            });
+  }
+
+  @Test
+  void compareAndSetReportsAbsentForDeletedAtom() {
+    String key = spi.atomKey("cas-deleted-" + System.nanoTime());
+    spi.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofMinutes(5));
+    spi.delete(key);
+
+    assertThat(
+            spi.compareAndSet(
+                key,
+                "tok-1",
+                "v2".getBytes(StandardCharsets.UTF_8),
+                "tok-2",
+                Duration.ofMinutes(5)))
+        .isEqualTo(CasResult.ABSENT);
+  }
+
+  @Test
+  void compareAndSetReportsAbsentForNeverCreatedAtom() {
+    String key = spi.atomKey("cas-missing-" + System.nanoTime());
+
+    assertThat(
+            spi.compareAndSet(
+                key,
+                "tok-1",
+                "v2".getBytes(StandardCharsets.UTF_8),
+                "tok-2",
+                Duration.ofMinutes(5)))
+        .isEqualTo(CasResult.ABSENT);
+  }
+
+  @Test
+  void setNeverLeavesTheAtomWithoutAnExpiration() {
+    String mapName = "substrate-atoms-ttl-" + System.nanoTime();
+    HazelcastAtomSpi ttlSpi = new HazelcastAtomSpi(hazelcast, "substrate:atom:", mapName);
+    String key = ttlSpi.atomKey("ttl-guard");
+
+    ttlSpi.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofMinutes(5));
+    ttlSpi.set(key, "v2".getBytes(StandardCharsets.UTF_8), "tok-2", Duration.ofMinutes(5));
+
+    long expiration =
+        hazelcast.<String, AtomEntry>getMap(mapName).getEntryView(key).getExpirationTime();
+    assertThat(expiration).isLessThan(Long.MAX_VALUE);
+    assertThat(expiration)
+        .isCloseTo(System.currentTimeMillis() + Duration.ofMinutes(5).toMillis(), within(30_000L));
+  }
+
+  @Test
+  void compareAndSetNeverLeavesTheAtomWithoutAnExpiration() {
+    String mapName = "substrate-atoms-ttl-cas-" + System.nanoTime();
+    HazelcastAtomSpi ttlSpi = new HazelcastAtomSpi(hazelcast, "substrate:atom:", mapName);
+    String key = ttlSpi.atomKey("ttl-guard-cas");
+
+    ttlSpi.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofMinutes(5));
+    ttlSpi.compareAndSet(
+        key, "tok-1", "v2".getBytes(StandardCharsets.UTF_8), "tok-2", Duration.ofMinutes(5));
+
+    long expiration =
+        hazelcast.<String, AtomEntry>getMap(mapName).getEntryView(key).getExpirationTime();
+    assertThat(expiration).isLessThan(Long.MAX_VALUE);
   }
 }

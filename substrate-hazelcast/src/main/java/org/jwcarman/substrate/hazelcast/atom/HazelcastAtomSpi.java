@@ -25,10 +25,25 @@ import org.jwcarman.substrate.core.atom.AbstractAtomSpi;
 import org.jwcarman.substrate.core.atom.CasResult;
 import org.jwcarman.substrate.core.atom.RawAtom;
 
+/**
+ * Atom storage backed by a Hazelcast {@code IMap}.
+ *
+ * <p><strong>Deployment note:</strong> {@link SetProcessor} and {@link CompareAndSetProcessor} run
+ * on cluster members, so this module's classes must be present on every member's classpath. That is
+ * automatic for embedded Hazelcast. Deployments that reach a remote cluster through a Hazelcast
+ * client must either place the substrate jar on the members or enable user-code deployment.
+ */
 public class HazelcastAtomSpi extends AbstractAtomSpi {
 
   private final IMap<String, AtomEntry> map;
 
+  /**
+   * Creates an atom SPI backed by the named map on the given Hazelcast instance.
+   *
+   * @param hazelcastInstance the Hazelcast instance holding the map
+   * @param prefix the key prefix applied to atom names
+   * @param mapName the name of the backing {@code IMap}
+   */
   public HazelcastAtomSpi(HazelcastInstance hazelcastInstance, String prefix, String mapName) {
     super(prefix);
     this.map = hazelcastInstance.getMap(mapName);
@@ -54,18 +69,15 @@ public class HazelcastAtomSpi extends AbstractAtomSpi {
 
   @Override
   public boolean set(String key, byte[] value, String token, Duration ttl) {
-    AtomEntry previous = map.replace(key, new AtomEntry(value, token));
-    if (previous == null) {
-      return false;
-    }
-    map.setTtl(key, ttl.toMillis(), TimeUnit.MILLISECONDS);
-    return true;
+    return Boolean.TRUE.equals(
+        map.executeOnKey(key, new SetProcessor(value, token, ttl.toMillis())));
   }
 
   @Override
   public CasResult compareAndSet(
       String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
-    throw new UnsupportedOperationException("compareAndSet not yet implemented");
+    return map.executeOnKey(
+        key, new CompareAndSetProcessor(expectedToken, value, newToken, ttl.toMillis()));
   }
 
   @Override
