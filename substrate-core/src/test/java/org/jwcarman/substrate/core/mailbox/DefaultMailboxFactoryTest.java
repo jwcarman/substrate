@@ -172,16 +172,6 @@ class DefaultMailboxFactoryTest {
         .hasMessageContaining("must be positive");
   }
 
-  private DefaultMailboxFactory boundedFactory() {
-    return new DefaultMailboxFactory(
-        mock(MailboxSpi.class),
-        codecFactory,
-        PayloadTransformer.IDENTITY,
-        newNotifier(),
-        Duration.ofMinutes(30),
-        coordinator);
-  }
-
   @Test
   void connectWithTypeRefReturnsBoundMailbox() {
     MailboxSpi spi = mock(MailboxSpi.class);
@@ -231,6 +221,16 @@ class DefaultMailboxFactoryTest {
     NextResult<String> result = sub.next(Duration.ofSeconds(5));
     assertThat(result).isInstanceOf(NextResult.Value.class);
     assertThat(((NextResult.Value<String>) result).value()).isEqualTo("hello");
+  }
+
+  private DefaultMailboxFactory boundedFactory() {
+    return new DefaultMailboxFactory(
+        mock(MailboxSpi.class),
+        codecFactory,
+        PayloadTransformer.IDENTITY,
+        newNotifier(),
+        Duration.ofMinutes(30),
+        coordinator);
   }
 
   private static Notifier newNotifier() {
