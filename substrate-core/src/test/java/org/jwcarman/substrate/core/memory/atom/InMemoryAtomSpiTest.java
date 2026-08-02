@@ -328,12 +328,16 @@ class InMemoryAtomSpiTest {
   }
 
   @Test
-  void compareAndSetResetsTtl() {
+  void compareAndSetResetsTtl() throws InterruptedException {
     String key = spi.atomKey("cas-ttl");
     spi.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofMillis(100));
 
     spi.compareAndSet(
         key, "tok-1", "v2".getBytes(StandardCharsets.UTF_8), "tok-2", Duration.ofMinutes(5));
+
+    // Wait past the ORIGINAL 100ms TTL: without this the assertion below cannot fail, because
+    // the atom would still be alive on its create-time lease even if the commit ignored the TTL.
+    Thread.sleep(250);
 
     assertThat(spi.exists(key)).isTrue();
   }
