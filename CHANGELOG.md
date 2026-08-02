@@ -10,6 +10,14 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+### Added
+
+- `Atom.compareAndSet(Snapshot<T>, T, Duration)` — a conditional write that
+  commits only when the atom's token still matches the given snapshot. Returns
+  `false` when another writer won the race and throws `AtomExpiredException`
+  when the atom is gone, so retry loops cannot spin against a dead atom.
+- `AtomSpi.compareAndSet(...)` and `CasResult` for backend implementors.
+
 ### Changed
 
 - `substrate-postgresql`: default `substrate.postgresql.notifier.poll-timeout`
@@ -31,6 +39,39 @@ occur between minor versions. The 1.0.0 release will mark API stability.
   reported `false` for up to a full poll timeout after `start()`. It now flips
   as soon as the `LISTEN` statement succeeds, which is when the listener is
   genuinely subscribed.
+- `substrate-hazelcast`: `set()` left the atom with no expiration between its
+  `IMap.replace` and `setTtl` calls, because `replace` discards the entry's
+  per-entry TTL. An interruption in that window produced an atom that never
+  expired and was never swept. Both `set` and `compareAndSet` now apply value
+  and TTL in one `EntryProcessor`.
+- `substrate-redis`: `touch(...)` passed a raw `ttl.toSeconds()` to Redis
+  `EXPIRE`. For any TTL under one second that evaluates to `0`, and Redis
+  `EXPIRE key 0` deletes the key immediately and replies `1` — so `touch`
+  destroyed the atom while returning `true`, directly contradicting
+  `Atom.touch`'s documented contract ("true if the lease was successfully
+  extended, false if the atom is already dead"). It is reachable from the
+  public API because TTL is validated only against an upper bound. All Redis
+  TTL paths now share a one-second floor.
+
+### Breaking changes
+
+- The `Snapshot` token is now a per-write random nonce rather than a hash of
+  the value. As a result, `set()` with an unchanged value now moves the token
+  and notifies subscribers, where previously it was silently invisible.
+- `AtomSpi` gained an abstract `compareAndSet` method. Third-party `AtomSpi`
+  implementations must implement it.
+- `substrate-redis` changed its Atom storage format from a single packed
+  Base64 string to a hash with separate `token` and `value` fields. Atoms are
+  ephemeral leased state, so no migration path is provided — existing atoms
+  should be allowed to expire, or the keys flushed. Atoms left in a running
+  Redis in the old format now cause reads to fail with a `WRONGTYPE` error
+  rather than being silently ignored, because `HGETALL` against a leftover
+  string key errors. Flush the old keys, or let them expire, before
+  upgrading.
+- `substrate-hazelcast` now runs `EntryProcessor`s on cluster members, so this
+  module's classes must be on every member's classpath. This is automatic for
+  embedded Hazelcast; client-server deployments need the substrate jar on the
+  members or user-code deployment enabled.
 
 ## [0.7.0] - 2026-04-16
 

@@ -149,6 +149,23 @@ try (BlockingSubscription<Snapshot<Session>> resumed = session.subscribe(lastSee
 Atom<Session> existing = atomFactory.connect("session:abc", Session.class);
 ```
 
+Writes are last-write-wins by default. For read-modify-write workflows, use
+`compareAndSet`, which commits only if nobody else has written since your
+snapshot:
+
+```java
+Snapshot<Session> current = session.get();
+Session updated = current.value().withHitCount(current.value().hitCount() + 1);
+
+while (!session.compareAndSet(current, updated, Duration.ofHours(1))) {
+    current = session.get();
+    updated = current.value().withHitCount(current.value().hitCount() + 1);
+}
+```
+
+A `false` return means another writer won — re-read and retry. An
+`AtomExpiredException` means the atom is gone and retrying cannot help.
+
 ### Journal -- ordered, append-only, replayable stream
 
 ```java
@@ -412,7 +429,7 @@ library and uses the same anonymous-subclass trick as Jackson's
 |---|---|
 | `AtomAlreadyExistsException` | `AtomFactory.create(name, ...)` is called and an atom with that name already exists and is still alive. |
 | `AtomNotFoundException` | First operation on an `AtomFactory.connect(...)`-sourced handle finds no atom exists at that name. Signals an identity-time "wrong name" mismatch, distinct from expiry. |
-| `AtomExpiredException` | `set` / `get` / `touch` is called on an atom whose lease has elapsed or which has been deleted. |
+| `AtomExpiredException` | `set` / `compareAndSet` / `get` / `touch` is called on an atom whose lease has elapsed or which has been deleted. |
 | `JournalAlreadyExistsException` | `JournalFactory.create(name, ...)` is called and a journal with that name already exists and is still active. |
 | `JournalNotFoundException` | First operation on a `JournalFactory.connect(...)`-sourced handle finds no journal exists at that name. |
 | `JournalCompletedException` | `append()` is called on a journal that has been completed via `complete()`. |

@@ -18,12 +18,14 @@ package org.jwcarman.substrate.atom;
 /**
  * A point-in-time view of an {@link Atom}'s value, paired with an opaque staleness token.
  *
- * <p>The {@link #token()} is an opaque marker used by the subscription mechanism to detect whether
- * the atom has changed since a known state. Tokens should be compared only via {@link
- * Object#equals(Object)}; their internal format is an implementation detail of the backend.
+ * <p>The {@link #token()} is an opaque marker identifying the write that produced this value. Every
+ * write generates a fresh token, so a token identifies a write rather than a value: setting the
+ * same value twice yields two different tokens. Tokens should be compared only via {@link
+ * Object#equals(Object)}; their internal format is an implementation detail.
  *
  * <p>Pass a {@code Snapshot} to {@link Atom#subscribe(Snapshot)} to receive notifications only for
- * changes that occur after the state this snapshot represents.
+ * changes after the state it represents, or to {@link Atom#compareAndSet} to make a write
+ * conditional on nothing having changed since.
  *
  * @param value the atom's value at the time this snapshot was taken
  * @param token an opaque staleness token associated with this snapshot
