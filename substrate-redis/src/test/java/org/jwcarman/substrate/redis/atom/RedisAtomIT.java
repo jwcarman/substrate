@@ -134,6 +134,18 @@ class RedisAtomIT {
   }
 
   @Test
+  void touchWithSubSecondTtlKeepsAtomAlive() {
+    String key = atom.atomKey("touch-sub-second");
+    atom.create(key, "data".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofMinutes(5));
+
+    boolean result = atom.touch(key, Duration.ofMillis(500));
+
+    assertThat(result).isTrue();
+    assertThat(atom.exists(key)).isTrue();
+    assertThat(atom.read(key)).isPresent();
+  }
+
+  @Test
   void touchReturnsFalseForMissingKey() {
     String key = atom.atomKey("touch-missing");
 

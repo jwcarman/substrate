@@ -81,7 +81,7 @@ public class RedisAtomSpi extends AbstractAtomSpi {
             new String[] {key},
             token,
             encode(value),
-            seconds(ttl));
+            Long.toString(seconds(ttl)));
     if (result == null || result == 0L) {
       throw new AtomAlreadyExistsException(key);
     }
@@ -105,7 +105,7 @@ public class RedisAtomSpi extends AbstractAtomSpi {
             new String[] {key},
             token,
             encode(value),
-            seconds(ttl));
+            Long.toString(seconds(ttl)));
     return result != null && result == 1L;
   }
 
@@ -120,7 +120,7 @@ public class RedisAtomSpi extends AbstractAtomSpi {
             expectedToken,
             newToken,
             encode(value),
-            seconds(ttl));
+            Long.toString(seconds(ttl)));
     if (result == null) {
       return CasResult.ABSENT;
     }
@@ -133,7 +133,7 @@ public class RedisAtomSpi extends AbstractAtomSpi {
 
   @Override
   public boolean touch(String key, Duration ttl) {
-    return commands.expire(key, ttl.toSeconds(), ExpireArgs.Builder.xx());
+    return commands.expire(key, seconds(ttl), ExpireArgs.Builder.xx());
   }
 
   @Override
@@ -154,7 +154,12 @@ public class RedisAtomSpi extends AbstractAtomSpi {
     return Base64.getDecoder().decode(encoded.getBytes(StandardCharsets.UTF_8));
   }
 
-  private static String seconds(Duration ttl) {
-    return Long.toString(Math.max(1L, ttl.toSeconds()));
+  /**
+   * Floors a TTL at one second. Redis expiration has one-second granularity, and {@code EXPIRE key
+   * 0} deletes the key outright rather than granting a short lease, so any sub-second TTL must be
+   * rounded up to keep the atom alive.
+   */
+  private static long seconds(Duration ttl) {
+    return Math.max(1L, ttl.toSeconds());
   }
 }
