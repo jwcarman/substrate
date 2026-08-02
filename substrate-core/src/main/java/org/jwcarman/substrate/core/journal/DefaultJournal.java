@@ -30,6 +30,7 @@ import org.jwcarman.substrate.core.subscription.CallbackPumpSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultBlockingSubscription;
 import org.jwcarman.substrate.core.subscription.DefaultSubscriberBuilder;
 import org.jwcarman.substrate.core.subscription.FeederSupport;
+import org.jwcarman.substrate.core.ttl.TtlBounds;
 import org.jwcarman.substrate.journal.Journal;
 import org.jwcarman.substrate.journal.JournalEntry;
 import org.jwcarman.substrate.journal.JournalExpiredException;
@@ -58,13 +59,8 @@ public class DefaultJournal<T> implements Journal<T> {
   @Override
   public String append(T data, Duration ttl) {
     ensureExists();
-    if (ttl.compareTo(context.limits().maxEntryTtl()) > 0) {
-      throw new IllegalArgumentException(
-          "Journal entry TTL "
-              + ttl
-              + " exceeds configured maximum "
-              + context.limits().maxEntryTtl());
-    }
+    // Upper bound only: Duration.ZERO is a supported entry TTL meaning "no TTL" — see TtlBounds.
+    TtlBounds.requireAtMost("Journal entry TTL", ttl, context.limits().maxEntryTtl());
     byte[] bytes = codec.encode(data);
     String entryId = context.spi().append(key, context.transformer().encode(bytes), ttl);
     context.notifier().notifyJournalChanged(key);
@@ -74,13 +70,10 @@ public class DefaultJournal<T> implements Journal<T> {
   @Override
   public void complete(Duration retentionTtl) {
     ensureExists();
-    if (retentionTtl.compareTo(context.limits().maxRetentionTtl()) > 0) {
-      throw new IllegalArgumentException(
-          "Journal retention TTL "
-              + retentionTtl
-              + " exceeds configured maximum "
-              + context.limits().maxRetentionTtl());
-    }
+    // Upper bound only: Duration.ZERO is a supported retention TTL meaning "no TTL" — see
+    // TtlBounds.
+    TtlBounds.requireAtMost(
+        "Journal retention TTL", retentionTtl, context.limits().maxRetentionTtl());
     context.spi().complete(key, retentionTtl);
     context.notifier().notifyJournalCompleted(key);
   }

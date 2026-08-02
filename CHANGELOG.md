@@ -90,6 +90,19 @@ occur between minor versions. The 1.0.0 release will mark API stability.
   a zero TTL as *infinite*, producing an atom that never expired and was never
   swept; other backends read it as already expired or floored it at one
   second).
+- Mailbox TTLs and Journal inactivity TTLs must now be strictly positive.
+  `Duration.ZERO` and negative durations throw `IllegalArgumentException` from
+  `MailboxFactory.create` and `JournalFactory.create`, matching the rule already
+  applied to Atom TTLs. Previously these were validated against an upper bound
+  only and passed straight to the backend, which interpreted them
+  inconsistently — a zero mailbox TTL produced a mailbox that never expires on
+  Hazelcast and DynamoDB, one that is already expired on the in-memory,
+  PostgreSQL and MongoDB backends, and a Redis `EXPIRE`/`SET EX 0` error.
+  Journal *entry* TTLs (`Journal.append`) and *retention* TTLs
+  (`Journal.complete`) are deliberately unchanged: those are per-record
+  retention hints, not leases, and `Duration.ZERO` has an established meaning
+  there — "store without a TTL" — which the Cassandra, Redis, MongoDB, DynamoDB
+  and Hazelcast journal SPIs all implement explicitly.
 - `substrate-redis` changed its Atom storage format from a single packed
   Base64 string to a hash with separate `token` and `value` fields. Atoms are
   ephemeral leased state, so no migration path is provided — existing atoms

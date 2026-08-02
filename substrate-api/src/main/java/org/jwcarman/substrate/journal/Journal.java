@@ -78,12 +78,17 @@ public interface Journal<T> {
    *
    * <p>Each successful append resets the journal's inactivity timer.
    *
+   * <p>The entry TTL is a per-record retention hint rather than a lease, so {@code Duration.ZERO}
+   * is legal and means "store this entry without a TTL". Backends that manage retention at the
+   * stream level rather than per entry ignore the value entirely.
+   *
    * @param data the entry payload
-   * @param ttl time-to-live for this individual entry
+   * @param ttl time-to-live for this individual entry, or {@code Duration.ZERO} for no TTL
    * @return the generated entry ID, monotonically ordered with respect to other entries in this
    *     journal
    * @throws JournalCompletedException if this journal has already been completed
    * @throws JournalExpiredException if this journal has expired or been deleted
+   * @throws IllegalArgumentException if {@code ttl} exceeds the maximum allowed entry TTL
    */
   String append(T data, Duration ttl);
 
@@ -94,7 +99,13 @@ public interface Journal<T> {
    * subscriptions remain readable until the retention period elapses, at which point the journal
    * expires fully.
    *
-   * @param retentionTtl how long the journal remains readable after completion
+   * <p>Like the entry TTL, the retention TTL is a retention hint rather than a lease: {@code
+   * Duration.ZERO} is legal and means "retain without a TTL".
+   *
+   * @param retentionTtl how long the journal remains readable after completion, or {@code
+   *     Duration.ZERO} for no TTL
+   * @throws IllegalArgumentException if {@code retentionTtl} exceeds the maximum allowed retention
+   *     TTL
    */
   void complete(Duration retentionTtl);
 

@@ -52,8 +52,10 @@ public interface MailboxFactory {
    * @param <T> the mailbox value type
    * @param name the logical name for the mailbox
    * @param type the value type class
-   * @param ttl how long the mailbox lives before expiring automatically
+   * @param ttl how long the mailbox lives before expiring automatically; must be strictly positive
    * @return a newly provisioned mailbox
+   * @throws IllegalArgumentException if {@code ttl} is zero or negative, or exceeds the maximum
+   *     allowed duration
    */
   <T> Mailbox<T> create(String name, Class<T> type, Duration ttl);
 
@@ -67,8 +69,10 @@ public interface MailboxFactory {
    * @param <T> the mailbox value type
    * @param name the logical name for the mailbox
    * @param typeRef a type reference capturing the generic value type
-   * @param ttl how long the mailbox lives before expiring automatically
+   * @param ttl how long the mailbox lives before expiring automatically; must be strictly positive
    * @return a newly provisioned mailbox
+   * @throws IllegalArgumentException if {@code ttl} is zero or negative, or exceeds the maximum
+   *     allowed duration
    */
   <T> Mailbox<T> create(String name, TypeRef<T> typeRef, Duration ttl);
 

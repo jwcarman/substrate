@@ -21,6 +21,7 @@ import org.jwcarman.codec.spi.TypeRef;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.core.transform.PayloadTransformer;
+import org.jwcarman.substrate.core.ttl.TtlBounds;
 import org.jwcarman.substrate.journal.Journal;
 import org.jwcarman.substrate.journal.JournalFactory;
 
@@ -70,12 +71,7 @@ public class DefaultJournalFactory implements JournalFactory {
   }
 
   private void validateInactivityTtl(Duration inactivityTtl) {
-    if (inactivityTtl.compareTo(context.limits().maxInactivityTtl()) > 0) {
-      throw new IllegalArgumentException(
-          "Journal inactivity TTL "
-              + inactivityTtl
-              + " exceeds configured maximum "
-              + context.limits().maxInactivityTtl());
-    }
+    TtlBounds.requirePositiveAtMost(
+        "Journal inactivity TTL", inactivityTtl, context.limits().maxInactivityTtl());
   }
 }

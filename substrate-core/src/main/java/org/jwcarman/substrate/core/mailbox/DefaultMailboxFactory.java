@@ -21,6 +21,7 @@ import org.jwcarman.codec.spi.TypeRef;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.core.transform.PayloadTransformer;
+import org.jwcarman.substrate.core.ttl.TtlBounds;
 import org.jwcarman.substrate.mailbox.Mailbox;
 import org.jwcarman.substrate.mailbox.MailboxFactory;
 
@@ -71,9 +72,6 @@ public class DefaultMailboxFactory implements MailboxFactory {
   }
 
   private void validateTtl(Duration ttl) {
-    if (ttl.compareTo(maxTtl) > 0) {
-      throw new IllegalArgumentException(
-          "Mailbox TTL " + ttl + " exceeds configured maximum " + maxTtl);
-    }
+    TtlBounds.requirePositiveAtMost("Mailbox TTL", ttl, maxTtl);
   }
 }

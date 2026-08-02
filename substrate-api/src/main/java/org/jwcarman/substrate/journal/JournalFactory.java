@@ -54,9 +54,12 @@ public interface JournalFactory {
    * @param <T> the entry payload type
    * @param name the unique name for the journal
    * @param type the payload class
-   * @param inactivityTtl how long the journal lives without appends before auto-expiring
+   * @param inactivityTtl how long the journal lives without appends before auto-expiring; must be
+   *     strictly positive
    * @return a new {@link Journal} instance
    * @throws JournalAlreadyExistsException if a journal with the given name already exists
+   * @throws IllegalArgumentException if {@code inactivityTtl} is zero or negative, or exceeds the
+   *     maximum allowed duration
    */
   <T> Journal<T> create(String name, Class<T> type, Duration inactivityTtl);
 
@@ -72,9 +75,12 @@ public interface JournalFactory {
    * @param <T> the entry payload type
    * @param name the unique name for the journal
    * @param typeRef a type reference capturing the full generic payload type
-   * @param inactivityTtl how long the journal lives without appends before auto-expiring
+   * @param inactivityTtl how long the journal lives without appends before auto-expiring; must be
+   *     strictly positive
    * @return a new {@link Journal} instance
    * @throws JournalAlreadyExistsException if a journal with the given name already exists
+   * @throws IllegalArgumentException if {@code inactivityTtl} is zero or negative, or exceeds the
+   *     maximum allowed duration
    */
   <T> Journal<T> create(String name, TypeRef<T> typeRef, Duration inactivityTtl);
 

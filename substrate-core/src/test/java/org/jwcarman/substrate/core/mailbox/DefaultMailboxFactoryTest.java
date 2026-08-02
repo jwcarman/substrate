@@ -20,7 +20,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
@@ -126,6 +130,56 @@ class DefaultMailboxFactoryTest {
     Duration excessiveTtl = Duration.ofHours(1);
     assertThatThrownBy(() -> factory.create("test", typeRef, excessiveTtl))
         .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void createWithClassThrowsWhenTtlIsZero() {
+    DefaultMailboxFactory factory = boundedFactory();
+
+    assertThatThrownBy(() -> factory.create("test", String.class, Duration.ZERO))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must be positive");
+  }
+
+  @Test
+  void createWithClassThrowsWhenTtlIsNegative() {
+    DefaultMailboxFactory factory = boundedFactory();
+    Duration negative = Duration.ofSeconds(-1);
+
+    assertThatThrownBy(() -> factory.create("test", String.class, negative))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must be positive");
+  }
+
+  @Test
+  void createWithTypeRefThrowsWhenTtlIsZero() {
+    DefaultMailboxFactory factory = boundedFactory();
+    TypeRef<String> typeRef = new TypeRef<>() {};
+
+    assertThatThrownBy(() -> factory.create("test", typeRef, Duration.ZERO))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must be positive");
+  }
+
+  @Test
+  void createWithTypeRefThrowsWhenTtlIsNegative() {
+    DefaultMailboxFactory factory = boundedFactory();
+    TypeRef<String> typeRef = new TypeRef<>() {};
+    Duration negative = Duration.ofSeconds(-1);
+
+    assertThatThrownBy(() -> factory.create("test", typeRef, negative))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must be positive");
+  }
+
+  private DefaultMailboxFactory boundedFactory() {
+    return new DefaultMailboxFactory(
+        mock(MailboxSpi.class),
+        codecFactory,
+        PayloadTransformer.IDENTITY,
+        newNotifier(),
+        Duration.ofMinutes(30),
+        coordinator);
   }
 
   @Test

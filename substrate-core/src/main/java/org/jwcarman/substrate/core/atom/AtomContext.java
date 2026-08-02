@@ -19,6 +19,7 @@ import java.time.Duration;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.core.transform.PayloadTransformer;
+import org.jwcarman.substrate.core.ttl.TtlBounds;
 
 /**
  * Shared infrastructure passed into every {@link DefaultAtom} instance produced by a {@link
@@ -43,22 +44,14 @@ public record AtomContext(
    * Validates a caller-supplied atom TTL against both bounds.
    *
    * <p>The lower bound is exclusive: a zero or negative TTL is rejected rather than passed down to
-   * the backend. Backends disagree violently about what a non-positive TTL means — Hazelcast's
-   * {@code IMap} reads {@code 0} as <em>infinite</em>, the in-memory, PostgreSQL, MongoDB and
-   * DynamoDB backends read it as <em>already expired</em>, and Redis, Cassandra and etcd floor it
-   * at one second. Rejecting it here makes every backend agree.
+   * the backend, because backends disagree violently about what a non-positive lease means. See
+   * {@link TtlBounds} for the details.
    *
    * @param ttl the requested time-to-live
    * @throws IllegalArgumentException if {@code ttl} is zero, negative, or greater than {@link
    *     #maxTtl()}
    */
   public void validateTtl(Duration ttl) {
-    if (ttl.isZero() || ttl.isNegative()) {
-      throw new IllegalArgumentException("Atom TTL " + ttl + " must be positive");
-    }
-    if (ttl.compareTo(maxTtl) > 0) {
-      throw new IllegalArgumentException(
-          "Atom TTL " + ttl + " exceeds configured maximum " + maxTtl);
-    }
+    TtlBounds.requirePositiveAtMost("Atom TTL", ttl, maxTtl);
   }
 }

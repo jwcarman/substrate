@@ -131,6 +131,38 @@ class DefaultJournalFactoryTest {
   }
 
   @Test
+  void createThrowsWhenInactivityTtlIsZero() {
+    assertThatThrownBy(() -> factory.create("test", String.class, Duration.ZERO))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must be positive");
+  }
+
+  @Test
+  void createThrowsWhenInactivityTtlIsNegative() {
+    Duration negative = Duration.ofSeconds(-1);
+    assertThatThrownBy(() -> factory.create("test", String.class, negative))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must be positive");
+  }
+
+  @Test
+  void createWithTypeRefThrowsWhenInactivityTtlIsZero() {
+    TypeRef<String> typeRef = new TypeRef<>() {};
+    assertThatThrownBy(() -> factory.create("test", typeRef, Duration.ZERO))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must be positive");
+  }
+
+  @Test
+  void createWithTypeRefThrowsWhenInactivityTtlIsNegative() {
+    TypeRef<String> typeRef = new TypeRef<>() {};
+    Duration negative = Duration.ofSeconds(-1);
+    assertThatThrownBy(() -> factory.create("test", typeRef, negative))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must be positive");
+  }
+
+  @Test
   void connectWithTypeRefReturnsLazyHandle() {
     TypeRef<String> typeRef = new TypeRef<>() {};
     lenient().when(codecFactory.create(typeRef)).thenReturn(stringCodec);
