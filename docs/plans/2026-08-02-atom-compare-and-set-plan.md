@@ -340,9 +340,11 @@ Append to `InMemoryAtomSpiTest.java` (match the existing imports; add `org.jwcar
       int n = i;
       pool.submit(() -> {
         latch.await();
+        // n + 1, not n: a new token of "tok-0" would equal the baseline every
+        // thread is racing against, letting a second thread win legitimately.
         if (spi.compareAndSet(
                 key, "tok-0", ("v" + n).getBytes(StandardCharsets.UTF_8),
-                "tok-" + n, Duration.ofMinutes(5))
+                "tok-" + (n + 1), Duration.ofMinutes(5))
             == CasResult.COMMITTED) {
           committed.incrementAndGet();
         }
