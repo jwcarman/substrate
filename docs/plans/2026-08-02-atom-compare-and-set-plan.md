@@ -896,6 +896,11 @@ Expected: FAIL — `UnsupportedOperationException`.
     if (row.getBoolean(APPLIED_COLUMN)) {
       return CasResult.COMMITTED;
     }
+    // An LWT against a nonexistent row returns ONLY the [applied] column -- no token
+    // column at all -- so getString(FIELD_TOKEN) throws rather than returning null.
+    if (!row.getColumnDefinitions().contains(FIELD_TOKEN)) {
+      return CasResult.ABSENT;
+    }
     return row.getString(FIELD_TOKEN) == null ? CasResult.ABSENT : CasResult.TOKEN_MISMATCH;
   }
 ```
