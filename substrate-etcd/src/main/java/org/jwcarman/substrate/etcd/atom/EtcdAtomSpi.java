@@ -106,7 +106,27 @@ public class EtcdAtomSpi extends AbstractAtomSpi {
   @Override
   public CasResult compareAndSet(
       String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
-    throw new UnsupportedOperationException("compareAndSet not yet implemented");
+    ByteSequence keyBs = bs(key);
+    KeyValue current = currentKv(keyBs);
+    if (current == null) {
+      return CasResult.ABSENT;
+    }
+    RawAtom raw = AtomPayload.decode(current.getValue().getBytes());
+    if (!raw.token().equals(expectedToken)) {
+      return CasResult.TOKEN_MISMATCH;
+    }
+    boolean applied =
+        leasedWrite(
+            new Cmp(keyBs, Cmp.Op.EQUAL, CmpTarget.modRevision(current.getModRevision())),
+            newLeaseId ->
+                Op.put(keyBs, bs(AtomPayload.encode(value, newToken)), withLease(newLeaseId)),
+            current.getLease(),
+            ttl,
+            "compare-and-set atom in etcd");
+    if (applied) {
+      return CasResult.COMMITTED;
+    }
+    return atomExists(keyBs) ? CasResult.TOKEN_MISMATCH : CasResult.ABSENT;
   }
 
   @Override
