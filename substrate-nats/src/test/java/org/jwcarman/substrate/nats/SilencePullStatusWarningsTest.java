@@ -17,37 +17,74 @@ package org.jwcarman.substrate.nats;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
 import io.nats.client.Connection;
 import io.nats.client.JetStreamSubscription;
 import io.nats.client.support.Status;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import org.slf4j.LoggerFactory;
 
+/**
+ * Verifies that {@link SilencePullStatusWarnings} drops the 404 "No Messages" pull status and
+ * forwards every other callback to its {@code ErrorListenerLoggerImpl} superclass.
+ *
+ * <p>Records are captured with a {@link java.util.logging} handler rather than a logback appender
+ * because {@code ErrorListenerLoggerImpl} logs through JUL directly. JUL records only reach logback
+ * once something installs {@code SLF4JBridgeHandler}, which Spring Boot does when a context boots —
+ * so a logback-based assertion here passes or fails purely on whether a Spring Boot test happened
+ * to run earlier in the same JVM. Attaching the handler to the JUL logger itself makes this test
+ * independent of that ordering.
+ */
 class SilencePullStatusWarningsTest {
+
+  private static final String NATS_LOGGER = "io.nats.client.impl.ErrorListenerLoggerImpl";
 
   private SilencePullStatusWarnings listener;
   private Logger natsLogger;
-  private ListAppender<ILoggingEvent> appender;
+  private Handler handler;
+  private Level previousLevel;
+  private List<LogRecord> records;
 
   @BeforeEach
   void setUp() {
     listener = new SilencePullStatusWarnings();
-    natsLogger = (Logger) LoggerFactory.getLogger("io.nats.client.impl.ErrorListenerLoggerImpl");
-    appender = new ListAppender<>();
-    appender.start();
-    natsLogger.addAppender(appender);
+    records = new CopyOnWriteArrayList<>();
+    natsLogger = Logger.getLogger(NATS_LOGGER);
+    previousLevel = natsLogger.getLevel();
+    // Pin the level: when logback's LevelChangePropagator is active it may have raised this
+    // logger above WARNING, which would suppress the very records under assertion.
+    natsLogger.setLevel(Level.ALL);
+    handler =
+        new Handler() {
+          @Override
+          public void publish(LogRecord record) {
+            records.add(record);
+          }
+
+          @Override
+          public void flush() {
+            // nothing is buffered
+          }
+
+          @Override
+          public void close() {
+            // nothing to release
+          }
+        };
+    natsLogger.addHandler(handler);
   }
 
   @AfterEach
   void tearDown() {
-    natsLogger.detachAppender(appender);
+    natsLogger.removeHandler(handler);
+    natsLogger.setLevel(previousLevel);
   }
 
   @Test
@@ -58,7 +95,7 @@ class SilencePullStatusWarningsTest {
 
     listener.pullStatusWarning(conn, sub, status);
 
-    assertThat(appender.list).isEmpty();
+    assertThat(records).isEmpty();
   }
 
   @Test
@@ -69,13 +106,13 @@ class SilencePullStatusWarningsTest {
 
     listener.pullStatusWarning(conn, sub, status);
 
-    assertThat(appender.list)
+    assertThat(records)
         .hasSize(1)
         .first()
         .satisfies(
-            event -> {
-              assertThat(event.getLevel()).isEqualTo(Level.WARN);
-              assertThat(event.getFormattedMessage()).contains("409");
+            record -> {
+              assertThat(record.getLevel()).isEqualTo(Level.WARNING);
+              assertThat(record.getMessage()).contains("409");
             });
   }
 
@@ -86,6 +123,6 @@ class SilencePullStatusWarningsTest {
 
     listener.pullStatusWarning(conn, sub, null);
 
-    assertThat(appender.list).hasSize(1);
+    assertThat(records).hasSize(1);
   }
 }
