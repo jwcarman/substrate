@@ -97,8 +97,8 @@ Atom<Session> session = atomFactory.create(
 session.set(new Session("user-42", "updated"), Duration.ofHours(1));
 
 // Synchronously read the current value. Returns a Snapshot<T> containing
-// the current value plus a staleness token (a SHA-256 fingerprint the SPI
-// uses to detect changes). This is the fast path for "what is the current
+// the current value plus a staleness token (a nonce identifying the write
+// that produced it). This is the fast path for "what is the current
 // value right now?" — no subscription, no polling.
 Snapshot<Session> snap = session.get();
 Session current = snap.value();
@@ -330,19 +330,22 @@ being completed.
 public record Snapshot<T>(T value, String token) {}
 ```
 
-The `token` is a SHA-256 fingerprint of the encoded value bytes. The SPI
-uses it for two things:
+The `token` identifies the write that produced `value`, not the value
+itself. Every write generates a fresh token, so setting the same value
+twice yields two different tokens. The SPI uses it for two things:
 
 1. **Change detection** — coalescing subscriptions skip deliveries when
-   the new token matches the last-delivered token. Two consecutive
-   `set()` calls with the same value never wake the subscriber.
+   the new token matches the last-delivered token. Since every write
+   moves the token, two consecutive `set()` calls — even with the same
+   value — now wake the subscriber.
 2. **Resume from a known state** — `subscribe(Snapshot<T> lastSeen)` only
    delivers values whose token differs from `lastSeen.token()`. Useful
    for reconnect-after-blip and for skipping the initial state when the
    caller already has it locally.
 
-You don't usually inspect the token directly — just hand a snapshot back
-to `subscribe(...)` to resume.
+You don't usually construct a token yourself — just hand a snapshot back
+to `subscribe(...)` to resume, or to `compareAndSet(...)` to make a write
+conditional on nothing having changed since.
 
 ### `JournalEntry<T>`
 
