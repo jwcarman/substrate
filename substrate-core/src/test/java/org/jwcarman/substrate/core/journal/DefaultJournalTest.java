@@ -148,6 +148,20 @@ class DefaultJournalTest {
   }
 
   @Test
+  void appendThrowsWhenEntryTtlIsNegative() {
+    Duration negativeEntryTtl = Duration.ofSeconds(-1);
+    assertThrows(IllegalArgumentException.class, () -> journal.append("data", negativeEntryTtl));
+    verifyNoInteractions(spi);
+  }
+
+  @Test
+  void appendAcceptsZeroEntryTtlAsNoTtl() {
+    when(spi.append(KEY, "data".getBytes(UTF_8), Duration.ZERO)).thenReturn("entry-3");
+
+    assertEquals("entry-3", journal.append("data", Duration.ZERO));
+  }
+
+  @Test
   void completeDelegatesToSpiWithBoundKey() {
     Duration retentionTtl = Duration.ofDays(1);
     journal.complete(retentionTtl);
@@ -160,6 +174,20 @@ class DefaultJournalTest {
   void completeThrowsWhenRetentionTtlExceedsMax() {
     Duration excessiveRetentionTtl = Duration.ofDays(60);
     assertThrows(IllegalArgumentException.class, () -> journal.complete(excessiveRetentionTtl));
+  }
+
+  @Test
+  void completeThrowsWhenRetentionTtlIsNegative() {
+    Duration negativeRetentionTtl = Duration.ofSeconds(-1);
+    assertThrows(IllegalArgumentException.class, () -> journal.complete(negativeRetentionTtl));
+    verifyNoInteractions(spi);
+  }
+
+  @Test
+  void completeAcceptsZeroRetentionTtlAsNoTtl() {
+    journal.complete(Duration.ZERO);
+
+    verify(spi).complete(KEY, Duration.ZERO);
   }
 
   @Test

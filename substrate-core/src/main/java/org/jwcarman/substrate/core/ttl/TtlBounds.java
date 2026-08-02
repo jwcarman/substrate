@@ -57,15 +57,25 @@ public final class TtlBounds {
   }
 
   /**
-   * Validates a TTL against its upper bound only, leaving {@code Duration.ZERO} legal.
+   * Validates a TTL against its upper bound, leaving {@code Duration.ZERO} legal but rejecting
+   * negative durations.
+   *
+   * <p>A negative TTL has no meaning on any backend and none implements one deliberately — it is
+   * instead destructive. Redis reads a non-positive {@code EXPIRE} as "delete this key", so a
+   * negative entry TTL would wipe out the whole stream including every previously appended entry;
+   * Cassandra rejects {@code USING TTL -1} with a query error, and MongoDB sweeps the document
+   * immediately.
    *
    * @param label the human-readable parameter name used in the exception message, e.g. {@code
    *     "Journal entry TTL"}
    * @param ttl the requested time-to-live
    * @param maxTtl the configured upper bound
-   * @throws IllegalArgumentException if {@code ttl} is greater than {@code maxTtl}
+   * @throws IllegalArgumentException if {@code ttl} is negative or greater than {@code maxTtl}
    */
   public static void requireAtMost(String label, Duration ttl, Duration maxTtl) {
+    if (ttl.isNegative()) {
+      throw new IllegalArgumentException(label + " " + ttl + " must not be negative");
+    }
     if (ttl.compareTo(maxTtl) > 0) {
       throw new IllegalArgumentException(
           label + " " + ttl + " exceeds configured maximum " + maxTtl);

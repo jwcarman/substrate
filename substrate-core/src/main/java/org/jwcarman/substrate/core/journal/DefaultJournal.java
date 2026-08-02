@@ -59,7 +59,8 @@ public class DefaultJournal<T> implements Journal<T> {
   @Override
   public String append(T data, Duration ttl) {
     ensureExists();
-    // Upper bound only: Duration.ZERO is a supported entry TTL meaning "no TTL" — see TtlBounds.
+    // Duration.ZERO is a supported entry TTL meaning "no TTL"; negatives are rejected because they
+    // are destructive on several backends — see TtlBounds.
     TtlBounds.requireAtMost("Journal entry TTL", ttl, context.limits().maxEntryTtl());
     byte[] bytes = codec.encode(data);
     String entryId = context.spi().append(key, context.transformer().encode(bytes), ttl);
@@ -70,8 +71,8 @@ public class DefaultJournal<T> implements Journal<T> {
   @Override
   public void complete(Duration retentionTtl) {
     ensureExists();
-    // Upper bound only: Duration.ZERO is a supported retention TTL meaning "no TTL" — see
-    // TtlBounds.
+    // Duration.ZERO is a supported retention TTL meaning "no TTL"; negatives are rejected because
+    // they are destructive on several backends — see TtlBounds.
     TtlBounds.requireAtMost(
         "Journal retention TTL", retentionTtl, context.limits().maxRetentionTtl());
     context.spi().complete(key, retentionTtl);

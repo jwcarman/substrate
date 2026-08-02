@@ -88,7 +88,8 @@ public interface Journal<T> {
    *     journal
    * @throws JournalCompletedException if this journal has already been completed
    * @throws JournalExpiredException if this journal has expired or been deleted
-   * @throws IllegalArgumentException if {@code ttl} exceeds the maximum allowed entry TTL
+   * @throws IllegalArgumentException if {@code ttl} is negative or exceeds the maximum allowed
+   *     entry TTL
    */
   String append(T data, Duration ttl);
 
@@ -104,8 +105,8 @@ public interface Journal<T> {
    *
    * @param retentionTtl how long the journal remains readable after completion, or {@code
    *     Duration.ZERO} for no TTL
-   * @throws IllegalArgumentException if {@code retentionTtl} exceeds the maximum allowed retention
-   *     TTL
+   * @throws IllegalArgumentException if {@code retentionTtl} is negative or exceeds the maximum
+   *     allowed retention TTL
    */
   void complete(Duration retentionTtl);
 

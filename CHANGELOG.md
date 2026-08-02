@@ -34,6 +34,17 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ### Fixed
 
+- `Journal.append(T, Duration)` and `Journal.complete(Duration)` now reject a
+  negative TTL with `IllegalArgumentException`. These parameters were validated
+  against an upper bound only, so a negative duration reached the backend, where
+  it is destructive rather than merely meaningless: Redis implements a
+  non-positive `EXPIRE` as *delete the key*, so
+  `append(data, Duration.ofSeconds(-1))` wiped out the entire stream — every
+  previously appended entry included — after which `exists()` returned false and
+  subsequent operations threw `JournalNotFoundException`. Cassandra rejected the
+  same input with an `InvalidQueryException` (`USING TTL -1`) and MongoDB swept
+  the document immediately. `Duration.ZERO` remains legal on both methods and
+  still means "store without a TTL".
 - `substrate-postgresql`: `PostgresNotifierSpi.isListening()` only became true
   after the first `getNotifications` call returned, so on a quiet channel it
   reported `false` for up to a full poll timeout after `start()`. It now flips
