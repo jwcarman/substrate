@@ -79,7 +79,28 @@ public class PostgresAtomSpi extends AbstractAtomSpi {
   @Override
   public CasResult compareAndSet(
       String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
-    throw new UnsupportedOperationException("compareAndSet not yet implemented");
+    Map<String, Object> row =
+        jdbcTemplate.queryForMap(
+            "WITH current AS ("
+                + " SELECT token FROM substrate_atom WHERE key = ? AND expires_at > NOW()"
+                + "), updated AS ("
+                + " UPDATE substrate_atom SET value = ?, token = ?, expires_at = ?"
+                + " WHERE key = ? AND expires_at > NOW() AND token = ?"
+                + " RETURNING 1"
+                + ") SELECT (SELECT COUNT(*) FROM updated) AS updated_count,"
+                + " (SELECT COUNT(*) FROM current) AS present_count",
+            key,
+            value,
+            newToken,
+            Timestamp.from(Instant.now().plus(ttl)),
+            key,
+            expectedToken);
+    if (((Number) row.get("updated_count")).longValue() > 0) {
+      return CasResult.COMMITTED;
+    }
+    return ((Number) row.get("present_count")).longValue() > 0
+        ? CasResult.TOKEN_MISMATCH
+        : CasResult.ABSENT;
   }
 
   @Override
