@@ -25,9 +25,11 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
+import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
+import org.jwcarman.substrate.core.atom.CasResult;
 import org.jwcarman.substrate.core.atom.RawAtom;
 import org.jwcarman.substrate.mongodb.AbstractMongoDbIT;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -35,10 +37,11 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 class MongoDbAtomSpiIT extends AbstractMongoDbIT {
 
   private MongoDbAtomSpi spi;
+  private MongoTemplate mongoTemplate;
 
   @BeforeEach
   void setUp() {
-    MongoTemplate mongoTemplate = createMongoTemplate();
+    mongoTemplate = createMongoTemplate();
     mongoTemplate.dropCollection("substrate_atom");
     spi = new MongoDbAtomSpi(mongoTemplate, "substrate:atom:", "substrate_atom");
     spi.ensureIndexes();
@@ -240,5 +243,92 @@ class MongoDbAtomSpiIT extends AbstractMongoDbIT {
         .pollDelay(Duration.ofSeconds(3))
         .atMost(Duration.ofSeconds(5))
         .untilAsserted(() -> assertThat(spi.read(key)).isPresent());
+  }
+
+  @Test
+  void compareAndSetCommitsWhenTokenMatches() {
+    String key = spi.atomKey("cas-match-" + System.nanoTime());
+    spi.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofMinutes(5));
+
+    CasResult result =
+        spi.compareAndSet(
+            key, "tok-1", "v2".getBytes(StandardCharsets.UTF_8), "tok-2", Duration.ofMinutes(5));
+
+    assertThat(result).isEqualTo(CasResult.COMMITTED);
+    assertThat(spi.read(key)).hasValueSatisfying(raw -> assertThat(raw.token()).isEqualTo("tok-2"));
+  }
+
+  @Test
+  void compareAndSetReportsMismatchAndLeavesValueUntouched() {
+    String key = spi.atomKey("cas-mismatch-" + System.nanoTime());
+    spi.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofMinutes(5));
+
+    CasResult result =
+        spi.compareAndSet(
+            key, "stale", "v2".getBytes(StandardCharsets.UTF_8), "tok-2", Duration.ofMinutes(5));
+
+    assertThat(result).isEqualTo(CasResult.TOKEN_MISMATCH);
+    assertThat(spi.read(key))
+        .hasValueSatisfying(
+            raw -> {
+              assertThat(raw.value()).isEqualTo("v1".getBytes(StandardCharsets.UTF_8));
+              assertThat(raw.token()).isEqualTo("tok-1");
+            });
+  }
+
+  @Test
+  void compareAndSetReportsAbsentForDeletedAtom() {
+    String key = spi.atomKey("cas-deleted-" + System.nanoTime());
+    spi.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofMinutes(5));
+    spi.delete(key);
+
+    assertThat(
+            spi.compareAndSet(
+                key,
+                "tok-1",
+                "v2".getBytes(StandardCharsets.UTF_8),
+                "tok-2",
+                Duration.ofMinutes(5)))
+        .isEqualTo(CasResult.ABSENT);
+  }
+
+  @Test
+  void compareAndSetReportsAbsentForNeverCreatedAtom() {
+    String key = spi.atomKey("cas-missing-" + System.nanoTime());
+
+    assertThat(
+            spi.compareAndSet(
+                key,
+                "tok-1",
+                "v2".getBytes(StandardCharsets.UTF_8),
+                "tok-2",
+                Duration.ofMinutes(5)))
+        .isEqualTo(CasResult.ABSENT);
+  }
+
+  @Test
+  void compareAndSetPreservesExpireAtBsonType() {
+    String key = spi.atomKey("cas-bson-type-" + System.nanoTime());
+    spi.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofMinutes(5));
+
+    Document before =
+        mongoTemplate.getCollection("substrate_atom").find(new Document("key", key)).first();
+    assertThat(before).isNotNull();
+    Class<?> beforeType = before.get("expireAt").getClass();
+
+    spi.compareAndSet(
+        key, "tok-1", "v2".getBytes(StandardCharsets.UTF_8), "tok-2", Duration.ofMinutes(5));
+
+    Document after =
+        mongoTemplate.getCollection("substrate_atom").find(new Document("key", key)).first();
+    assertThat(after).isNotNull();
+    Class<?> afterType = after.get("expireAt").getClass();
+
+    assertThat(afterType)
+        .as(
+            "expireAt BSON type must stay consistent across the MongoTemplate write path (create)"
+                + " and the raw-driver write path (compareAndSet), or TTL comparisons in read()/"
+                + "set()/touch() would silently misbehave")
+        .isEqualTo(beforeType);
   }
 }

@@ -15,8 +15,12 @@
  */
 package org.jwcarman.substrate.mongodb.atom;
 
+import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.ReturnDocument;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 import org.bson.Document;
 import org.bson.types.Binary;
@@ -97,7 +101,42 @@ public class MongoDbAtomSpi extends AbstractAtomSpi {
   @Override
   public CasResult compareAndSet(
       String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
-    throw new UnsupportedOperationException("compareAndSet not yet implemented");
+    Date now = Date.from(Instant.now());
+    Date newExpireAt = Date.from(Instant.now().plus(ttl));
+    Document filter =
+        new Document(FIELD_KEY, key).append(FIELD_EXPIRE_AT, new Document("$gt", now));
+    Document matches = new Document("$eq", List.of("$" + FIELD_TOKEN, expectedToken));
+    List<Document> pipeline =
+        List.of(
+            new Document(
+                "$set",
+                new Document()
+                    .append(
+                        FIELD_VALUE,
+                        new Document(
+                            "$cond", List.of(matches, new Binary(value), "$" + FIELD_VALUE)))
+                    .append(
+                        FIELD_TOKEN,
+                        new Document("$cond", List.of(matches, newToken, "$" + FIELD_TOKEN)))
+                    .append(
+                        FIELD_EXPIRE_AT,
+                        new Document(
+                            "$cond", List.of(matches, newExpireAt, "$" + FIELD_EXPIRE_AT)))));
+
+    Document before =
+        mongoTemplate
+            .getCollection(collectionName)
+            .findOneAndUpdate(
+                filter,
+                pipeline,
+                new FindOneAndUpdateOptions().returnDocument(ReturnDocument.BEFORE));
+
+    if (before == null) {
+      return CasResult.ABSENT;
+    }
+    return expectedToken.equals(before.getString(FIELD_TOKEN))
+        ? CasResult.COMMITTED
+        : CasResult.TOKEN_MISMATCH;
   }
 
   @Override
