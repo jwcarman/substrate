@@ -119,10 +119,14 @@ occur between minor versions. The 1.0.0 release will mark API stability.
   Hazelcast and DynamoDB, one that is already expired on the in-memory,
   PostgreSQL and MongoDB backends, and a Redis `EXPIRE`/`SET EX 0` error.
   Journal *entry* TTLs (`Journal.append`) and *retention* TTLs
-  (`Journal.complete`) are deliberately unchanged: those are per-record
-  retention hints, not leases, and `Duration.ZERO` has an established meaning
-  there — "store without a TTL" — which the Cassandra, Redis, MongoDB, DynamoDB
-  and Hazelcast journal SPIs all implement explicitly.
+  (`Journal.complete`) still accept `Duration.ZERO`: those are per-record
+  retention hints, not leases, and zero has an established meaning there —
+  "store without a TTL" — which the Cassandra, Redis, MongoDB and DynamoDB
+  journal SPIs implement explicitly for both parameters. Hazelcast implements
+  it for the retention TTL only; its `append` manages retention at the
+  ringbuffer level and ignores the per-entry TTL entirely. On Redis,
+  `complete(Duration.ZERO)` leaves the existing `EXPIRE` from the last `append`
+  in place rather than retaining forever.
 - `substrate-redis` changed its Atom storage format from a single packed
   Base64 string to a hash with separate `token` and `value` fields. Atoms are
   ephemeral leased state, so no migration path is provided — existing atoms

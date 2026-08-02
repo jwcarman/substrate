@@ -32,8 +32,15 @@ import java.time.Duration;
  *
  * <p><strong>Retention hints</strong> — a Journal entry TTL and a Journal retention TTL are
  * per-record hints rather than leases, and {@code Duration.ZERO} has an established meaning there:
- * the Cassandra, Redis, MongoDB, DynamoDB and Hazelcast journal SPIs all read zero as "store this
- * without a TTL". Those parameters are bounded from above only, via {@link #requireAtMost}.
+ * "store this without a TTL". The Cassandra, Redis, MongoDB and DynamoDB journal SPIs implement
+ * that for both entry and retention TTLs; Hazelcast implements it for the retention TTL only, since
+ * its {@code append} manages retention at the ringbuffer level and ignores the per-entry value
+ * entirely. Those parameters are not bounded from below by {@link #requireAtMost}, which accepts
+ * zero but still rejects negatives.
+ *
+ * <p>One backend-specific nuance worth knowing: on Redis {@code complete(Duration.ZERO)} means
+ * "leave whatever TTL is already on the stream key in place" — the {@code EXPIRE} set by the last
+ * {@code append} still applies — rather than "retain forever".
  */
 public final class TtlBounds {
 
