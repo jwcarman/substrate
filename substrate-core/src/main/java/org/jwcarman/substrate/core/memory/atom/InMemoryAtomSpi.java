@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicReference;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
 import org.jwcarman.substrate.core.atom.AbstractAtomSpi;
 import org.jwcarman.substrate.core.atom.CasResult;
@@ -84,7 +85,24 @@ public class InMemoryAtomSpi extends AbstractAtomSpi {
   @Override
   public CasResult compareAndSet(
       String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
-    throw new UnsupportedOperationException("compareAndSet not yet implemented");
+    ExpiringEntry<RawAtom> next =
+        new ExpiringEntry<>(new RawAtom(value, newToken), Instant.now().plus(ttl));
+    var outcome = new AtomicReference<>(CasResult.ABSENT);
+    store.compute(
+        key,
+        (k, existing) -> {
+          if (existing == null || existing.isExpired()) {
+            outcome.set(CasResult.ABSENT);
+            return null;
+          }
+          if (!existing.value().token().equals(expectedToken)) {
+            outcome.set(CasResult.TOKEN_MISMATCH);
+            return existing;
+          }
+          outcome.set(CasResult.COMMITTED);
+          return next;
+        });
+    return outcome.get();
   }
 
   @Override

@@ -20,15 +20,18 @@ import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
+import org.jwcarman.substrate.core.atom.CasResult;
 import org.jwcarman.substrate.core.atom.RawAtom;
 
 class InMemoryAtomSpiTest {
@@ -260,5 +263,111 @@ class InMemoryAtomSpiTest {
     spi.create("key", new byte[] {1}, "t1", Duration.ofSeconds(10));
 
     assertThat(spi.sweep(1000)).isZero();
+  }
+
+  @Test
+  void compareAndSetCommitsWhenTokenMatches() {
+    String key = spi.atomKey("cas-match");
+    spi.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofMinutes(5));
+
+    CasResult result =
+        spi.compareAndSet(
+            key, "tok-1", "v2".getBytes(StandardCharsets.UTF_8), "tok-2", Duration.ofMinutes(5));
+
+    assertThat(result).isEqualTo(CasResult.COMMITTED);
+    assertThat(spi.read(key))
+        .hasValueSatisfying(
+            raw -> {
+              assertThat(raw.value()).isEqualTo("v2".getBytes(StandardCharsets.UTF_8));
+              assertThat(raw.token()).isEqualTo("tok-2");
+            });
+  }
+
+  @Test
+  void compareAndSetReportsMismatchAndLeavesValueUntouched() {
+    String key = spi.atomKey("cas-mismatch");
+    spi.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofMinutes(5));
+
+    CasResult result =
+        spi.compareAndSet(
+            key, "stale", "v2".getBytes(StandardCharsets.UTF_8), "tok-2", Duration.ofMinutes(5));
+
+    assertThat(result).isEqualTo(CasResult.TOKEN_MISMATCH);
+    assertThat(spi.read(key))
+        .hasValueSatisfying(
+            raw -> {
+              assertThat(raw.value()).isEqualTo("v1".getBytes(StandardCharsets.UTF_8));
+              assertThat(raw.token()).isEqualTo("tok-1");
+            });
+  }
+
+  @Test
+  void compareAndSetReportsAbsentForDeletedAtom() {
+    String key = spi.atomKey("cas-deleted");
+    spi.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofMinutes(5));
+    spi.delete(key);
+
+    CasResult result =
+        spi.compareAndSet(
+            key, "tok-1", "v2".getBytes(StandardCharsets.UTF_8), "tok-2", Duration.ofMinutes(5));
+
+    assertThat(result).isEqualTo(CasResult.ABSENT);
+  }
+
+  @Test
+  void compareAndSetReportsAbsentForExpiredAtom() throws InterruptedException {
+    String key = spi.atomKey("cas-expired");
+    spi.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofMillis(50));
+    Thread.sleep(120);
+
+    CasResult result =
+        spi.compareAndSet(
+            key, "tok-1", "v2".getBytes(StandardCharsets.UTF_8), "tok-2", Duration.ofMinutes(5));
+
+    assertThat(result).isEqualTo(CasResult.ABSENT);
+  }
+
+  @Test
+  void compareAndSetResetsTtl() {
+    String key = spi.atomKey("cas-ttl");
+    spi.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofMillis(100));
+
+    spi.compareAndSet(
+        key, "tok-1", "v2".getBytes(StandardCharsets.UTF_8), "tok-2", Duration.ofMinutes(5));
+
+    assertThat(spi.exists(key)).isTrue();
+  }
+
+  @Test
+  void concurrentCompareAndSetAdmitsExactlyOneWinner() throws InterruptedException {
+    String key = spi.atomKey("cas-race");
+    spi.create(key, "v0".getBytes(StandardCharsets.UTF_8), "tok-0", Duration.ofMinutes(5));
+
+    int threads = 16;
+    CountDownLatch latch = new CountDownLatch(1);
+    AtomicInteger committed = new AtomicInteger();
+    ExecutorService pool = Executors.newFixedThreadPool(threads);
+    for (int i = 0; i < threads; i++) {
+      int n = i;
+      pool.submit(
+          () -> {
+            latch.await();
+            if (spi.compareAndSet(
+                    key,
+                    "tok-0",
+                    ("v" + n).getBytes(StandardCharsets.UTF_8),
+                    "tok-" + (n + 1),
+                    Duration.ofMinutes(5))
+                == CasResult.COMMITTED) {
+              committed.incrementAndGet();
+            }
+            return null;
+          });
+    }
+    latch.countDown();
+    pool.shutdown();
+    assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+
+    assertThat(committed.get()).isEqualTo(1);
   }
 }
