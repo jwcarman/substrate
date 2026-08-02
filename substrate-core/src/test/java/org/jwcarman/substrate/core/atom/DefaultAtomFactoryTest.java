@@ -171,6 +171,12 @@ class DefaultAtomFactoryTest {
           }
 
           @Override
+          public CasResult compareAndSet(
+              String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
+            throw new AssertionError("SPI should not be called during connect");
+          }
+
+          @Override
           public boolean touch(String key, Duration ttl) {
             throw new AssertionError("SPI should not be called during connect");
           }

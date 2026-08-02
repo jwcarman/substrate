@@ -67,6 +67,22 @@ public interface AtomSpi extends Sweepable {
   boolean set(String key, byte[] value, String token, Duration ttl);
 
   /**
+   * Writes a new value and token only if the atom's current token equals {@code expectedToken},
+   * resetting its TTL on success. Implementations must perform the comparison and the write as one
+   * atomic operation — no lost update may be possible under concurrent writers.
+   *
+   * @param key the backend storage key
+   * @param expectedToken the token the caller last observed
+   * @param value the new serialized payload
+   * @param newToken the new opaque staleness marker
+   * @param ttl the new time-to-live
+   * @return {@link CasResult#COMMITTED} if written, {@link CasResult#TOKEN_MISMATCH} if a live atom
+   *     exists with a different token, {@link CasResult#ABSENT} if no live atom exists
+   */
+  CasResult compareAndSet(
+      String key, String expectedToken, byte[] value, String newToken, Duration ttl);
+
+  /**
    * Extends the TTL of an existing atom without changing its value or token.
    *
    * @param key the backend storage key

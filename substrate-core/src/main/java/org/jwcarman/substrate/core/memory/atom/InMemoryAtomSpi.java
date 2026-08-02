@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
 import org.jwcarman.substrate.core.atom.AbstractAtomSpi;
+import org.jwcarman.substrate.core.atom.CasResult;
 import org.jwcarman.substrate.core.atom.RawAtom;
 import org.jwcarman.substrate.core.memory.ExpiringEntry;
 
@@ -78,6 +79,12 @@ public class InMemoryAtomSpi extends AbstractAtomSpi {
               return next;
             });
     return result == next;
+  }
+
+  @Override
+  public CasResult compareAndSet(
+      String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
+    throw new UnsupportedOperationException("compareAndSet not yet implemented");
   }
 
   @Override

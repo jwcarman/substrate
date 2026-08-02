@@ -27,6 +27,7 @@ import java.time.Duration;
 import java.util.Optional;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
 import org.jwcarman.substrate.core.atom.AbstractAtomSpi;
+import org.jwcarman.substrate.core.atom.CasResult;
 import org.jwcarman.substrate.core.atom.RawAtom;
 import org.jwcarman.substrate.nats.NatsKvSupport;
 
@@ -88,6 +89,12 @@ public class NatsAtomSpi extends AbstractAtomSpi {
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to set atom in NATS KV", e);
     }
+  }
+
+  @Override
+  public CasResult compareAndSet(
+      String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
+    throw new UnsupportedOperationException("compareAndSet not yet implemented");
   }
 
   @Override

@@ -31,6 +31,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.function.LongFunction;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
 import org.jwcarman.substrate.core.atom.AbstractAtomSpi;
+import org.jwcarman.substrate.core.atom.CasResult;
 import org.jwcarman.substrate.core.atom.RawAtom;
 
 /**
@@ -100,6 +101,12 @@ public class EtcdAtomSpi extends AbstractAtomSpi {
         oldLeaseId,
         ttl,
         "set atom in etcd");
+  }
+
+  @Override
+  public CasResult compareAndSet(
+      String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
+    throw new UnsupportedOperationException("compareAndSet not yet implemented");
   }
 
   @Override

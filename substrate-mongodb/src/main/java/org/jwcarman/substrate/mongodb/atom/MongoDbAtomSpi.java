@@ -22,6 +22,7 @@ import org.bson.Document;
 import org.bson.types.Binary;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
 import org.jwcarman.substrate.core.atom.AbstractAtomSpi;
+import org.jwcarman.substrate.core.atom.CasResult;
 import org.jwcarman.substrate.core.atom.RawAtom;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Sort;
@@ -91,6 +92,12 @@ public class MongoDbAtomSpi extends AbstractAtomSpi {
             .set(FIELD_EXPIRE_AT, Instant.now().plus(ttl));
     var result = mongoTemplate.updateFirst(query, update, collectionName);
     return result.getModifiedCount() > 0;
+  }
+
+  @Override
+  public CasResult compareAndSet(
+      String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
+    throw new UnsupportedOperationException("compareAndSet not yet implemented");
   }
 
   @Override

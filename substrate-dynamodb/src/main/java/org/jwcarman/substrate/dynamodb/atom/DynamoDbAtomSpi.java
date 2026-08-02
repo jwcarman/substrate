@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
 import org.jwcarman.substrate.core.atom.AbstractAtomSpi;
+import org.jwcarman.substrate.core.atom.CasResult;
 import org.jwcarman.substrate.core.atom.RawAtom;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -135,6 +136,12 @@ public class DynamoDbAtomSpi extends AbstractAtomSpi {
     } catch (ConditionalCheckFailedException _) {
       return false;
     }
+  }
+
+  @Override
+  public CasResult compareAndSet(
+      String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
+    throw new UnsupportedOperationException("compareAndSet not yet implemented");
   }
 
   @Override

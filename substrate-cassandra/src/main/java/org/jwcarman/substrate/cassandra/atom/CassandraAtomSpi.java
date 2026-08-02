@@ -23,6 +23,7 @@ import java.time.Duration;
 import java.util.Optional;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
 import org.jwcarman.substrate.core.atom.AbstractAtomSpi;
+import org.jwcarman.substrate.core.atom.CasResult;
 import org.jwcarman.substrate.core.atom.RawAtom;
 
 public class CassandraAtomSpi extends AbstractAtomSpi {
@@ -145,6 +146,12 @@ public class CassandraAtomSpi extends AbstractAtomSpi {
             .execute(updateIfExists.bind(ttlSeconds(ttl), ByteBuffer.wrap(value), token, key))
             .one();
     return row != null && row.getBoolean(APPLIED_COLUMN);
+  }
+
+  @Override
+  public CasResult compareAndSet(
+      String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
+    throw new UnsupportedOperationException("compareAndSet not yet implemented");
   }
 
   @Override

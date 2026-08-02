@@ -22,6 +22,7 @@ import java.time.Duration;
 import java.util.Optional;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
 import org.jwcarman.substrate.core.atom.AbstractAtomSpi;
+import org.jwcarman.substrate.core.atom.CasResult;
 import org.jwcarman.substrate.core.atom.RawAtom;
 
 public class RedisAtomSpi extends AbstractAtomSpi {
@@ -56,6 +57,12 @@ public class RedisAtomSpi extends AbstractAtomSpi {
     String payload = AtomPayload.encode(value, token);
     String result = commands.set(key, payload, SetArgs.Builder.xx().ex(ttl.toSeconds()));
     return result != null;
+  }
+
+  @Override
+  public CasResult compareAndSet(
+      String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
+    throw new UnsupportedOperationException("compareAndSet not yet implemented");
   }
 
   @Override

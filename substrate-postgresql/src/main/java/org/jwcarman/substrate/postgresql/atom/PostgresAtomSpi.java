@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
 import org.jwcarman.substrate.core.atom.AbstractAtomSpi;
+import org.jwcarman.substrate.core.atom.CasResult;
 import org.jwcarman.substrate.core.atom.RawAtom;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -73,6 +74,12 @@ public class PostgresAtomSpi extends AbstractAtomSpi {
             Timestamp.from(Instant.now().plus(ttl)),
             key)
         > 0;
+  }
+
+  @Override
+  public CasResult compareAndSet(
+      String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
+    throw new UnsupportedOperationException("compareAndSet not yet implemented");
   }
 
   @Override

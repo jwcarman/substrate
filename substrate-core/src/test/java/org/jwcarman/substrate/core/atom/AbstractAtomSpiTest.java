@@ -73,6 +73,12 @@ class AbstractAtomSpiTest {
     }
 
     @Override
+    public CasResult compareAndSet(
+        String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
     public boolean touch(String key, Duration ttl) {
       throw new UnsupportedOperationException();
     }

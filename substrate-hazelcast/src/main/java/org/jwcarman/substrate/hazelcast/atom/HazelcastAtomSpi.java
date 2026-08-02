@@ -22,6 +22,7 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
 import org.jwcarman.substrate.core.atom.AbstractAtomSpi;
+import org.jwcarman.substrate.core.atom.CasResult;
 import org.jwcarman.substrate.core.atom.RawAtom;
 
 public class HazelcastAtomSpi extends AbstractAtomSpi {
@@ -59,6 +60,12 @@ public class HazelcastAtomSpi extends AbstractAtomSpi {
     }
     map.setTtl(key, ttl.toMillis(), TimeUnit.MILLISECONDS);
     return true;
+  }
+
+  @Override
+  public CasResult compareAndSet(
+      String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
+    throw new UnsupportedOperationException("compareAndSet not yet implemented");
   }
 
   @Override
