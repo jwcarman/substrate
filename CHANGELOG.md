@@ -10,6 +10,28 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+### Changed
+
+- `substrate-postgresql`: default `substrate.postgresql.notifier.poll-timeout`
+  raised from `500ms` to `30s`. This timeout governs how long a single
+  `getNotifications` call blocks when no notifications are arriving; it is
+  not a polling interval. Notification latency is unaffected — incoming
+  socket data wakes the blocking read immediately regardless of the timeout.
+  Shutdown responsiveness is also unaffected — `stop()` closes the LISTEN
+  connection and interrupts the listener thread. Raising the default reduces
+  idle wakeup cycles when the channel is quiet. Under sustained NOTIFY
+  load, the wakeup rate is governed by notification volume rather than this
+  timeout. Deployments that want the old cadence can set the property
+  explicitly.
+
+### Fixed
+
+- `substrate-postgresql`: `PostgresNotifierSpi.isListening()` only became true
+  after the first `getNotifications` call returned, so on a quiet channel it
+  reported `false` for up to a full poll timeout after `start()`. It now flips
+  as soon as the `LISTEN` statement succeeds, which is when the listener is
+  genuinely subscribed.
+
 ## [0.7.0] - 2026-04-16
 
 ### Added

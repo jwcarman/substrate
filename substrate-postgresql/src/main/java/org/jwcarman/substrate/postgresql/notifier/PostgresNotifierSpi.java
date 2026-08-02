@@ -125,6 +125,7 @@ public class PostgresNotifierSpi implements NotifierSpi, SmartLifecycle {
         }
 
         log.info("Listening on PostgreSQL channel '{}'", channel);
+        listening.set(true);
 
         pollNotifications(pgConnection);
       } catch (SQLException e) {
@@ -139,13 +140,8 @@ public class PostgresNotifierSpi implements NotifierSpi, SmartLifecycle {
   }
 
   private void pollNotifications(PGConnection pgConnection) throws SQLException {
-    boolean firstPoll = true;
     while (running.get()) {
       PGNotification[] notifications = pgConnection.getNotifications(pollTimeoutMillis);
-      if (firstPoll) {
-        listening.set(true);
-        firstPoll = false;
-      }
       if (notifications != null) {
         for (PGNotification notification : notifications) {
           dispatchNotification(notification.getParameter());
