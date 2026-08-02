@@ -33,6 +33,7 @@ import software.amazon.awssdk.services.dynamodb.model.GetItemResponse;
 import software.amazon.awssdk.services.dynamodb.model.KeyType;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.ResourceInUseException;
+import software.amazon.awssdk.services.dynamodb.model.ReturnValuesOnConditionCheckFailure;
 import software.amazon.awssdk.services.dynamodb.model.ScalarAttributeType;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
@@ -141,7 +142,36 @@ public class DynamoDbAtomSpi extends AbstractAtomSpi {
   @Override
   public CasResult compareAndSet(
       String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
-    throw new UnsupportedOperationException("compareAndSet not yet implemented");
+    long expiresAt = Instant.now().plus(ttl).getEpochSecond();
+    long now = Instant.now().getEpochSecond();
+    try {
+      client.putItem(
+          PutItemRequest.builder()
+              .tableName(tableName)
+              .item(
+                  Map.of(
+                      FIELD_PK, AttributeValue.builder().s(key).build(),
+                      FIELD_VALUE,
+                          AttributeValue.builder().b(SdkBytes.fromByteArray(value)).build(),
+                      FIELD_TOKEN, AttributeValue.builder().s(newToken).build(),
+                      FIELD_TTL, AttributeValue.builder().n(Long.toString(expiresAt)).build()))
+              .conditionExpression("attribute_exists(pk) AND #t > :now AND #tok = :expected")
+              .expressionAttributeNames(Map.of("#t", FIELD_TTL, "#tok", FIELD_TOKEN))
+              .expressionAttributeValues(
+                  Map.of(
+                      ":now", AttributeValue.builder().n(Long.toString(now)).build(),
+                      ":expected", AttributeValue.builder().s(expectedToken).build()))
+              .returnValuesOnConditionCheckFailure(ReturnValuesOnConditionCheckFailure.ALL_OLD)
+              .build());
+      return CasResult.COMMITTED;
+    } catch (ConditionalCheckFailedException e) {
+      Map<String, AttributeValue> old = e.item();
+      if (old == null || old.isEmpty()) {
+        return CasResult.ABSENT;
+      }
+      long oldTtl = Long.parseLong(old.get(FIELD_TTL).n());
+      return Instant.now().getEpochSecond() >= oldTtl ? CasResult.ABSENT : CasResult.TOKEN_MISMATCH;
+    }
   }
 
   @Override
