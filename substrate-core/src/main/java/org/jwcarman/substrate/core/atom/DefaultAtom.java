@@ -15,12 +15,10 @@
  */
 package org.jwcarman.substrate.core.atom;
 
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.Base64;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -64,7 +62,7 @@ public class DefaultAtom<T> implements Atom<T> {
     ensureExists();
     validateTtl(ttl);
     byte[] bytes = codec.encode(data);
-    String newToken = token(bytes);
+    String newToken = nextToken();
     boolean alive = context.spi().set(key, context.transformer().encode(bytes), newToken, ttl);
     if (!alive) {
       throw new AtomExpiredException(key);
@@ -180,20 +178,15 @@ public class DefaultAtom<T> implements Atom<T> {
   private static final int TOKEN_BYTES = 16;
 
   /**
-   * Hashes the encoded atom value into a compact staleness token for change detection. Uses the
-   * first 128 bits of SHA-256 — plenty for pairwise collision resistance when comparing "last
-   * observed value" against "current value," and the truncation halves the token length over the
-   * full digest (22 chars of Base64URL instead of 43).
+   * Generates a fresh staleness token for a write. Each call returns a distinct 128-bit random
+   * value, so a token identifies the <em>write</em> that produced it rather than the value it
+   * wrote. That is what makes it sound to compare in {@link #compareAndSet}: a value that changes
+   * from A to B and back to A does not resurrect its original token.
    */
-  static String token(byte[] encodedBytes) {
-    try {
-      byte[] digest = MessageDigest.getInstance("SHA-256").digest(encodedBytes);
-      return Base64.getUrlEncoder()
-          .withoutPadding()
-          .encodeToString(Arrays.copyOf(digest, TOKEN_BYTES));
-    } catch (NoSuchAlgorithmException e) {
-      throw new IllegalStateException("SHA-256 unavailable", e);
-    }
+  static String nextToken() {
+    byte[] bytes = new byte[TOKEN_BYTES];
+    ThreadLocalRandom.current().nextBytes(bytes);
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
   }
 
   private void validateTtl(Duration ttl) {

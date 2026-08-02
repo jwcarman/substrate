@@ -104,7 +104,7 @@ class PayloadTransformerRoundTripTest {
   }
 
   @Test
-  void atomTokensComputedFromPlaintextNotCiphertext() {
+  void atomTokenIsFreshNonceRegardlessOfTransformer() {
     InMemoryAtomSpi spi = new InMemoryAtomSpi();
 
     DefaultAtomFactory factory =
@@ -114,10 +114,12 @@ class PayloadTransformerRoundTripTest {
     Atom<String> atom = factory.create("token-test", String.class, "value", Duration.ofSeconds(10));
     String token1 = atom.get().token();
 
+    // The token is a per-write random nonce, not derived from the (plaintext or ciphertext)
+    // value, so re-setting an identical value still mints a new token.
     atom.set("value", Duration.ofSeconds(10));
     String token2 = atom.get().token();
 
-    assertThat(token1).isEqualTo(token2);
+    assertThat(token1).isNotEqualTo(token2);
   }
 
   @Test

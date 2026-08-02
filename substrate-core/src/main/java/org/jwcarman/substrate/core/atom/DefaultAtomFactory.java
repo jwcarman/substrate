@@ -47,7 +47,7 @@ public class DefaultAtomFactory implements AtomFactory {
     Codec<T> codec = codecFactory.create(type);
     String key = context.spi().atomKey(name);
     byte[] bytes = codec.encode(initialValue);
-    String token = DefaultAtom.token(bytes);
+    String token = DefaultAtom.nextToken();
     context.spi().create(key, context.transformer().encode(bytes), token, ttl);
     context.notifier().notifyAtomChanged(key);
     return new DefaultAtom<>(context, key, codec, false);
@@ -59,7 +59,7 @@ public class DefaultAtomFactory implements AtomFactory {
     Codec<T> codec = codecFactory.create(typeRef);
     String key = context.spi().atomKey(name);
     byte[] bytes = codec.encode(initialValue);
-    String token = DefaultAtom.token(bytes);
+    String token = DefaultAtom.nextToken();
     context.spi().create(key, context.transformer().encode(bytes), token, ttl);
     context.notifier().notifyAtomChanged(key);
     return new DefaultAtom<>(context, key, codec, false);

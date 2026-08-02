@@ -20,10 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
-import java.security.MessageDigest;
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.Base64;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -79,7 +76,7 @@ class DefaultAtomTest {
     notifier = new DefaultNotifier(new InMemoryNotifier(), CODEC_FACTORY);
 
     byte[] bytes = STRING_CODEC.encode("initial");
-    String token = DefaultAtom.token(bytes);
+    String token = DefaultAtom.nextToken();
     spi.create(KEY, bytes, token, TTL);
 
     atom = new DefaultAtom<>(context(spi), KEY, STRING_CODEC, false);
@@ -257,7 +254,7 @@ class DefaultAtomTest {
     InMemoryAtomSpi shortSpi = new InMemoryAtomSpi();
 
     byte[] bytes = STRING_CODEC.encode("ephemeral");
-    String token = DefaultAtom.token(bytes);
+    String token = DefaultAtom.nextToken();
     Duration shortTtl = Duration.ofMillis(200);
     shortSpi.create(KEY, bytes, token, shortTtl);
 
@@ -361,7 +358,7 @@ class DefaultAtomTest {
     InMemoryAtomSpi shortSpi = new InMemoryAtomSpi();
 
     byte[] bytes = STRING_CODEC.encode("ephemeral");
-    String token = DefaultAtom.token(bytes);
+    String token = DefaultAtom.nextToken();
     Duration shortTtl = Duration.ofMillis(200);
     shortSpi.create(KEY, bytes, token, shortTtl);
 
@@ -429,32 +426,24 @@ class DefaultAtomTest {
   // ═══════════════ token & TTL tests ═══════════════
 
   @Test
-  void tokenIsContentDerived() throws Exception {
-    byte[] bytes = "hello".getBytes(UTF_8);
-    byte[] digest = MessageDigest.getInstance("SHA-256").digest(bytes);
-    String expected =
-        Base64.getUrlEncoder().withoutPadding().encodeToString(Arrays.copyOf(digest, 16));
-
-    assertThat(DefaultAtom.token(bytes)).isEqualTo(expected);
-    assertThat(expected).hasSize(22);
+  void nextTokenProducesDistinctValues() {
+    assertThat(DefaultAtom.nextToken()).isNotEqualTo(DefaultAtom.nextToken());
   }
 
   @Test
-  void identicalEncodedBytesProduceIdenticalTokens() {
-    byte[] bytes1 = "same-value".getBytes(UTF_8);
-    byte[] bytes2 = "same-value".getBytes(UTF_8);
-
-    assertThat(DefaultAtom.token(bytes1)).isEqualTo(DefaultAtom.token(bytes2));
+  void nextTokenIsTwentyTwoCharBase64Url() {
+    assertThat(DefaultAtom.nextToken()).hasSize(22).matches("[A-Za-z0-9_-]{22}");
   }
 
   @Test
-  void setWithSameValueProducesSameToken() {
+  void setWithSameValueProducesNewToken() {
     Snapshot<String> before = atom.get();
 
     atom.set("initial", TTL);
 
     Snapshot<String> after = atom.get();
-    assertThat(after.token()).isEqualTo(before.token());
+    assertThat(after.value()).isEqualTo("initial");
+    assertThat(after.token()).isNotEqualTo(before.token());
   }
 
   @Test
