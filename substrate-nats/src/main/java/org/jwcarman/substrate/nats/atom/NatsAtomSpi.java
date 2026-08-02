@@ -91,10 +91,46 @@ public class NatsAtomSpi extends AbstractAtomSpi {
     }
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>NATS KV offers no transaction, so the outcome is determined in two parts. The write itself
+   * is exact: {@code update} with the revision observed by the preceding read is an atomic
+   * compare-and-swap, so no lost update is possible. Classifying a <em>failed</em> write requires a
+   * follow-up read, and if the atom is deleted between the failed update and that read, the failure
+   * is reported as {@link CasResult#ABSENT} rather than {@link CasResult#TOKEN_MISMATCH}. Both
+   * outcomes mean the caller lost the race, and {@code ABSENT} is a true statement about the atom
+   * at the moment it was read.
+   */
   @Override
   public CasResult compareAndSet(
       String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
-    throw new UnsupportedOperationException("compareAndSet not yet implemented");
+    try {
+      var kv = connection.keyValue(bucketName);
+      KeyValueEntry entry = kv.get(toKvKey(key));
+      if (entry == null || entry.getOperation() != KeyValueOperation.PUT) {
+        return CasResult.ABSENT;
+      }
+      if (!decode(entry.getValue()).token().equals(expectedToken)) {
+        return CasResult.TOKEN_MISMATCH;
+      }
+      try {
+        kv.update(toKvKey(key), encode(value, newToken), entry.getRevision());
+        return CasResult.COMMITTED;
+      } catch (JetStreamApiException e) {
+        if (!isWrongLastSequence(e)) {
+          throw new IllegalStateException("Failed to compare-and-set atom in NATS KV", e);
+        }
+        KeyValueEntry latest = kv.get(toKvKey(key));
+        return latest == null || latest.getOperation() != KeyValueOperation.PUT
+            ? CasResult.ABSENT
+            : CasResult.TOKEN_MISMATCH;
+      }
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to compare-and-set atom in NATS KV", e);
+    } catch (JetStreamApiException e) {
+      throw new IllegalStateException("Failed to compare-and-set atom in NATS KV", e);
+    }
   }
 
   @Override
@@ -144,6 +180,10 @@ public class NatsAtomSpi extends AbstractAtomSpi {
   }
 
   private static boolean isKeyExists(JetStreamApiException e) {
+    return e.getApiErrorCode() == 10071;
+  }
+
+  private static boolean isWrongLastSequence(JetStreamApiException e) {
     return e.getApiErrorCode() == 10071;
   }
 

@@ -27,6 +27,7 @@ import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.atom.AtomAlreadyExistsException;
+import org.jwcarman.substrate.core.atom.CasResult;
 import org.jwcarman.substrate.core.atom.RawAtom;
 import org.jwcarman.substrate.nats.AbstractNatsIT;
 
@@ -232,5 +233,67 @@ class NatsAtomIT extends AbstractNatsIT {
   @Test
   void sweepReturnsZero() {
     assertThat(atom.sweep(100)).isZero();
+  }
+
+  @Test
+  void compareAndSetCommitsWhenTokenMatches() {
+    String key = atom.atomKey("cas-match-" + System.nanoTime());
+    atom.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofMinutes(5));
+
+    CasResult result =
+        atom.compareAndSet(
+            key, "tok-1", "v2".getBytes(StandardCharsets.UTF_8), "tok-2", Duration.ofMinutes(5));
+
+    assertThat(result).isEqualTo(CasResult.COMMITTED);
+    assertThat(atom.read(key))
+        .hasValueSatisfying(raw -> assertThat(raw.token()).isEqualTo("tok-2"));
+  }
+
+  @Test
+  void compareAndSetReportsMismatchAndLeavesValueUntouched() {
+    String key = atom.atomKey("cas-mismatch-" + System.nanoTime());
+    atom.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofMinutes(5));
+
+    CasResult result =
+        atom.compareAndSet(
+            key, "stale", "v2".getBytes(StandardCharsets.UTF_8), "tok-2", Duration.ofMinutes(5));
+
+    assertThat(result).isEqualTo(CasResult.TOKEN_MISMATCH);
+    assertThat(atom.read(key))
+        .hasValueSatisfying(
+            raw -> {
+              assertThat(raw.value()).isEqualTo("v1".getBytes(StandardCharsets.UTF_8));
+              assertThat(raw.token()).isEqualTo("tok-1");
+            });
+  }
+
+  @Test
+  void compareAndSetReportsAbsentForDeletedAtom() {
+    String key = atom.atomKey("cas-deleted-" + System.nanoTime());
+    atom.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofMinutes(5));
+    atom.delete(key);
+
+    assertThat(
+            atom.compareAndSet(
+                key,
+                "tok-1",
+                "v2".getBytes(StandardCharsets.UTF_8),
+                "tok-2",
+                Duration.ofMinutes(5)))
+        .isEqualTo(CasResult.ABSENT);
+  }
+
+  @Test
+  void compareAndSetReportsAbsentForNeverCreatedAtom() {
+    String key = atom.atomKey("cas-missing-" + System.nanoTime());
+
+    assertThat(
+            atom.compareAndSet(
+                key,
+                "tok-1",
+                "v2".getBytes(StandardCharsets.UTF_8),
+                "tok-2",
+                Duration.ofMinutes(5)))
+        .isEqualTo(CasResult.ABSENT);
   }
 }
