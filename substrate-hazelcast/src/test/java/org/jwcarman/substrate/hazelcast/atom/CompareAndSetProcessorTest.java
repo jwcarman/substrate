@@ -17,16 +17,37 @@ package org.jwcarman.substrate.hazelcast.atom;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import com.hazelcast.map.ExtendedMapEntry;
 import java.nio.charset.StandardCharsets;
 import java.util.AbstractMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.jwcarman.substrate.core.atom.CasResult;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+@ExtendWith(MockitoExtension.class)
 class CompareAndSetProcessorTest {
 
   private static final byte[] VALUE = "v".getBytes(StandardCharsets.UTF_8);
+
+  @Mock private ExtendedMapEntry<String, AtomEntry> extendedEntry;
+
+  @Test
+  void writesValueAndTtlAsASingleOperationOnCommit() {
+    CompareAndSetProcessor processor = new CompareAndSetProcessor("tok-1", VALUE, "tok-2", 1000L);
+    when(extendedEntry.getValue())
+        .thenReturn(new AtomEntry("old".getBytes(StandardCharsets.UTF_8), "tok-1"));
+
+    assertThat(processor.process(extendedEntry)).isEqualTo(CasResult.COMMITTED);
+
+    verify(extendedEntry).setValue(new AtomEntry(VALUE, "tok-2"), 1000L, TimeUnit.MILLISECONDS);
+  }
 
   @Test
   void reportsAbsentWhenEntryHasNoValue() {

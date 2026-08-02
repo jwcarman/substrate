@@ -330,5 +330,7 @@ class HazelcastAtomIT extends AbstractHazelcastIT {
     long expiration =
         hazelcast.<String, AtomEntry>getMap(mapName).getEntryView(key).getExpirationTime();
     assertThat(expiration).isLessThan(Long.MAX_VALUE);
+    assertThat(expiration)
+        .isCloseTo(System.currentTimeMillis() + Duration.ofMinutes(5).toMillis(), within(30_000L));
   }
 }
