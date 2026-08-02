@@ -58,6 +58,8 @@ public interface AtomFactory {
    * @param ttl the initial time-to-live for the atom's lease
    * @return a new {@link Atom} handle
    * @throws AtomAlreadyExistsException if an atom with {@code name} already exists
+   * @throws IllegalArgumentException if {@code ttl} is zero or negative, or exceeds the maximum
+   *     allowed duration
    */
   <T> Atom<T> create(String name, Class<T> type, T initialValue, Duration ttl);
 
@@ -77,6 +79,8 @@ public interface AtomFactory {
    * @param ttl the initial time-to-live for the atom's lease
    * @return a new {@link Atom} handle
    * @throws AtomAlreadyExistsException if an atom with {@code name} already exists
+   * @throws IllegalArgumentException if {@code ttl} is zero or negative, or exceeds the maximum
+   *     allowed duration
    */
   <T> Atom<T> create(String name, TypeRef<T> typeRef, T initialValue, Duration ttl);
 

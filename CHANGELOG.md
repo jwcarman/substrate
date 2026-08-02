@@ -58,7 +58,15 @@ occur between minor versions. The 1.0.0 release will mark API stability.
   current epoch second and returned `true`, after which the next `read()`
   reported the atom expired and `get()` threw `AtomExpiredException`. All four
   write paths now share a one-second floor, as Redis, Cassandra and etcd
-  already did.
+  already did. The same helper also rounds the current instant *up* to the next
+  whole second before adding the TTL, so a whole-second TTL now buys a full
+  second of life instead of losing the fraction of the current second that had
+  already elapsed. That shifts every DynamoDB atom expiry up to one second
+  later than the equivalent 0.7.0 build produced — a visible change for
+  whole-second TTLs, not only sub-second ones. Sub-second remainders are still
+  truncated by `ttl.toSeconds()`, so a 1.9s TTL issued late in a second can
+  still yield closer to 1.0s of life; that is no worse than before and matches
+  what Redis and Cassandra already do.
 - `substrate-dynamodb`: the `compareAndSet` failure classifier threw
   `NullPointerException` when the returned `ALL_OLD` image carried no `ttl`
   attribute, as a hand-written or legacy row would. A missing `ttl` is now

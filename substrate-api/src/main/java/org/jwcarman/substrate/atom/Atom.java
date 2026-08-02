@@ -81,7 +81,8 @@ public interface Atom<T> {
    * @param data the new value to store
    * @param ttl the new time-to-live for this atom
    * @throws AtomExpiredException if the atom's lease has already elapsed or it has been deleted
-   * @throws IllegalArgumentException if {@code ttl} exceeds the maximum allowed duration
+   * @throws IllegalArgumentException if {@code ttl} is zero or negative, or exceeds the maximum
+   *     allowed duration
    */
   void set(T data, Duration ttl);
 
@@ -110,7 +111,8 @@ public interface Atom<T> {
    *     atom first
    * @throws AtomExpiredException if the atom's lease has already elapsed or it has been deleted
    * @throws NullPointerException if {@code expected} is {@code null}
-   * @throws IllegalArgumentException if {@code ttl} exceeds the maximum allowed duration
+   * @throws IllegalArgumentException if {@code ttl} is zero or negative, or exceeds the maximum
+   *     allowed duration
    */
   boolean compareAndSet(Snapshot<T> expected, T data, Duration ttl);
 
@@ -120,6 +122,8 @@ public interface Atom<T> {
    * @param ttl the new time-to-live to apply
    * @return {@code true} if the lease was successfully extended, {@code false} if the atom is
    *     already dead (expired or deleted)
+   * @throws IllegalArgumentException if {@code ttl} is zero or negative, or exceeds the maximum
+   *     allowed duration
    */
   boolean touch(Duration ttl);
 
