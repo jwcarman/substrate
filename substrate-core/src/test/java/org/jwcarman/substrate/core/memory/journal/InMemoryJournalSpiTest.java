@@ -412,6 +412,31 @@ class InMemoryJournalSpiTest {
   }
 
   @Test
+  void zeroEntryTtlStoresEntryWithoutExpiry() {
+    journal.create(KEY, Duration.ofHours(1));
+    journal.append(KEY, "no-ttl".getBytes(UTF_8), Duration.ZERO);
+
+    assertThat(journal.readAfter(KEY, "0-0")).hasSize(1);
+    assertThat(journal.readLast(KEY, 10)).hasSize(1);
+  }
+
+  @Test
+  void zeroRetentionTtlKeepsCompletedJournalReadable() {
+    journal.create(KEY, Duration.ofHours(1));
+    journal.append(KEY, "data1".getBytes(UTF_8), Duration.ofHours(1));
+    journal.complete(KEY, Duration.ZERO);
+
+    await()
+        .during(Duration.ofMillis(100))
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(
+            () -> {
+              assertThat(journal.isComplete(KEY)).isTrue();
+              assertThat(journal.readAfter(KEY, "0-0")).hasSize(1);
+            });
+  }
+
+  @Test
   void sweepRemovesDeadJournals() {
     journal.create(KEY, Duration.ofMillis(50));
     journal.append(KEY, "data".getBytes(UTF_8), Duration.ofHours(1));

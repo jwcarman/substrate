@@ -45,6 +45,15 @@ occur between minor versions. The 1.0.0 release will mark API stability.
   same input with an `InvalidQueryException` (`USING TTL -1`) and MongoDB swept
   the document immediately. `Duration.ZERO` remains legal on both methods and
   still means "store without a TTL".
+- `InMemoryJournalSpi` treated a zero entry TTL and a zero retention TTL as
+  *already expired* rather than *no expiry*, contradicting the documented
+  contract that the Cassandra, Redis, MongoDB and DynamoDB backends implement.
+  `append(data, Duration.ZERO)` returned an entry ID and woke subscribers, but
+  no `readAfter`/`readLast` ever returned the entry, and
+  `complete(Duration.ZERO)` produced a completion that expired the instant the
+  clock moved. Because `InMemoryJournalSpi` is the `@ConditionalOnMissingBean`
+  fallback, this was the out-of-the-box behavior with no backend module on the
+  classpath. Zero now means "no expiry" in memory, matching the other backends.
 - `substrate-postgresql`: `PostgresNotifierSpi.isListening()` only became true
   after the first `getNotifications` call returned, so on a quiet channel it
   reported `false` for up to a full poll timeout after `start()`. It now flips

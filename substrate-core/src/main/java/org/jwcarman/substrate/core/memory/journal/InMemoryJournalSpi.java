@@ -51,7 +51,9 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
       implements State {
     @Override
     public boolean isDead(Instant now) {
-      return now.isAfter(completedAt.plus(retentionTtl));
+      // Duration.ZERO means "retain without a TTL", matching the Cassandra, Redis, MongoDB and
+      // DynamoDB journal SPIs. See TtlBounds.
+      return !retentionTtl.isZero() && now.isAfter(completedAt.plus(retentionTtl));
     }
   }
 
@@ -89,7 +91,7 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
   public String append(String key, byte[] data, Duration entryTtl) {
     Instant now = Instant.now();
     String entryId = counter.incrementAndGet() + "-0";
-    Instant expiresAt = now.plus(entryTtl);
+    Instant expiresAt = expiryOf(now, entryTtl);
     RawJournalEntry entry = new RawJournalEntry(entryId, key, data, now);
 
     store.compute(
@@ -227,6 +229,15 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
     if (store.remove(key) != null) {
       tombstone(key, Instant.now());
     }
+  }
+
+  /**
+   * Resolves an entry's expiry instant, reading {@code Duration.ZERO} as "store this entry without
+   * a TTL" — the same meaning the Cassandra, Redis, MongoDB and DynamoDB journal SPIs give it. See
+   * {@code TtlBounds}.
+   */
+  private static Instant expiryOf(Instant now, Duration entryTtl) {
+    return entryTtl.isZero() ? Instant.MAX : now.plus(entryTtl);
   }
 
   private static long parseId(String id) {
