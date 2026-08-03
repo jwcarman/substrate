@@ -23,8 +23,10 @@ import java.util.Optional;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.jwcarman.codec.jackson.JacksonCodecAutoConfiguration;
 import org.jwcarman.codec.jackson.JacksonCodecFactory;
 import org.jwcarman.codec.spi.CodecFactory;
+import org.jwcarman.substrate.atom.AtomFactory;
 import org.jwcarman.substrate.core.journal.JournalSpi;
 import org.jwcarman.substrate.core.journal.RawJournalEntry;
 import org.jwcarman.substrate.core.mailbox.MailboxSpi;
@@ -37,6 +39,7 @@ import org.jwcarman.substrate.core.notifier.NotifierSubscription;
 import org.jwcarman.substrate.core.sweep.Sweeper;
 import org.jwcarman.substrate.journal.JournalFactory;
 import org.jwcarman.substrate.mailbox.MailboxFactory;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -158,6 +161,68 @@ class SubstrateAutoConfigurationTest {
     contextRunner
         .withUserConfiguration(CodecFactoryConfiguration.class)
         .run(context -> assertThat(context).hasSingleBean(Notifier.class));
+  }
+
+  /**
+   * Exercises the arrangement every real consumer has: the {@code CodecFactory} arrives from a
+   * sibling auto-configuration rather than from user configuration.
+   *
+   * <p>The other {@code CodecFactory} tests here use {@code withUserConfiguration}, and user
+   * configuration is always processed before auto-configurations, so they satisfy
+   * {@code @ConditionalOnBean(CodecFactory.class)} regardless of how the two auto-configurations
+   * are ordered. This one uses {@link AutoConfigurations#of} for both, which applies the real
+   * auto-configuration sorter.
+   *
+   * <p><strong>This test cannot currently fail</strong>, and that is worth stating plainly rather
+   * than leaving for someone to discover. With no ordering declared, Spring's sorter falls back to
+   * alphabetical class-name order, and {@code org.jwcarman.codec.*} sorts before {@code
+   * org.jwcarman.substrate.*} — so the codec would win even without the {@code afterName}
+   * declaration on {@link SubstrateAutoConfiguration}. It is kept as an end-to-end assertion that
+   * the pure-auto-configuration arrangement produces a working context; {@link
+   * #declaresOrderingAfterTheCodecAutoConfigurations()} is what actually guards the fix.
+   */
+  @Test
+  void createsFactoriesWhenCodecFactoryComesFromASiblingAutoConfiguration() {
+    new ApplicationContextRunner()
+        .withBean(JsonMapper.class, () -> JsonMapper.builder().build())
+        .withConfiguration(
+            AutoConfigurations.of(
+                JacksonCodecAutoConfiguration.class, SubstrateAutoConfiguration.class))
+        .run(
+            context -> {
+              assertThat(context).hasSingleBean(CodecFactory.class);
+              assertThat(context).hasSingleBean(Notifier.class);
+              assertThat(context).hasSingleBean(AtomFactory.class);
+              assertThat(context).hasSingleBean(JournalFactory.class);
+              assertThat(context).hasSingleBean(MailboxFactory.class);
+            });
+  }
+
+  /**
+   * Guards the ordering declaration itself.
+   *
+   * <p>Substrate's factory beans are {@code @ConditionalOnBean(CodecFactory.class)}, and
+   * {@code @ConditionalOnBean} only sees bean definitions registered so far. Whether the codec
+   * auto-configuration has contributed its {@code CodecFactory} by then must not be left to the
+   * sorter's alphabetical fallback: a codec whose class name sorted after {@code
+   * SubstrateAutoConfiguration} would yield an application with no {@code Notifier} and no
+   * factories, silently and with no error.
+   *
+   * <p>Asserting on the annotation is deliberate. A context test cannot detect the removal of this
+   * declaration, because the codec modules that ship today happen to sort first anyway — so this is
+   * the only assertion that fails if someone drops or narrows {@code afterName}.
+   */
+  @Test
+  void declaresOrderingAfterTheCodecAutoConfigurations() {
+    AutoConfiguration annotation =
+        SubstrateAutoConfiguration.class.getAnnotation(AutoConfiguration.class);
+
+    assertThat(annotation).isNotNull();
+    assertThat(annotation.afterName())
+        .contains(
+            "org.jwcarman.codec.jackson.JacksonCodecAutoConfiguration",
+            "org.jwcarman.codec.gson.GsonCodecAutoConfiguration",
+            "org.jwcarman.codec.protobuf.ProtobufCodecAutoConfiguration");
   }
 
   @Test

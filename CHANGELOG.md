@@ -10,6 +10,24 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-08-03
+
+### Fixed
+
+- `SubstrateAutoConfiguration` now declares that it runs after the codec
+  auto-configurations (`afterName`, referenced by name because the codec modules
+  are not compile dependencies, so an absent class makes the entry a no-op).
+  Substrate's factory beans are `@ConditionalOnBean(CodecFactory.class)`, and
+  `@ConditionalOnBean` only sees bean definitions registered so far. With no
+  ordering declared, whether the codec auto-configuration had contributed its
+  `CodecFactory` in time depended on the auto-configuration sorter's alphabetical
+  fallback — that is, on class names. It happens to work for the codec modules
+  shipped today, because `org.jwcarman.codec.*` sorts before
+  `org.jwcarman.substrate.*`, but a codec whose class name sorted later produced
+  an application with no `Notifier` and no `AtomFactory`, `JournalFactory` or
+  `MailboxFactory` at all — silently, with no error, because the conditions
+  simply did not match.
+
 ## [0.8.0] - 2026-08-03
 
 ### Breaking changes
@@ -756,6 +774,7 @@ abstractions:
 
 - **BOM** (`substrate-bom`) for version alignment across all modules
 
+[0.8.1]: https://github.com/jwcarman/substrate/releases/tag/0.8.1
 [0.8.0]: https://github.com/jwcarman/substrate/releases/tag/0.8.0
 [0.7.0]: https://github.com/jwcarman/substrate/releases/tag/0.7.0
 [0.6.0]: https://github.com/jwcarman/substrate/releases/tag/0.6.0

@@ -49,7 +49,21 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.PropertySource;
 
-@AutoConfiguration
+// Substrate's factory beans are @ConditionalOnBean(CodecFactory.class), and @ConditionalOnBean
+// only sees bean definitions registered so far. Without an explicit ordering relationship, whether
+// the codec auto-configuration has contributed its CodecFactory by the time these conditions are
+// evaluated depends on the auto-configuration sorter's alphabetical fallback — that is, on class
+// names. Today `org.jwcarman.codec.*` happens to sort before `org.jwcarman.substrate.*`, so it
+// works by accident; a codec whose class name sorted later would silently produce an application
+// with no Notifier and no factories at all. Declare the dependency instead of relying on the
+// accident. Referenced by name because the codec modules are not compile dependencies; an absent
+// class makes the entry a no-op.
+@AutoConfiguration(
+    afterName = {
+      "org.jwcarman.codec.jackson.JacksonCodecAutoConfiguration",
+      "org.jwcarman.codec.gson.GsonCodecAutoConfiguration",
+      "org.jwcarman.codec.protobuf.ProtobufCodecAutoConfiguration"
+    })
 @EnableConfigurationProperties(SubstrateProperties.class)
 @PropertySource("classpath:substrate-defaults.properties")
 public class SubstrateAutoConfiguration {
