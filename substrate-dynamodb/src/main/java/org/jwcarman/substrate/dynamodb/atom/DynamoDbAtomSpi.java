@@ -82,6 +82,24 @@ public class DynamoDbAtomSpi extends AbstractAtomSpi {
     return nowCeiling + Math.max(MIN_TTL_SECONDS, ttl.toSeconds());
   }
 
+  /**
+   * Returns whether an item represents a live atom — one carrying a {@code ttl} attribute that has
+   * not yet elapsed.
+   *
+   * <p>DynamoDB reaps expired items lazily, so a present item is not automatically a live one and
+   * every read path has to re-check the attribute itself. A hand-written or legacy row with no
+   * {@code ttl} attribute at all carries no proof of life and is treated exactly like an expired
+   * one, rather than throwing.
+   *
+   * @param item the item returned by DynamoDB, which must contain the {@code ttl} attribute in its
+   *     projection
+   * @return {@code true} if the item is present and unexpired
+   */
+  private static boolean isLive(Map<String, AttributeValue> item) {
+    AttributeValue ttl = item.get(FIELD_TTL);
+    return ttl != null && Instant.now().getEpochSecond() < Long.parseLong(ttl.n());
+  }
+
   @Override
   public void create(String key, byte[] value, String token, Duration ttl) {
     long expiresAt = expiresAt(ttl);
@@ -118,8 +136,7 @@ public class DynamoDbAtomSpi extends AbstractAtomSpi {
     }
 
     Map<String, AttributeValue> item = response.item();
-    long ttlValue = Long.parseLong(item.get(FIELD_TTL).n());
-    if (Instant.now().getEpochSecond() >= ttlValue) {
+    if (!isLive(item)) {
       return Optional.empty();
     }
 
@@ -184,15 +201,7 @@ public class DynamoDbAtomSpi extends AbstractAtomSpi {
       if (old == null || old.isEmpty()) {
         return CasResult.ABSENT;
       }
-      AttributeValue oldTtl = old.get(FIELD_TTL);
-      if (oldTtl == null) {
-        // A hand-written or legacy row with no ttl attribute carries no proof of life; treat it
-        // the same way an expired row is treated.
-        return CasResult.ABSENT;
-      }
-      return Instant.now().getEpochSecond() >= Long.parseLong(oldTtl.n())
-          ? CasResult.ABSENT
-          : CasResult.TOKEN_MISMATCH;
+      return isLive(old) ? CasResult.TOKEN_MISMATCH : CasResult.ABSENT;
     }
   }
 
@@ -242,7 +251,6 @@ public class DynamoDbAtomSpi extends AbstractAtomSpi {
     if (!response.hasItem() || response.item().isEmpty()) {
       return false;
     }
-    long ttlValue = Long.parseLong(response.item().get(FIELD_TTL).n());
-    return Instant.now().getEpochSecond() < ttlValue;
+    return isLive(response.item());
   }
 }

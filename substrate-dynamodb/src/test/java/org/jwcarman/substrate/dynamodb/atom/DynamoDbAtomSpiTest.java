@@ -140,6 +140,35 @@ class DynamoDbAtomSpiTest {
   }
 
   @Test
+  void readReturnsEmptyWhenItemHasNoTtlAttribute() {
+    when(client.getItem(any(GetItemRequest.class)))
+        .thenReturn(
+            GetItemResponse.builder()
+                .item(
+                    Map.of(
+                        "pk", AttributeValue.builder().s("key1").build(),
+                        "value",
+                            AttributeValue.builder()
+                                .b(SdkBytes.fromByteArray("hello".getBytes(StandardCharsets.UTF_8)))
+                                .build(),
+                        "token", AttributeValue.builder().s("tok1").build()))
+                .build());
+
+    assertThat(atom.read("key1")).isEmpty();
+  }
+
+  @Test
+  void existsReturnsFalseWhenItemHasNoTtlAttribute() {
+    when(client.getItem(any(GetItemRequest.class)))
+        .thenReturn(
+            GetItemResponse.builder()
+                .item(Map.of("pk", AttributeValue.builder().s("key1").build()))
+                .build());
+
+    assertThat(atom.exists("key1")).isFalse();
+  }
+
+  @Test
   void readUsesConsistentRead() {
     when(client.getItem(any(GetItemRequest.class))).thenReturn(GetItemResponse.builder().build());
 
