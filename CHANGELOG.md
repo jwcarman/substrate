@@ -10,6 +10,56 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-03
+
+### Breaking changes
+
+- The `Snapshot` token is now a per-write random nonce rather than a hash of
+  the value. As a result, `set()` with an unchanged value now moves the token
+  and notifies subscribers, where previously it was silently invisible.
+- `Atom<T>` gained an abstract `compareAndSet(Snapshot<T>, T, Duration)` method.
+  `Atom` is a public API interface, so any consumer test double, decorator or
+  delegating wrapper that implements it fails to compile until the method is
+  added.
+- `AtomSpi` gained an abstract `compareAndSet` method. Third-party `AtomSpi`
+  implementations must implement it.
+- Atom TTLs must now be strictly positive. `Duration.ZERO` and negative
+  durations throw `IllegalArgumentException` from `AtomFactory.create`,
+  `Atom.set`, `Atom.compareAndSet` and `Atom.touch`, where previously they were
+  passed to the backend — which interpreted them inconsistently (Hazelcast read
+  a zero TTL as *infinite*, producing an atom that never expired and was never
+  swept; other backends read it as already expired or floored it at one
+  second).
+- Mailbox TTLs and Journal inactivity TTLs must now be strictly positive.
+  `Duration.ZERO` and negative durations throw `IllegalArgumentException` from
+  `MailboxFactory.create` and `JournalFactory.create`, matching the rule already
+  applied to Atom TTLs. Previously these were validated against an upper bound
+  only and passed straight to the backend, which interpreted them
+  inconsistently — a zero mailbox TTL produced a mailbox that never expires on
+  Hazelcast and DynamoDB, one that is already expired on the in-memory,
+  PostgreSQL and MongoDB backends, and a Redis `EXPIRE`/`SET EX 0` error.
+  Journal *entry* TTLs (`Journal.append`) and *retention* TTLs
+  (`Journal.complete`) still accept `Duration.ZERO`: those are per-record
+  retention hints, not leases, and zero has an established meaning there —
+  "store without a TTL" — which the Cassandra, Redis, MongoDB and DynamoDB
+  journal SPIs implement explicitly for both parameters. Hazelcast implements
+  it for the retention TTL only; its `append` manages retention at the
+  ringbuffer level and ignores the per-entry TTL entirely. On Redis,
+  `complete(Duration.ZERO)` leaves the existing `EXPIRE` from the last `append`
+  in place rather than retaining forever.
+- `substrate-redis` changed its Atom storage format from a single packed
+  Base64 string to a hash with separate `token` and `value` fields. Atoms are
+  ephemeral leased state, so no migration path is provided — existing atoms
+  should be allowed to expire, or the keys flushed. Atoms left in a running
+  Redis in the old format now cause reads to fail with a `WRONGTYPE` error
+  rather than being silently ignored, because `HGETALL` against a leftover
+  string key errors. Flush the old keys, or let them expire, before
+  upgrading.
+- `substrate-hazelcast` now runs `EntryProcessor`s on cluster members, so this
+  module's classes must be on every member's classpath. This is automatic for
+  embedded Hazelcast; client-server deployments need the substrate jar on the
+  members or user-code deployment enabled.
+
 ### Added
 
 - `Atom.compareAndSet(Snapshot<T>, T, Duration)` — a conditional write that
@@ -87,58 +137,12 @@ occur between minor versions. The 1.0.0 release will mark API stability.
   truncated by `ttl.toSeconds()`, so a 1.9s TTL issued late in a second can
   still yield closer to 1.0s of life; that is no worse than before and matches
   what Redis and Cassandra already do.
-- `substrate-dynamodb`: the `compareAndSet` failure classifier threw
-  `NullPointerException` when the returned `ALL_OLD` image carried no `ttl`
-  attribute, as a hand-written or legacy row would. A missing `ttl` is now
-  treated as expired, i.e. `ABSENT`.
-
-### Breaking changes
-
-- The `Snapshot` token is now a per-write random nonce rather than a hash of
-  the value. As a result, `set()` with an unchanged value now moves the token
-  and notifies subscribers, where previously it was silently invisible.
-- `Atom<T>` gained an abstract `compareAndSet(Snapshot<T>, T, Duration)` method.
-  `Atom` is a public API interface, so any consumer test double, decorator or
-  delegating wrapper that implements it fails to compile until the method is
-  added.
-- `AtomSpi` gained an abstract `compareAndSet` method. Third-party `AtomSpi`
-  implementations must implement it.
-- Atom TTLs must now be strictly positive. `Duration.ZERO` and negative
-  durations throw `IllegalArgumentException` from `AtomFactory.create`,
-  `Atom.set`, `Atom.compareAndSet` and `Atom.touch`, where previously they were
-  passed to the backend — which interpreted them inconsistently (Hazelcast read
-  a zero TTL as *infinite*, producing an atom that never expired and was never
-  swept; other backends read it as already expired or floored it at one
-  second).
-- Mailbox TTLs and Journal inactivity TTLs must now be strictly positive.
-  `Duration.ZERO` and negative durations throw `IllegalArgumentException` from
-  `MailboxFactory.create` and `JournalFactory.create`, matching the rule already
-  applied to Atom TTLs. Previously these were validated against an upper bound
-  only and passed straight to the backend, which interpreted them
-  inconsistently — a zero mailbox TTL produced a mailbox that never expires on
-  Hazelcast and DynamoDB, one that is already expired on the in-memory,
-  PostgreSQL and MongoDB backends, and a Redis `EXPIRE`/`SET EX 0` error.
-  Journal *entry* TTLs (`Journal.append`) and *retention* TTLs
-  (`Journal.complete`) still accept `Duration.ZERO`: those are per-record
-  retention hints, not leases, and zero has an established meaning there —
-  "store without a TTL" — which the Cassandra, Redis, MongoDB and DynamoDB
-  journal SPIs implement explicitly for both parameters. Hazelcast implements
-  it for the retention TTL only; its `append` manages retention at the
-  ringbuffer level and ignores the per-entry TTL entirely. On Redis,
-  `complete(Duration.ZERO)` leaves the existing `EXPIRE` from the last `append`
-  in place rather than retaining forever.
-- `substrate-redis` changed its Atom storage format from a single packed
-  Base64 string to a hash with separate `token` and `value` fields. Atoms are
-  ephemeral leased state, so no migration path is provided — existing atoms
-  should be allowed to expire, or the keys flushed. Atoms left in a running
-  Redis in the old format now cause reads to fail with a `WRONGTYPE` error
-  rather than being silently ignored, because `HGETALL` against a leftover
-  string key errors. Flush the old keys, or let them expire, before
-  upgrading.
-- `substrate-hazelcast` now runs `EntryProcessor`s on cluster members, so this
-  module's classes must be on every member's classpath. This is automatic for
-  embedded Hazelcast; client-server deployments need the substrate jar on the
-  members or user-code deployment enabled.
+- `substrate-dynamodb`: `read`, `exists` and the `compareAndSet` failure
+  classifier all threw `NullPointerException` on an item carrying no `ttl`
+  attribute, as a hand-written or legacy row would. All three now share one
+  liveness check: a row with no `ttl` carries no proof of life and is treated
+  exactly like an expired one, so `read` returns empty, `exists` returns
+  `false`, and `compareAndSet` reports `ABSENT`.
 
 ## [0.7.0] - 2026-04-16
 
@@ -752,6 +756,7 @@ abstractions:
 
 - **BOM** (`substrate-bom`) for version alignment across all modules
 
+[0.8.0]: https://github.com/jwcarman/substrate/releases/tag/0.8.0
 [0.7.0]: https://github.com/jwcarman/substrate/releases/tag/0.7.0
 [0.6.0]: https://github.com/jwcarman/substrate/releases/tag/0.6.0
 [0.5.0]: https://github.com/jwcarman/substrate/releases/tag/0.5.0
