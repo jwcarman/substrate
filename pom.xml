@@ -72,8 +72,8 @@
         <source.plugin.version>3.4.0</source.plugin.version>
         <sonatype.plugin.version>0.10.0</sonatype.plugin.version>
         <license.plugin.version>5.0.0</license.plugin.version>
-        <jacoco.plugin.version>0.8.14</jacoco.plugin.version>
-        <sonar.plugin.version>5.5.0.6356</sonar.plugin.version>
+        <jacoco.plugin.version>0.8.15</jacoco.plugin.version>
+        <sonar.plugin.version>5.7.0.6970</sonar.plugin.version>
 
         <!-- License Header Configuration -->
         <license.owner>James Carman</license.owner>
