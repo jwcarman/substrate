@@ -220,7 +220,7 @@ class FeederSupportTest {
                 // Stands in for a blocking backend call that is in flight when cancel() lands.
                 release.await(2, TimeUnit.SECONDS);
                 interruptedDuringStep.set(Thread.currentThread().isInterrupted());
-              } catch (InterruptedException e) {
+              } catch (InterruptedException _) {
                 interruptedDuringStep.set(true);
                 Thread.currentThread().interrupt();
               } finally {
