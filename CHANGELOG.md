@@ -10,6 +10,25 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-09-17
+
+### Fixed
+
+- Cancelling a subscription no longer interrupts its feeder thread. The canceller
+  returned by `FeederSupport.start` used to call `Thread.interrupt()`, which could
+  land while the feeder was blocked in a backend call. Drivers that cannot survive
+  an interrupt mid-socket-read — pgjdbc in particular — respond by closing the
+  socket, so the read failed with `SQLSTATE(08006)` and the pooled connection was
+  discarded as broken. An application that opens a subscription per client (one
+  journal subscription per SSE connection, say) burned a pooled connection and
+  logged a stack trace on every reconnect. The feeder is now stopped
+  cooperatively: the canceller clears the running flag and releases the loop's
+  semaphore, and an in-flight step runs to completion before the loop exits. No
+  feeder step blocks indefinitely, so stop latency is unchanged in practice.
+- `DefaultBlockingSubscription.cancel` now sets the handoff's `Cancelled` terminal
+  before running the feeder canceller. With the interrupt gone, the terminal is
+  what releases a feeder parked in `BoundedQueueHandoff.deliver` on a full queue.
+
 ## [0.8.1] - 2026-08-03
 
 ### Fixed
@@ -774,6 +793,7 @@ abstractions:
 
 - **BOM** (`substrate-bom`) for version alignment across all modules
 
+[0.8.2]: https://github.com/jwcarman/substrate/releases/tag/0.8.2
 [0.8.1]: https://github.com/jwcarman/substrate/releases/tag/0.8.1
 [0.8.0]: https://github.com/jwcarman/substrate/releases/tag/0.8.0
 [0.7.0]: https://github.com/jwcarman/substrate/releases/tag/0.7.0

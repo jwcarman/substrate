@@ -60,11 +60,12 @@ public class DefaultBlockingSubscription<T> implements BlockingSubscription<T> {
   @Override
   public void cancel() {
     if (markDone()) {
-      canceller.run();
-      // markCancelled unblocks any thread parked inside next() by setting the
-      // sticky Cancelled terminal. The woken poll returns Cancelled, the
-      // caller observes isActive false on the next loop turn, and exits.
+      // markCancelled runs first: setting the sticky Cancelled terminal unblocks any thread parked
+      // inside next(), and also any feeder parked in deliver() on a full handoff. The woken poll
+      // returns Cancelled, the caller observes isActive false on the next loop turn, and exits.
+      // The feeder is stopped cooperatively, so this is what releases it — nothing interrupts it.
       handoff.markCancelled();
+      canceller.run();
     }
   }
 

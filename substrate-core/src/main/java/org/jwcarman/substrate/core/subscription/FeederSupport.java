@@ -57,8 +57,10 @@ public final class FeederSupport {
    *     markDeleted} and {@code error} when those events fire
    * @param threadName the virtual thread name prefix (e.g., {@code "substrate-atom-feeder"})
    * @param step the primitive-specific work to run on each iteration
-   * @return a canceller closure that, when run, stops the feeder thread (by interrupting it) and
-   *     cancels the notifier subscription
+   * @return a canceller closure that, when run, stops the feeder cooperatively — it clears the
+   *     running flag, wakes the loop, and cancels the notifier subscription. The feeder thread is
+   *     never interrupted, so a step already blocked in a backend call runs to completion before
+   *     the loop exits.
    */
   public static Runnable start(
       String key,
@@ -86,14 +88,18 @@ public final class FeederSupport {
               semaphore.release();
             });
 
-    Thread feederThread =
-        Thread.ofVirtual()
-            .name(threadName, 0)
-            .start(() -> runLoop(running, semaphore, handoff, step, notifierSub, threadName, key));
+    Thread.ofVirtual()
+        .name(threadName, 0)
+        .start(() -> runLoop(running, semaphore, handoff, step, notifierSub, threadName, key));
 
     return () -> {
       running.set(false);
-      feederThread.interrupt();
+      // Wake the loop if it is parked in waitForNudge so it observes the flag immediately. The
+      // feeder thread is never interrupted: a step may be blocked in a backend call, and drivers
+      // such as pgjdbc respond to an interrupt by closing the socket, which surfaces as a
+      // connection error and costs the caller a pooled connection. An in-flight step is allowed to
+      // finish; the loop then exits on the next turn.
+      semaphore.release();
       notifierSub.cancel();
     };
   }
@@ -181,8 +187,10 @@ public final class FeederSupport {
      *     cleanly. Returning false is appropriate when the primitive has reached a terminal state
      *     (expired, deleted, single-delivery complete) and the step has already called the relevant
      *     {@code mark*} method on the handoff.
-     * @throws InterruptedException if the feeder thread is interrupted while the step is blocked
-     *     (for example, on a semaphore or SPI call); the feeder loop catches this and exits cleanly
+     * @throws InterruptedException if the feeder thread is interrupted while the step is blocked.
+     *     Cancelling a subscription does <em>not</em> interrupt the feeder, so this fires only when
+     *     something outside Substrate interrupts the thread; the feeder loop catches it and exits
+     *     cleanly.
      */
     boolean runOnce() throws InterruptedException;
   }

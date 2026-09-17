@@ -20,6 +20,8 @@ import static org.awaitility.Awaitility.await;
 
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -191,6 +193,51 @@ class FeederSupportTest {
     canceller.run();
 
     assertThat(handoff.poll(SHORT_TIMEOUT)).isInstanceOf(NextResult.Timeout.class);
+  }
+
+  /**
+   * A feeder must be stopped cooperatively, never by interrupting it mid-step. Backend drivers that
+   * are blocked in a socket read (pgjdbc, for one) cannot survive {@code Thread.interrupt()}: the
+   * socket is closed under them and the pooled connection is discarded as broken.
+   */
+  @Test
+  void cancellerDoesNotInterruptAnInFlightStep() {
+    var handoff = new SingleSlotHandoff<String>();
+    var stepEntered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var stepExited = new CountDownLatch(1);
+    var interruptedDuringStep = new AtomicBoolean(false);
+
+    Runnable canceller =
+        FeederSupport.start(
+            KEY,
+            notifier::subscribeToAtom,
+            handoff,
+            "test-feeder",
+            () -> {
+              stepEntered.countDown();
+              try {
+                // Stands in for a blocking backend call that is in flight when cancel() lands.
+                release.await(2, TimeUnit.SECONDS);
+                interruptedDuringStep.set(Thread.currentThread().isInterrupted());
+              } catch (InterruptedException e) {
+                interruptedDuringStep.set(true);
+                Thread.currentThread().interrupt();
+              } finally {
+                stepExited.countDown();
+              }
+              return true;
+            });
+
+    await().atMost(Duration.ofSeconds(2)).until(() -> stepEntered.getCount() == 0);
+
+    canceller.run();
+    release.countDown();
+
+    await().atMost(Duration.ofSeconds(2)).until(() -> stepExited.getCount() == 0);
+    assertThat(interruptedDuringStep)
+        .as("the in-flight feeder step must not be interrupted by cancellation")
+        .isFalse();
   }
 
   @Test
