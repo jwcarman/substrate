@@ -604,7 +604,7 @@ class DefaultAtomTest {
   }
 
   @Test
-  void compareAndSetNotifiesSubscribersOnlyWhenCommitted() throws Exception {
+  void compareAndSetNotifiesSubscribersOnlyWhenCommitted() {
     Snapshot<String> current = atom.get();
     var delivered = new CopyOnWriteArrayList<String>();
     Subscription sub =

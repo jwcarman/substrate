@@ -28,7 +28,9 @@ import org.jwcarman.substrate.core.notifier.NotifierSubscription;
 public class InMemoryNotifier implements NotifierSpi {
 
   /** Creates a notifier with no subscribers. */
-  public InMemoryNotifier() {}
+  public InMemoryNotifier() {
+    // Nothing to initialize; declared explicitly so it can carry a doc comment.
+  }
 
   private final List<Consumer<byte[]>> handlers = new CopyOnWriteArrayList<>();
 
