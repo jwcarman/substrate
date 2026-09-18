@@ -19,7 +19,6 @@ import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import org.bson.Document;
@@ -102,8 +101,8 @@ public class MongoDbAtomSpi extends AbstractAtomSpi {
   @Override
   public CasResult compareAndSet(
       String key, String expectedToken, byte[] value, String newToken, Duration ttl) {
-    Date now = Date.from(Instant.now());
-    Date newExpireAt = Date.from(Instant.now().plus(ttl));
+    Instant now = Instant.now();
+    Instant newExpireAt = now.plus(ttl);
     Document filter =
         new Document(FIELD_KEY, key).append(FIELD_EXPIRE_AT, new Document("$gt", now));
     Document matches = new Document("$eq", List.of("$" + FIELD_TOKEN, expectedToken));
