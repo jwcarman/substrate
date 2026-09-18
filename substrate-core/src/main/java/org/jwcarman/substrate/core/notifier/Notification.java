@@ -15,14 +15,39 @@
  */
 package org.jwcarman.substrate.core.notifier;
 
+/**
+ * Something that happened to a primitive at a given key, delivered to subscribers so they know to
+ * look again. A notification carries no payload beyond the key — it is a wake-up, not a value, and
+ * the subscriber reads the primitive to find out what changed.
+ */
 public sealed interface Notification
     permits Notification.Changed, Notification.Completed, Notification.Deleted {
 
+  /**
+   * Returns the backend storage key the notification is about.
+   *
+   * @return the backend storage key
+   */
   String key();
 
+  /**
+   * The value at this key was written: an atom set, a journal appended to, a mailbox filled.
+   *
+   * @param key the backend storage key
+   */
   record Changed(String key) implements Notification {}
 
+  /**
+   * The journal at this key was completed and will accept no further appends.
+   *
+   * @param key the backend storage key
+   */
   record Completed(String key) implements Notification {}
 
+  /**
+   * The primitive at this key was deleted.
+   *
+   * @param key the backend storage key
+   */
   record Deleted(String key) implements Notification {}
 }

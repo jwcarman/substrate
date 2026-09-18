@@ -21,6 +21,12 @@ import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.NextResult;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 
+/**
+ * Default {@link BlockingSubscription}: callers pull the next value, blocking until one arrives,
+ * the subscription ends, or the timeout elapses.
+ *
+ * @param <T> the type of values delivered to this subscription
+ */
 public class DefaultBlockingSubscription<T> implements BlockingSubscription<T> {
 
   private final Handoff<T> handoff;
@@ -28,6 +34,13 @@ public class DefaultBlockingSubscription<T> implements BlockingSubscription<T> {
   private final ShutdownCoordinator shutdownCoordinator;
   private final AtomicBoolean done = new AtomicBoolean(false);
 
+  /**
+   * Creates a blocking subscription over a handoff fed by a subscription feeder.
+   *
+   * @param handoff where the feeder deposits values for this subscription to collect
+   * @param canceller stops the feeder when this subscription is cancelled
+   * @param shutdownCoordinator cancels this subscription at context shutdown
+   */
   public DefaultBlockingSubscription(
       Handoff<T> handoff, Runnable canceller, ShutdownCoordinator shutdownCoordinator) {
     this.handoff = handoff;

@@ -25,11 +25,22 @@ import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
 import org.jwcarman.substrate.core.notifier.Notifier;
 import org.jwcarman.substrate.core.transform.PayloadTransformer;
 
+/** Default {@link AtomFactory}, creating and attaching {@link DefaultAtom} handles. */
 public class DefaultAtomFactory implements AtomFactory {
 
   private final CodecFactory codecFactory;
   private final AtomContext context;
 
+  /**
+   * Creates a factory that hands out atom handles over the given backend.
+   *
+   * @param atomSpi the backend implementation
+   * @param codecFactory supplies per-type codecs
+   * @param transformer applied to payload bytes on the way to and from the backend
+   * @param notifier announces changes to subscribers
+   * @param maxTtl the TTL ceiling callers may request
+   * @param shutdownCoordinator cancels this factory's subscriptions at context shutdown
+   */
   public DefaultAtomFactory(
       AtomSpi atomSpi,
       CodecFactory codecFactory,

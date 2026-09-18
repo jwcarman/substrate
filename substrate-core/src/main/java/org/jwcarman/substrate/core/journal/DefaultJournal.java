@@ -36,6 +36,12 @@ import org.jwcarman.substrate.journal.JournalEntry;
 import org.jwcarman.substrate.journal.JournalExpiredException;
 import org.jwcarman.substrate.journal.JournalNotFoundException;
 
+/**
+ * Default {@link Journal} handle: an append-only sequence at a key, read forward from a cursor and
+ * closed by completing it.
+ *
+ * @param <T> the type of value appended to this journal
+ */
 public class DefaultJournal<T> implements Journal<T> {
 
   private final JournalContext context;
@@ -43,6 +49,14 @@ public class DefaultJournal<T> implements Journal<T> {
   private final Codec<T> codec;
   private final AtomicBoolean connected;
 
+  /**
+   * Creates a handle on the journal stored at the given key.
+   *
+   * @param context the shared backend, codec and notifier wiring
+   * @param key the backend storage key
+   * @param codec encodes and decodes this journal's values
+   * @param connected whether this handle attached to an existing journal rather than creating it
+   */
   public DefaultJournal(JournalContext context, String key, Codec<T> codec, boolean connected) {
     this.context = context;
     this.key = key;

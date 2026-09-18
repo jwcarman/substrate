@@ -46,6 +46,12 @@ public final class CallbackPumpSubscription<T> implements Subscription {
   private final BlockingSubscription<T> source;
   private final Thread pumpThread;
 
+  /**
+   * Starts pumping values from a blocking subscription into a callback subscriber.
+   *
+   * @param source the subscription to drain
+   * @param subscriber the handlers to invoke for each value and terminal signal
+   */
   public CallbackPumpSubscription(BlockingSubscription<T> source, Subscriber<T> subscriber) {
     this.source = source;
     // Capture source + subscriber as LOCALS — the lambda never touches `this`.

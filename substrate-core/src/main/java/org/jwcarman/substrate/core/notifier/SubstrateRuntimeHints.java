@@ -36,6 +36,9 @@ import org.springframework.aot.hint.RuntimeHintsRegistrar;
  */
 public class SubstrateRuntimeHints implements RuntimeHintsRegistrar {
 
+  /** Creates the registrar. Instantiated reflectively by Spring's AOT infrastructure. */
+  public SubstrateRuntimeHints() {}
+
   private static final BindingReflectionHintsRegistrar BINDING =
       new BindingReflectionHintsRegistrar();
 

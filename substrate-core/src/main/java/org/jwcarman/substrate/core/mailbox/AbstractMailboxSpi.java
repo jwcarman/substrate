@@ -25,10 +25,20 @@ public abstract class AbstractMailboxSpi implements MailboxSpi {
 
   private final String prefix;
 
+  /**
+   * Creates a base SPI that qualifies every logical name with the given key prefix.
+   *
+   * @param prefix prepended to every logical name to form the backend storage key
+   */
   protected AbstractMailboxSpi(String prefix) {
     this.prefix = prefix;
   }
 
+  /**
+   * Returns the key prefix this SPI qualifies logical names with.
+   *
+   * @return the configured key prefix
+   */
   protected String prefix() {
     return prefix;
   }

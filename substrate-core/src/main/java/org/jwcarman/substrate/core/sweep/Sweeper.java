@@ -23,6 +23,14 @@ import java.util.random.RandomGenerator;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+/**
+ * Drives a {@link Sweepable} backend on a schedule, reclaiming records whose TTL has run out.
+ *
+ * <p>Backends with native expiry inherit a no-op {@code sweep} and this driver simply finds nothing
+ * to do; backends without it — PostgreSQL — depend on this class to make TTLs mean anything. Each
+ * tick calls {@code sweep(batchSize)} repeatedly while the backend keeps returning full batches, so
+ * a large backlog drains over several ticks rather than monopolising the thread.
+ */
 public class Sweeper implements AutoCloseable {
 
   private static final Log log = LogFactory.getLog(Sweeper.class);
@@ -33,6 +41,16 @@ public class Sweeper implements AutoCloseable {
   private final int batchSize;
   private final ScheduledExecutorService scheduler;
 
+  /**
+   * Starts a sweeper on its own daemon thread.
+   *
+   * @param primitiveType the primitive being swept, used to name the thread
+   * @param target the backend to sweep
+   * @param interval how often to sweep; must be positive
+   * @param batchSize the maximum records to reclaim per call; must be positive
+   * @throws IllegalArgumentException if any argument is null, or the interval or batch size is not
+   *     positive
+   */
   public Sweeper(Class<?> primitiveType, Sweepable target, Duration interval, int batchSize) {
     if (primitiveType == null) {
       throw new IllegalArgumentException("primitiveType must not be null");

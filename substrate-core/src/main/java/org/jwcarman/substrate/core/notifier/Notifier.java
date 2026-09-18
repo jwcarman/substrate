@@ -17,25 +17,90 @@ package org.jwcarman.substrate.core.notifier;
 
 import java.util.function.Consumer;
 
+/**
+ * Routes {@link Notification}s from the writer of a primitive to whoever is subscribed to it,
+ * across nodes when the backing transport spans them.
+ *
+ * <p>A notifier is a wake-up channel, not a delivery guarantee: a dropped notification costs a
+ * subscriber latency, not correctness, because subscribers re-read the primitive to learn what
+ * actually changed. Primitives call the {@code notify*} methods after a successful write; the
+ * {@code subscribeTo*} methods are how subscriptions listen.
+ */
 public interface Notifier {
 
+  /**
+   * Announces that the atom at this key was written.
+   *
+   * @param key the backend storage key
+   */
   void notifyAtomChanged(String key);
 
+  /**
+   * Announces that the atom at this key was deleted.
+   *
+   * @param key the backend storage key
+   */
   void notifyAtomDeleted(String key);
 
+  /**
+   * Announces that the journal at this key was appended to.
+   *
+   * @param key the backend storage key
+   */
   void notifyJournalChanged(String key);
 
+  /**
+   * Announces that the journal at this key was completed.
+   *
+   * @param key the backend storage key
+   */
   void notifyJournalCompleted(String key);
 
+  /**
+   * Announces that the journal at this key was deleted.
+   *
+   * @param key the backend storage key
+   */
   void notifyJournalDeleted(String key);
 
+  /**
+   * Announces that the mailbox at this key was written.
+   *
+   * @param key the backend storage key
+   */
   void notifyMailboxChanged(String key);
 
+  /**
+   * Announces that the mailbox at this key was deleted.
+   *
+   * @param key the backend storage key
+   */
   void notifyMailboxDeleted(String key);
 
+  /**
+   * Subscribes to notifications about the atom at the given key.
+   *
+   * @param key the backend storage key
+   * @param handler invoked for each notification about this key
+   * @return a handle that stops delivery when closed
+   */
   NotifierSubscription subscribeToAtom(String key, Consumer<Notification> handler);
 
+  /**
+   * Subscribes to notifications about the journal at the given key.
+   *
+   * @param key the backend storage key
+   * @param handler invoked for each notification about this key
+   * @return a handle that stops delivery when closed
+   */
   NotifierSubscription subscribeToJournal(String key, Consumer<Notification> handler);
 
+  /**
+   * Subscribes to notifications about the mailbox at the given key.
+   *
+   * @param key the backend storage key
+   * @param handler invoked for each notification about this key
+   * @return a handle that stops delivery when closed
+   */
   NotifierSubscription subscribeToMailbox(String key, Consumer<Notification> handler);
 }

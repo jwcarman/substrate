@@ -25,11 +25,22 @@ import org.jwcarman.substrate.core.ttl.TtlBounds;
 import org.jwcarman.substrate.journal.Journal;
 import org.jwcarman.substrate.journal.JournalFactory;
 
+/** Default {@link JournalFactory}, creating and attaching {@link DefaultJournal} handles. */
 public class DefaultJournalFactory implements JournalFactory {
 
   private final CodecFactory codecFactory;
   private final JournalContext context;
 
+  /**
+   * Creates a factory that hands out journal handles over the given backend.
+   *
+   * @param journalSpi the backend implementation
+   * @param codecFactory supplies per-type codecs
+   * @param transformer applied to payload bytes on the way to and from the backend
+   * @param notifier announces changes to subscribers
+   * @param limits the subscription and TTL ceilings callers may request
+   * @param shutdownCoordinator cancels this factory's subscriptions at context shutdown
+   */
   public DefaultJournalFactory(
       JournalSpi journalSpi,
       CodecFactory codecFactory,

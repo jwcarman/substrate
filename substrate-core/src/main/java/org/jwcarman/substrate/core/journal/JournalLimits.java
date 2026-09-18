@@ -48,6 +48,8 @@ public record JournalLimits(
    * Returns a {@code JournalLimits} populated with the canonical defaults — the same values {@link
    * org.jwcarman.substrate.core.autoconfigure.SubstrateProperties.JournalProperties} applies when
    * no explicit configuration is present.
+   *
+   * @return the canonical default journal limits
    */
   public static JournalLimits defaults() {
     return new JournalLimits(

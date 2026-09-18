@@ -48,10 +48,17 @@ public class ShutdownCoordinator implements SmartLifecycle {
   private final AtomicBoolean running = new AtomicBoolean(true);
   private final Duration totalTimeout;
 
+  /** Creates a coordinator that allows registered subscriptions five seconds to stop. */
   public ShutdownCoordinator() {
     this(DEFAULT_TIMEOUT);
   }
 
+  /**
+   * Creates a coordinator with an explicit shutdown budget.
+   *
+   * @param totalTimeout how long all registered subscriptions together get to stop before shutdown
+   *     proceeds anyway
+   */
   public ShutdownCoordinator(Duration totalTimeout) {
     this.totalTimeout = totalTimeout;
   }
@@ -59,6 +66,8 @@ public class ShutdownCoordinator implements SmartLifecycle {
   /**
    * Register a subscription so it gets cancelled at context shutdown. If the coordinator has
    * already started shutting down, the subscription is cancelled synchronously on this call.
+   *
+   * @param subscription the subscription to cancel at shutdown
    */
   public void register(Subscription subscription) {
     if (running.get()) {
@@ -72,7 +81,11 @@ public class ShutdownCoordinator implements SmartLifecycle {
     }
   }
 
-  /** Un-register a subscription. Called from the subscription's own {@code cancel()} path. */
+  /**
+   * Un-register a subscription. Called from the subscription's own {@code cancel()} path.
+   *
+   * @param subscription the subscription to stop tracking
+   */
   public void unregister(Subscription subscription) {
     registered.remove(subscription);
   }

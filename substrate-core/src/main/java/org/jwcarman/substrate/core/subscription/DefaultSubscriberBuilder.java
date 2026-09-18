@@ -27,6 +27,9 @@ import org.jwcarman.substrate.SubscriberConfig;
  */
 public final class DefaultSubscriberBuilder<T> implements SubscriberConfig<T> {
 
+  /** Creates a builder with no handlers registered. */
+  public DefaultSubscriberBuilder() {}
+
   private Consumer<T> onNext;
   private Runnable onCompleted;
   private Runnable onExpired;

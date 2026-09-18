@@ -38,6 +38,12 @@ import org.jwcarman.substrate.core.subscription.DefaultSubscriberBuilder;
 import org.jwcarman.substrate.core.subscription.FeederSupport;
 import org.jwcarman.substrate.core.subscription.SingleSlotHandoff;
 
+/**
+ * Default {@link Atom} handle: a single value at a key, read and replaced under a staleness token
+ * so concurrent writers detect each other.
+ *
+ * @param <T> the type of value held by this atom
+ */
 public class DefaultAtom<T> implements Atom<T> {
 
   private final AtomContext context;
@@ -45,6 +51,14 @@ public class DefaultAtom<T> implements Atom<T> {
   private final Codec<T> codec;
   private final AtomicBoolean connected;
 
+  /**
+   * Creates a handle on the atom stored at the given key.
+   *
+   * @param context the shared backend, codec and notifier wiring
+   * @param key the backend storage key
+   * @param codec encodes and decodes this atom's values
+   * @param connected whether this handle attached to an existing atom rather than creating it
+   */
   public DefaultAtom(AtomContext context, String key, Codec<T> codec, boolean connected) {
     this.context = context;
     this.key = key;

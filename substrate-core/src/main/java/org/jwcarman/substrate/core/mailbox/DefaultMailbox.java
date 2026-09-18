@@ -32,6 +32,12 @@ import org.jwcarman.substrate.mailbox.Mailbox;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 import org.jwcarman.substrate.mailbox.MailboxNotFoundException;
 
+/**
+ * Default {@link Mailbox} handle: a single-slot drop box at a key, where each delivery replaces
+ * whatever was waiting.
+ *
+ * @param <T> the type of value delivered to this mailbox
+ */
 public class DefaultMailbox<T> implements Mailbox<T> {
 
   private final MailboxContext context;
@@ -39,6 +45,14 @@ public class DefaultMailbox<T> implements Mailbox<T> {
   private final Codec<T> codec;
   private final AtomicBoolean connected;
 
+  /**
+   * Creates a handle on the mailbox stored at the given key.
+   *
+   * @param context the shared backend, codec and notifier wiring
+   * @param key the backend storage key
+   * @param codec encodes and decodes this mailbox's values
+   * @param connected whether this handle attached to an existing mailbox rather than creating it
+   */
   public DefaultMailbox(MailboxContext context, String key, Codec<T> codec, boolean connected) {
     this.context = context;
     this.key = key;

@@ -30,10 +30,20 @@ package org.jwcarman.substrate.core.transform;
  */
 public interface PayloadTransformer {
 
-  /** Called before writing to the backend. Typical use: encrypt the bytes. */
+  /**
+   * Called before writing to the backend. Typical use: encrypt the bytes.
+   *
+   * @param plaintext the payload as the primitive produced it
+   * @return the bytes to hand to the backend
+   */
   byte[] encode(byte[] plaintext);
 
-  /** Called after reading from the backend. Typical use: decrypt the bytes. */
+  /**
+   * Called after reading from the backend. Typical use: decrypt the bytes.
+   *
+   * @param ciphertext the payload as the backend stored it
+   * @return the bytes to hand back to the primitive
+   */
   byte[] decode(byte[] ciphertext);
 
   /** Pass-through transformer. The default when no concrete transformer is configured. */

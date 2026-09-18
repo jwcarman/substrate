@@ -21,7 +21,14 @@ import java.util.function.Consumer;
 import org.jwcarman.substrate.core.notifier.NotifierSpi;
 import org.jwcarman.substrate.core.notifier.NotifierSubscription;
 
+/**
+ * In-process {@link NotifierSpi} fallback. Delivers notifications to subscribers in this JVM only,
+ * which is all a single-node deployment needs; add a backend notifier to span nodes.
+ */
 public class InMemoryNotifier implements NotifierSpi {
+
+  /** Creates a notifier with no subscribers. */
+  public InMemoryNotifier() {}
 
   private final List<Consumer<byte[]>> handlers = new CopyOnWriteArrayList<>();
 

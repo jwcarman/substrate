@@ -23,6 +23,12 @@ import org.jwcarman.substrate.Subscriber;
  * Unset (null) handlers are silently ignored.
  *
  * @param <T> the type of values delivered to this subscriber
+ * @param onNextHandler invoked with each delivered value
+ * @param onCompletedHandler invoked when the source is completed
+ * @param onExpiredHandler invoked when the source expires
+ * @param onDeletedHandler invoked when the source is deleted
+ * @param onCancelledHandler invoked when the subscription is cancelled
+ * @param onErrorHandler invoked with any error raised while delivering
  */
 public record ConfiguredSubscriber<T>(
     Consumer<T> onNextHandler,

@@ -24,6 +24,11 @@ import org.apache.commons.logging.LogFactory;
 import org.jwcarman.codec.spi.Codec;
 import org.jwcarman.codec.spi.CodecFactory;
 
+/**
+ * Default {@link Notifier}, routing every primitive's notifications over a single {@link
+ * org.jwcarman.substrate.core.notifier.NotifierSpi} transport by encoding the primitive, key and
+ * kind into the payload.
+ */
 public class DefaultNotifier implements Notifier {
 
   private static final Log log = LogFactory.getLog(DefaultNotifier.class);
@@ -33,6 +38,12 @@ public class DefaultNotifier implements Notifier {
   private final Map<PrimitiveType, Map<String, CopyOnWriteArrayList<Consumer<Notification>>>>
       index = new ConcurrentHashMap<>();
 
+  /**
+   * Creates a notifier over the given transport.
+   *
+   * @param spi the transport that carries notification payloads
+   * @param codecFactory supplies the codec used to encode and decode those payloads
+   */
   public DefaultNotifier(NotifierSpi spi, CodecFactory codecFactory) {
     this.spi = spi;
     this.codec = codecFactory.create(RawNotification.class);

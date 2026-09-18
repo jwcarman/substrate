@@ -34,10 +34,20 @@ public abstract class AbstractJournalSpi implements JournalSpi {
 
   private final String prefix;
 
+  /**
+   * Creates a base SPI that qualifies every logical name with the given key prefix.
+   *
+   * @param prefix prepended to every logical name to form the backend storage key
+   */
   protected AbstractJournalSpi(String prefix) {
     this.prefix = prefix;
   }
 
+  /**
+   * Returns the key prefix this SPI qualifies logical names with.
+   *
+   * @return the configured key prefix
+   */
   protected String prefix() {
     return prefix;
   }
@@ -57,6 +67,11 @@ public abstract class AbstractJournalSpi implements JournalSpi {
     return 0;
   }
 
+  /**
+   * Generates a fresh entry id that sorts after every id generated before it.
+   *
+   * @return a new UUID v7 entry id
+   */
   protected String generateEntryId() {
     return UUID_GENERATOR.generate().toString();
   }

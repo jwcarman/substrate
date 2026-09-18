@@ -29,6 +29,12 @@ import org.jwcarman.substrate.journal.JournalAlreadyExistsException;
 import org.jwcarman.substrate.journal.JournalCompletedException;
 import org.jwcarman.substrate.journal.JournalExpiredException;
 
+/**
+ * In-process {@link org.jwcarman.substrate.core.journal.JournalSpi} fallback, and the reference
+ * implementation of the journal lifecycle: inactivity and retention leases, per-entry TTLs, and
+ * tombstones so a read just after a journal dies reports the expiry rather than an empty journal.
+ * State dies with the JVM.
+ */
 public class InMemoryJournalSpi extends AbstractJournalSpi {
 
   private static final int DEFAULT_MAX_LEN = 100_000;
@@ -64,10 +70,16 @@ public class InMemoryJournalSpi extends AbstractJournalSpi {
   private final int maxLen;
   private final AtomicLong counter = new AtomicLong(0);
 
+  /** Creates an empty in-memory journal store bounded at 100,000 entries per journal. */
   public InMemoryJournalSpi() {
     this(DEFAULT_MAX_LEN);
   }
 
+  /**
+   * Creates an empty in-memory journal store with an explicit per-journal entry bound.
+   *
+   * @param maxLen the maximum entries retained per journal; older entries are dropped first
+   */
   public InMemoryJournalSpi(int maxLen) {
     super("substrate:journal:");
     this.maxLen = maxLen;

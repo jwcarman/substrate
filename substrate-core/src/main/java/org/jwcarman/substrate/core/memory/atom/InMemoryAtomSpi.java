@@ -27,10 +27,15 @@ import org.jwcarman.substrate.core.atom.CasResult;
 import org.jwcarman.substrate.core.atom.RawAtom;
 import org.jwcarman.substrate.core.memory.ExpiringEntry;
 
+/**
+ * In-process {@link org.jwcarman.substrate.core.atom.AtomSpi} fallback. Holds atoms in a map with
+ * explicit expiry, swept on read and by the sweeper; state dies with the JVM.
+ */
 public class InMemoryAtomSpi extends AbstractAtomSpi {
 
   private final ConcurrentMap<String, ExpiringEntry<RawAtom>> store = new ConcurrentHashMap<>();
 
+  /** Creates an empty in-memory atom store under the default key prefix. */
   public InMemoryAtomSpi() {
     super("substrate:atom:");
   }

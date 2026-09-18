@@ -25,12 +25,23 @@ import org.jwcarman.substrate.core.ttl.TtlBounds;
 import org.jwcarman.substrate.mailbox.Mailbox;
 import org.jwcarman.substrate.mailbox.MailboxFactory;
 
+/** Default {@link MailboxFactory}, creating and attaching {@link DefaultMailbox} handles. */
 public class DefaultMailboxFactory implements MailboxFactory {
 
   private final CodecFactory codecFactory;
   private final Duration maxTtl;
   private final MailboxContext context;
 
+  /**
+   * Creates a factory that hands out mailbox handles over the given backend.
+   *
+   * @param mailboxSpi the backend implementation
+   * @param codecFactory supplies per-type codecs
+   * @param transformer applied to payload bytes on the way to and from the backend
+   * @param notifier announces changes to subscribers
+   * @param maxTtl the TTL ceiling callers may request
+   * @param shutdownCoordinator cancels this factory's subscriptions at context shutdown
+   */
   public DefaultMailboxFactory(
       MailboxSpi mailboxSpi,
       CodecFactory codecFactory,

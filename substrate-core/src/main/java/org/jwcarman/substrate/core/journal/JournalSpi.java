@@ -39,6 +39,8 @@ public interface JournalSpi extends Sweepable {
   /**
    * Create a new journal with an inactivity TTL. Must be atomic set-if-not-exists.
    *
+   * @param key the backend storage key for the journal
+   * @param inactivityTtl how long the journal may go without an append before it expires
    * @throws JournalAlreadyExistsException if a live journal already exists at this key
    */
   void create(String key, Duration inactivityTtl);
@@ -46,6 +48,11 @@ public interface JournalSpi extends Sweepable {
   /**
    * Append an entry, resetting the journal's inactivity timer atomically.
    *
+   * @param key the backend storage key for the journal
+   * @param data the encoded entry payload
+   * @param entryTtl how long this entry remains readable; {@code Duration.ZERO} stores it without a
+   *     TTL
+   * @return the id of the appended entry, ordered after every id already in the journal
    * @throws JournalCompletedException if the journal is completed
    * @throws JournalExpiredException if the journal is expired
    */
@@ -54,6 +61,9 @@ public interface JournalSpi extends Sweepable {
   /**
    * Read entries strictly after the given id.
    *
+   * @param key the backend storage key for the journal
+   * @param afterId the exclusive lower bound cursor
+   * @return the entries after the cursor in append order, empty if there are none
    * @throws JournalExpiredException if the journal is expired
    */
   List<RawJournalEntry> readAfter(String key, String afterId);
@@ -61,6 +71,9 @@ public interface JournalSpi extends Sweepable {
   /**
    * Read the last {@code count} entries in chronological order.
    *
+   * @param key the backend storage key for the journal
+   * @param count the maximum number of entries to return
+   * @return up to {@code count} of the most recent entries, oldest first
    * @throws JournalExpiredException if the journal is expired
    */
   List<RawJournalEntry> readLast(String key, int count);
@@ -69,6 +82,9 @@ public interface JournalSpi extends Sweepable {
    * Mark the journal as completed with a retention TTL. Calling on an already-completed journal
    * updates the retention TTL (latest call wins).
    *
+   * @param key the backend storage key for the journal
+   * @param retentionTtl how long the completed journal stays readable; {@code Duration.ZERO}
+   *     retains it without a TTL
    * @throws JournalExpiredException if the journal is already expired
    */
   void complete(String key, Duration retentionTtl);

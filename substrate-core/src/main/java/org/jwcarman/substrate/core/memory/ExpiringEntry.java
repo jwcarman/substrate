@@ -34,6 +34,12 @@ import java.util.concurrent.ConcurrentMap;
  */
 public record ExpiringEntry<V>(V value, Instant expiresAt) {
 
+  /**
+   * Returns whether this entry has reached its expiry instant, judged against the current
+   * wall-clock time.
+   *
+   * @return {@code true} once {@code expiresAt} has been reached
+   */
   public boolean isExpired() {
     return !Instant.now().isBefore(expiresAt);
   }
@@ -43,6 +49,10 @@ public record ExpiringEntry<V>(V value, Instant expiresAt) {
    * once, removes those whose {@link #isExpired} returns true, and stops after {@code maxToSweep}
    * removals.
    *
+   * @param store the map to sweep
+   * @param maxToSweep the maximum number of entries to remove in this call
+   * @param <K> the map's key type
+   * @param <V> the wrapped value type
    * @return the number of entries removed
    */
   public static <K, V> int sweepExpired(ConcurrentMap<K, ExpiringEntry<V>> store, int maxToSweep) {

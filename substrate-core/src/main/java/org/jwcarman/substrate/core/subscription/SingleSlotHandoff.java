@@ -24,6 +24,9 @@ package org.jwcarman.substrate.core.subscription;
  */
 public final class SingleSlotHandoff<T> extends AbstractHandoff<T> {
 
+  /** Creates an empty handoff. */
+  public SingleSlotHandoff() {}
+
   private T value;
 
   @Override

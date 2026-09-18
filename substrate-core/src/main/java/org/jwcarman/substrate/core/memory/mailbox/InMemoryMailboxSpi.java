@@ -25,11 +25,16 @@ import org.jwcarman.substrate.core.memory.ExpiringEntry;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 import org.jwcarman.substrate.mailbox.MailboxFullException;
 
+/**
+ * In-process {@link org.jwcarman.substrate.core.mailbox.MailboxSpi} fallback. Holds mailboxes in a
+ * map with explicit expiry, swept on read and by the sweeper; state dies with the JVM.
+ */
 public class InMemoryMailboxSpi extends AbstractMailboxSpi {
 
   private final ConcurrentMap<String, ExpiringEntry<Optional<byte[]>>> store =
       new ConcurrentHashMap<>();
 
+  /** Creates an empty in-memory mailbox store under the default key prefix. */
   public InMemoryMailboxSpi() {
     super("substrate:mailbox:");
   }
