@@ -10,6 +10,8 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-18
+
 ### Breaking changes
 
 - `substrate-postgresql`: the journal schema changed. `substrate_journal_completed`
@@ -43,6 +45,22 @@ occur between minor versions. The 1.0.0 release will mark API stability.
   expired mailbox rows accumulated forever. Reads were already gated on
   `expires_at`, so expired mailboxes behaved as gone — this was a storage leak
   rather than a correctness bug. It now sweeps.
+- `substrate-core`: `DefaultAtom` drew its staleness tokens from
+  `ThreadLocalRandom`. Tokens are what `compareAndSet` compares, so they are
+  concurrency-control material; they now come from `SecureRandom`.
+- `substrate-mongodb`: `MongoDbAtomSpi` converted `Instant` to `java.util.Date`
+  purely to build the compare-and-set aggregation pipeline. The driver encodes
+  `Instant` directly, so the conversion is gone.
+
+### Documentation
+
+- `substrate-core`'s SPI and contract types are now documented for javadoc:
+  `JournalSpi`'s parameters, `Notifier`, `Notification`, `ConfiguredSubscriber`,
+  `ExpiringEntry`, `PayloadTransformer`, `ShutdownCoordinator`, `JournalLimits`,
+  the `Abstract*Spi` bases, `Sweeper`, and the `Default*` / `InMemory*`
+  implementations. The Maven Central publish runs javadoc non-quiet, so these
+  showed up as build annotations; 317 warnings across the reactor are down to 245,
+  and 100 to 28 within `substrate-core`.
 
 ## [0.8.2] - 2026-09-17
 
@@ -827,6 +845,7 @@ abstractions:
 
 - **BOM** (`substrate-bom`) for version alignment across all modules
 
+[0.9.0]: https://github.com/jwcarman/substrate/releases/tag/0.9.0
 [0.8.2]: https://github.com/jwcarman/substrate/releases/tag/0.8.2
 [0.8.1]: https://github.com/jwcarman/substrate/releases/tag/0.8.1
 [0.8.0]: https://github.com/jwcarman/substrate/releases/tag/0.8.0
