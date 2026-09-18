@@ -16,6 +16,7 @@
 package org.jwcarman.substrate.postgresql.mailbox;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.charset.StandardCharsets;
@@ -171,6 +172,39 @@ class PostgresMailboxIT {
     assertThat(successes.get()).isEqualTo(1);
     assertThat(failures.get()).isEqualTo(threadCount - 1);
     assertThat(mailbox.get(key)).isPresent();
+  }
+
+  @Test
+  void sweepDeletesExpiredMailboxes() {
+    for (int i = 0; i < 10; i++) {
+      mailbox.create(mailbox.mailboxKey("sweep-" + i), Duration.ofMillis(50));
+    }
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(() -> assertThat(mailbox.sweep(100)).isEqualTo(10));
+
+    Integer count =
+        jdbcTemplate.queryForObject("SELECT COUNT(*) FROM substrate_mailbox", Integer.class);
+    assertThat(count).isZero();
+  }
+
+  @Test
+  void sweepLeavesLiveMailboxes() {
+    mailbox.create(mailbox.mailboxKey("sweep-live"), Duration.ofHours(1));
+
+    assertThat(mailbox.sweep(100)).isZero();
+  }
+
+  @Test
+  void sweepStopsAtTheRequestedLimit() {
+    for (int i = 0; i < 10; i++) {
+      mailbox.create(mailbox.mailboxKey("sweep-limit-" + i), Duration.ofMillis(50));
+    }
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(() -> assertThat(mailbox.sweep(4)).isEqualTo(4));
   }
 
   private DataSource createDataSource() {

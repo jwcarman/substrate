@@ -90,4 +90,19 @@ public class PostgresMailboxSpi extends AbstractMailboxSpi {
             key);
     return Boolean.TRUE.equals(result);
   }
+
+  @Override
+  public int sweep(int maxToSweep) {
+    // SKIP LOCKED allows concurrent sweepers on multiple nodes to grab
+    // disjoint batches without blocking each other.
+    return jdbcTemplate.update(
+        "DELETE FROM substrate_mailbox WHERE ctid IN ("
+            + " SELECT ctid FROM substrate_mailbox"
+            + " WHERE expires_at < NOW()"
+            + " ORDER BY expires_at"
+            + " LIMIT ?"
+            + " FOR UPDATE SKIP LOCKED"
+            + ")",
+        maxToSweep);
+  }
 }

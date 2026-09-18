@@ -16,6 +16,8 @@
 package org.jwcarman.substrate.postgresql.journal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -24,6 +26,9 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.core.journal.RawJournalEntry;
+import org.jwcarman.substrate.journal.JournalAlreadyExistsException;
+import org.jwcarman.substrate.journal.JournalCompletedException;
+import org.jwcarman.substrate.journal.JournalExpiredException;
 import org.jwcarman.substrate.postgresql.PostgresTestContainer;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -45,7 +50,7 @@ class PostgresJournalSpiIT {
     populator.execute(dataSource);
 
     jdbcTemplate.update("DELETE FROM substrate_journal_entries");
-    jdbcTemplate.update("DELETE FROM substrate_journal_completed");
+    jdbcTemplate.update("DELETE FROM substrate_journal");
 
     journal = new PostgresJournalSpi(jdbcTemplate, "substrate:journal:", 100_000);
   }
@@ -58,6 +63,7 @@ class PostgresJournalSpiIT {
   @Test
   void existsReturnsTrueAfterAppend() {
     String key = journal.journalKey("exists-test");
+    journal.create(key, Duration.ofHours(1));
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     assertThat(journal.exists(key)).isTrue();
   }
@@ -65,6 +71,7 @@ class PostgresJournalSpiIT {
   @Test
   void appendAndReadAfterFullLifecycle() {
     String key = journal.journalKey("test-stream");
+    journal.create(key, Duration.ofHours(1));
     String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     String id2 =
         journal.append(key, "second".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
@@ -84,6 +91,7 @@ class PostgresJournalSpiIT {
   @Test
   void readLastReturnsEntriesInChronologicalOrder() {
     String key = journal.journalKey("last-test");
+    journal.create(key, Duration.ofHours(1));
     journal.append(key, "a".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     journal.append(key, "b".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     journal.append(key, "c".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
@@ -104,6 +112,7 @@ class PostgresJournalSpiIT {
   @Test
   void deleteRemovesAllEntries() {
     String key = journal.journalKey("delete-test");
+    journal.create(key, Duration.ofHours(1));
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     journal.delete(key);
 
@@ -112,34 +121,33 @@ class PostgresJournalSpiIT {
   }
 
   @Test
-  void completeStoresCompletionMarker() {
+  void completeMarksTheJournalComplete() {
     String key = journal.journalKey("complete-test");
+    journal.create(key, Duration.ofHours(1));
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     journal.complete(key, Duration.ofHours(1));
 
-    Integer count =
-        jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM substrate_journal_completed WHERE key = ?", Integer.class, key);
-    assertThat(count).isEqualTo(1);
+    assertThat(journal.isComplete(key)).isTrue();
   }
 
   @Test
-  void deleteRemovesCompletionMarker() {
+  void deleteRemovesCompletionState() {
     String key = journal.journalKey("complete-delete-test");
+    journal.create(key, Duration.ofHours(1));
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     journal.complete(key, Duration.ofHours(1));
     journal.delete(key);
 
-    Integer count =
-        jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM substrate_journal_completed WHERE key = ?", Integer.class, key);
-    assertThat(count).isZero();
+    assertThat(journal.isComplete(key)).isFalse();
+    assertThat(journal.exists(key)).isFalse();
   }
 
   @Test
   void deleteDoesNotAffectOtherStreams() {
     String stream1 = journal.journalKey("stream-a");
     String stream2 = journal.journalKey("stream-b");
+    journal.create(stream1, Duration.ofHours(1));
+    journal.create(stream2, Duration.ofHours(1));
     journal.append(stream1, "a-event".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     journal.append(stream2, "b-event".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
@@ -152,6 +160,7 @@ class PostgresJournalSpiIT {
   @Test
   void appendReturnsMonotonicId() {
     String key = journal.journalKey("monotonic-test");
+    journal.create(key, Duration.ofHours(1));
     String id1 = journal.append(key, "first".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     String id2 =
         journal.append(key, "second".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
@@ -170,6 +179,7 @@ class PostgresJournalSpiIT {
     PostgresJournalSpi smallJournal = new PostgresJournalSpi(jdbcTemplate, "substrate:journal:", 5);
 
     String key = smallJournal.journalKey("trim-test");
+    smallJournal.create(key, Duration.ofHours(1));
     for (int i = 0; i < 10; i++) {
       smallJournal.append(
           key, ("event-" + i).getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
@@ -181,20 +191,20 @@ class PostgresJournalSpiIT {
   }
 
   @Test
-  void completeIsIdempotent() {
+  void completeIsIdempotentAndTheLatestRetentionTtlWins() {
     String key = journal.journalKey("idempotent-complete");
-    journal.complete(key, Duration.ofHours(1));
+    journal.create(key, Duration.ofHours(1));
+    journal.complete(key, Duration.ofMillis(50));
     journal.complete(key, Duration.ofHours(1));
 
-    Integer count =
-        jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM substrate_journal_completed WHERE key = ?", Integer.class, key);
-    assertThat(count).isEqualTo(1);
+    assertThat(journal.isComplete(key)).isTrue();
+    assertThat(journal.exists(key)).isTrue();
   }
 
   @Test
   void isCompleteReturnsFalseForNonCompletedJournal() {
     String key = journal.journalKey("incomplete-test");
+    journal.create(key, Duration.ofHours(1));
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
 
     assertThat(journal.isComplete(key)).isFalse();
@@ -203,6 +213,7 @@ class PostgresJournalSpiIT {
   @Test
   void isCompleteReturnsTrueAfterComplete() {
     String key = journal.journalKey("is-complete-test");
+    journal.create(key, Duration.ofHours(1));
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     journal.complete(key, Duration.ofHours(1));
 
@@ -215,6 +226,7 @@ class PostgresJournalSpiIT {
         new PostgresJournalSpi(jdbcTemplate, "substrate:journal:", 10);
 
     String key = smallJournal.journalKey("trim-100-test");
+    smallJournal.create(key, Duration.ofHours(1));
     for (int i = 0; i < 100; i++) {
       smallJournal.append(
           key, ("event-" + i).getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
@@ -223,6 +235,249 @@ class PostgresJournalSpiIT {
     List<RawJournalEntry> entries = smallJournal.readLast(key, 100);
     assertThat(entries).hasSizeLessThanOrEqualTo(10);
     assertThat(new String(entries.getLast().data(), StandardCharsets.UTF_8)).isEqualTo("event-99");
+  }
+
+  @Test
+  void readLastOmitsEntriesPastTheirEntryTtl() {
+    String key = journal.journalKey("entry-ttl-read");
+    journal.create(key, Duration.ofHours(1));
+    journal.append(key, "ephemeral".getBytes(StandardCharsets.UTF_8), Duration.ofMillis(50));
+    journal.append(key, "durable".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(
+            () ->
+                assertThat(journal.readLast(key, 100))
+                    .extracting(e -> new String(e.data(), StandardCharsets.UTF_8))
+                    .containsExactly("durable"));
+  }
+
+  @Test
+  void sweepDeletesEntriesPastTheirEntryTtl() {
+    String key = journal.journalKey("entry-ttl-sweep");
+    journal.create(key, Duration.ofHours(1));
+    for (int i = 0; i < 10; i++) {
+      journal.append(key, ("event-" + i).getBytes(StandardCharsets.UTF_8), Duration.ofMillis(50));
+    }
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(() -> assertThat(journal.sweep(100)).isEqualTo(10));
+
+    Integer remaining =
+        jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM substrate_journal_entries WHERE key = ?", Integer.class, key);
+    assertThat(remaining).isZero();
+  }
+
+  @Test
+  void sweepLeavesEntriesWithinTheirEntryTtl() {
+    String key = journal.journalKey("entry-ttl-sweep-live");
+    journal.create(key, Duration.ofHours(1));
+    journal.append(key, "durable".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+
+    assertThat(journal.sweep(100)).isZero();
+    assertThat(journal.readLast(key, 100)).hasSize(1);
+  }
+
+  @Test
+  void sweepStopsAtTheRequestedLimit() {
+    String key = journal.journalKey("entry-ttl-sweep-limit");
+    journal.create(key, Duration.ofHours(1));
+    for (int i = 0; i < 10; i++) {
+      journal.append(key, ("event-" + i).getBytes(StandardCharsets.UTF_8), Duration.ofMillis(50));
+    }
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(() -> assertThat(journal.sweep(4)).isEqualTo(4));
+  }
+
+  @Test
+  void existsReturnsFalseOnceTheInactivityTtlElapses() {
+    String key = journal.journalKey("inactivity-expiry");
+    journal.create(key, Duration.ofMillis(50));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(() -> assertThat(journal.exists(key)).isFalse());
+  }
+
+  @Test
+  void appendPushesOutTheInactivityDeadline() throws InterruptedException {
+    String key = journal.journalKey("inactivity-reset");
+    journal.create(key, Duration.ofMillis(500));
+
+    for (int i = 0; i < 4; i++) {
+      Thread.sleep(200);
+      journal.append(key, ("event-" + i).getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    }
+
+    assertThat(journal.exists(key)).isTrue();
+    assertThat(journal.readLast(key, 100)).hasSize(4);
+  }
+
+  @Test
+  void appendThrowsOnceTheJournalIsDead() {
+    String key = journal.journalKey("append-after-death");
+    journal.create(key, Duration.ofMillis(50));
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(
+            () ->
+                assertThatThrownBy(
+                        () ->
+                            journal.append(
+                                key, "late".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1)))
+                    .isInstanceOf(JournalExpiredException.class));
+  }
+
+  @Test
+  void appendThrowsForAJournalThatWasNeverCreated() {
+    assertThatThrownBy(
+            () ->
+                journal.append(
+                    journal.journalKey("never-created"),
+                    "data".getBytes(StandardCharsets.UTF_8),
+                    Duration.ofHours(1)))
+        .isInstanceOf(JournalExpiredException.class);
+  }
+
+  @Test
+  void readLastThrowsOnceTheJournalIsDead() {
+    String key = journal.journalKey("read-after-death");
+    journal.create(key, Duration.ofMillis(50));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(
+            () ->
+                assertThatThrownBy(() -> journal.readLast(key, 100))
+                    .isInstanceOf(JournalExpiredException.class));
+  }
+
+  @Test
+  void readAfterThrowsOnceTheJournalIsDead() {
+    String key = journal.journalKey("read-after-cursor-death");
+    journal.create(key, Duration.ofMillis(50));
+    String id = journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(
+            () ->
+                assertThatThrownBy(() -> journal.readAfter(key, id))
+                    .isInstanceOf(JournalExpiredException.class));
+  }
+
+  @Test
+  void createThrowsWhenALiveJournalAlreadyExists() {
+    String key = journal.journalKey("duplicate-create");
+    journal.create(key, Duration.ofHours(1));
+
+    assertThatThrownBy(() -> journal.create(key, Duration.ofHours(1)))
+        .isInstanceOf(JournalAlreadyExistsException.class);
+  }
+
+  @Test
+  void createReplacesADeadJournalAndDiscardsItsEntries() {
+    String key = journal.journalKey("recreate-dead");
+    journal.create(key, Duration.ofMillis(50));
+    journal.append(key, "stale".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(
+            () -> {
+              journal.create(key, Duration.ofHours(1));
+              assertThat(journal.readLast(key, 100)).isEmpty();
+            });
+  }
+
+  @Test
+  void appendThrowsOnceTheJournalIsCompleted() {
+    String key = journal.journalKey("append-after-complete");
+    journal.create(key, Duration.ofHours(1));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.complete(key, Duration.ofHours(1));
+
+    assertThatThrownBy(
+            () -> journal.append(key, "late".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1)))
+        .isInstanceOf(JournalCompletedException.class);
+  }
+
+  @Test
+  void completedJournalStaysReadableWithinItsRetentionTtl() {
+    String key = journal.journalKey("retention-live");
+    journal.create(key, Duration.ofMillis(50));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.complete(key, Duration.ofHours(1));
+
+    assertThat(journal.exists(key)).isTrue();
+    assertThat(journal.isComplete(key)).isTrue();
+    assertThat(journal.readLast(key, 100)).hasSize(1);
+  }
+
+  @Test
+  void completedJournalDiesOnceItsRetentionTtlElapses() {
+    String key = journal.journalKey("retention-expiry");
+    journal.create(key, Duration.ofHours(1));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.complete(key, Duration.ofMillis(50));
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(
+            () -> {
+              assertThat(journal.exists(key)).isFalse();
+              assertThat(journal.isComplete(key)).isFalse();
+            });
+  }
+
+  @Test
+  void completeWithZeroRetentionRetainsTheJournalIndefinitely() {
+    String key = journal.journalKey("retention-forever");
+    journal.create(key, Duration.ofMillis(50));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+    journal.complete(key, Duration.ZERO);
+
+    assertThat(journal.exists(key)).isTrue();
+    assertThat(journal.isComplete(key)).isTrue();
+    assertThat(journal.sweep(100)).isZero();
+  }
+
+  @Test
+  void completeThrowsOnceTheJournalIsDead() {
+    String key = journal.journalKey("complete-after-death");
+    journal.create(key, Duration.ofMillis(50));
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(
+            () ->
+                assertThatThrownBy(() -> journal.complete(key, Duration.ofHours(1)))
+                    .isInstanceOf(JournalExpiredException.class));
+  }
+
+  @Test
+  void sweepDeletesDeadJournalsAndTheirEntries() {
+    String key = journal.journalKey("sweep-dead-journal");
+    journal.create(key, Duration.ofMillis(50));
+    journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
+
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(() -> assertThat(journal.sweep(100)).isPositive());
+
+    Integer entries =
+        jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM substrate_journal_entries WHERE key = ?", Integer.class, key);
+    assertThat(entries).isZero();
+    assertThat(journal.exists(key)).isFalse();
   }
 
   private DataSource createDataSource() {

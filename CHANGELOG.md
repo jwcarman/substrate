@@ -10,6 +10,40 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+### Breaking changes
+
+- `substrate-postgresql`: the journal schema changed. `substrate_journal_completed`
+  is gone, replaced by a `substrate_journal` table holding each journal's lease and
+  completion state, and `substrate_journal_entries` gained an `expires_at` column.
+  Existing journal tables are not migrated — drop them and let the auto-create
+  script rebuild the schema.
+- `substrate-postgresql`: `PostgresJournalSpi` now enforces the journal lifecycle
+  the SPI contract describes. `append` on a journal that was never created, has
+  outlived its lease, or has been completed now throws `JournalExpiredException` /
+  `JournalCompletedException` instead of silently inserting a row; `create` on a
+  live journal throws `JournalAlreadyExistsException`; `complete` on a dead journal
+  throws `JournalExpiredException`. Code that appended without calling
+  `JournalFactory.create(...)` first must now create the journal.
+
+### Fixed
+
+- `substrate-postgresql`: journal TTLs had no effect. `append(key, data, entryTtl)`
+  and `complete(key, retentionTtl)` accepted their `Duration` and ignored it, the
+  schema had nowhere to record a deadline, and `PostgresJournalSpi` inherited the
+  no-op `sweep` from `AbstractJournalSpi` — so the journal `Sweeper` that
+  `SubstrateAutoConfiguration` registers woke on its interval, deleted nothing and
+  slept again, for the life of the process. Journal entries on PostgreSQL were
+  bounded only by `max-len` (positionally, via an in-memory counter that reset on
+  restart), never by time. Entry TTL, inactivity TTL and retention TTL are now all
+  honoured: deadlines live in `substrate_journal.dies_at` and
+  `substrate_journal_entries.expires_at`, every read is gated on them, and `sweep`
+  reclaims both past-deadline journals and past-deadline entries with the same
+  batched `FOR UPDATE SKIP LOCKED` delete `PostgresAtomSpi` already used.
+- `substrate-postgresql`: `PostgresMailboxSpi` also inherited the no-op `sweep`, so
+  expired mailbox rows accumulated forever. Reads were already gated on
+  `expires_at`, so expired mailboxes behaved as gone — this was a storage leak
+  rather than a correctness bug. It now sweeps.
+
 ## [0.8.2] - 2026-09-17
 
 ### Fixed
