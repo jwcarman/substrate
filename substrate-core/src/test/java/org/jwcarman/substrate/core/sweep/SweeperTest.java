@@ -22,6 +22,7 @@ import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -90,7 +91,7 @@ class SweeperTest {
     sweeper.tick();
     sweeper.close();
 
-    verify(target, org.mockito.Mockito.times(3)).sweep(100);
+    verify(target, times(3)).sweep(100);
   }
 
   @Test

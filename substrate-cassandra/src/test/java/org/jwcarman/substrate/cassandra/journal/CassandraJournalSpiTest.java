@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -156,10 +157,10 @@ class CassandraJournalSpiTest {
   @Test
   void isCompleteReturnsTrueWhenCompletedDataExists() {
     ByteBuffer completedData = ByteBuffer.wrap("__COMPLETED__".getBytes(StandardCharsets.UTF_8));
-    Row row = org.mockito.Mockito.mock(Row.class);
+    Row row = mock(Row.class);
     when(row.getByteBuffer("data")).thenReturn(completedData);
 
-    ResultSet isCompleteResultSet = org.mockito.Mockito.mock(ResultSet.class);
+    ResultSet isCompleteResultSet = mock(ResultSet.class);
     when(isCompleteResultSet.iterator()).thenReturn(List.of(row).iterator());
     when(session.execute(anyString(), any(Object.class))).thenReturn(isCompleteResultSet);
 
@@ -169,10 +170,10 @@ class CassandraJournalSpiTest {
   @Test
   void isCompleteReturnsFalseWhenNoCompletedData() {
     ByteBuffer regularData = ByteBuffer.wrap("regular".getBytes(StandardCharsets.UTF_8));
-    Row row = org.mockito.Mockito.mock(Row.class);
+    Row row = mock(Row.class);
     when(row.getByteBuffer("data")).thenReturn(regularData);
 
-    ResultSet isCompleteResultSet = org.mockito.Mockito.mock(ResultSet.class);
+    ResultSet isCompleteResultSet = mock(ResultSet.class);
     when(isCompleteResultSet.iterator()).thenReturn(List.of(row).iterator());
     when(session.execute(anyString(), any(Object.class))).thenReturn(isCompleteResultSet);
 
@@ -181,7 +182,7 @@ class CassandraJournalSpiTest {
 
   @Test
   void isCompleteReturnsFalseWhenEmpty() {
-    ResultSet isCompleteResultSet = org.mockito.Mockito.mock(ResultSet.class);
+    ResultSet isCompleteResultSet = mock(ResultSet.class);
     when(isCompleteResultSet.iterator()).thenReturn(List.<Row>of().iterator());
     when(session.execute(anyString(), any(Object.class))).thenReturn(isCompleteResultSet);
 
@@ -195,12 +196,12 @@ class CassandraJournalSpiTest {
     UUID regularId = Uuids.timeBased();
     Instant now = Instant.now();
 
-    Row regularRow = org.mockito.Mockito.mock(Row.class);
+    Row regularRow = mock(Row.class);
     when(regularRow.getByteBuffer("data")).thenReturn(regularData);
     when(regularRow.getUuid("entry_id")).thenReturn(regularId);
     when(regularRow.getInstant("timestamp")).thenReturn(now);
 
-    Row completedRow = org.mockito.Mockito.mock(Row.class);
+    Row completedRow = mock(Row.class);
     when(completedRow.getByteBuffer("data")).thenReturn(completedData);
 
     when(resultSet.iterator()).thenReturn(List.of(regularRow, completedRow).iterator());
@@ -221,12 +222,12 @@ class CassandraJournalSpiTest {
     Instant now = Instant.now();
 
     // DESC order: id2 first, then id1
-    Row row2 = org.mockito.Mockito.mock(Row.class);
+    Row row2 = mock(Row.class);
     when(row2.getByteBuffer("data")).thenReturn(data2);
     when(row2.getUuid("entry_id")).thenReturn(id2);
     when(row2.getInstant("timestamp")).thenReturn(now);
 
-    Row row1 = org.mockito.Mockito.mock(Row.class);
+    Row row1 = mock(Row.class);
     when(row1.getByteBuffer("data")).thenReturn(data1);
     when(row1.getUuid("entry_id")).thenReturn(id1);
     when(row1.getInstant("timestamp")).thenReturn(now);
@@ -248,7 +249,7 @@ class CassandraJournalSpiTest {
     List<Row> rows = new java.util.ArrayList<>();
     for (int i = 0; i < 5; i++) {
       UUID id = Uuids.timeBased();
-      Row row = org.mockito.Mockito.mock(Row.class);
+      Row row = mock(Row.class);
       ByteBuffer data = ByteBuffer.wrap(("data-" + i).getBytes(StandardCharsets.UTF_8));
       when(row.getByteBuffer("data")).thenReturn(data);
       when(row.getUuid("entry_id")).thenReturn(id);
@@ -293,7 +294,7 @@ class CassandraJournalSpiTest {
     UUID entryId = Uuids.timeBased();
     Instant now = Instant.now();
 
-    Row row = org.mockito.Mockito.mock(Row.class);
+    Row row = mock(Row.class);
     when(row.getByteBuffer("data")).thenReturn(null);
     when(row.getUuid("entry_id")).thenReturn(entryId);
     when(row.getInstant("timestamp")).thenReturn(now);

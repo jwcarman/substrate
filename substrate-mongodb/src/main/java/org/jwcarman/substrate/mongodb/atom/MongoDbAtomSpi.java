@@ -39,6 +39,7 @@ import org.springframework.data.mongodb.core.query.Update;
 public class MongoDbAtomSpi extends AbstractAtomSpi {
 
   private static final String FIELD_KEY = "key";
+  private static final String OP_COND = "$cond";
   private static final String FIELD_VALUE = "value";
   private static final String FIELD_TOKEN = "token";
   private static final String FIELD_EXPIRE_AT = "expireAt";
@@ -114,14 +115,14 @@ public class MongoDbAtomSpi extends AbstractAtomSpi {
                     .append(
                         FIELD_VALUE,
                         new Document(
-                            "$cond", List.of(matches, new Binary(value), "$" + FIELD_VALUE)))
+                            OP_COND, List.of(matches, new Binary(value), "$" + FIELD_VALUE)))
                     .append(
                         FIELD_TOKEN,
-                        new Document("$cond", List.of(matches, newToken, "$" + FIELD_TOKEN)))
+                        new Document(OP_COND, List.of(matches, newToken, "$" + FIELD_TOKEN)))
                     .append(
                         FIELD_EXPIRE_AT,
                         new Document(
-                            "$cond", List.of(matches, newExpireAt, "$" + FIELD_EXPIRE_AT)))));
+                            OP_COND, List.of(matches, newExpireAt, "$" + FIELD_EXPIRE_AT)))));
 
     Document before =
         mongoTemplate

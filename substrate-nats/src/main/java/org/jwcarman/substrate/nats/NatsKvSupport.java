@@ -17,6 +17,7 @@ package org.jwcarman.substrate.nats;
 
 import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;
+import io.nats.client.KeyValueManagement;
 import io.nats.client.api.KeyValueConfiguration;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -45,21 +46,30 @@ public final class NatsKvSupport {
   public static void ensureBucketExists(
       Connection connection, String bucketName, Duration defaultTtl) {
     try {
-      var kvm = connection.keyValueManagement();
-      try {
-        kvm.getStatus(bucketName);
-      } catch (JetStreamApiException _) {
-        kvm.create(
-            KeyValueConfiguration.builder()
-                .name(bucketName)
-                .ttl(defaultTtl)
-                .maxHistoryPerKey(1)
-                .build());
-      }
+      createIfMissing(connection.keyValueManagement(), bucketName, defaultTtl);
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to create NATS KV bucket", e);
     } catch (JetStreamApiException e) {
       throw new IllegalStateException("Failed to create NATS KV bucket", e);
+    }
+  }
+
+  /**
+   * Creates the bucket unless it is already there. A failed {@code getStatus} is how the KV API
+   * reports "no such bucket", so it is the signal to create rather than an error.
+   */
+  private static void createIfMissing(
+      KeyValueManagement kvm, String bucketName, Duration defaultTtl)
+      throws IOException, JetStreamApiException {
+    try {
+      kvm.getStatus(bucketName);
+    } catch (JetStreamApiException _) {
+      kvm.create(
+          KeyValueConfiguration.builder()
+              .name(bucketName)
+              .ttl(defaultTtl)
+              .maxHistoryPerKey(1)
+              .build());
     }
   }
 

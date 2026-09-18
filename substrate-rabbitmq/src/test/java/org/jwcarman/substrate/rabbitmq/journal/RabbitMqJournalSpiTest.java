@@ -169,7 +169,8 @@ class RabbitMqJournalSpiTest {
     when(appPropsBuilder.entry(any(), any(String.class))).thenReturn(appPropsBuilder);
     when(appPropsBuilder.messageBuilder()).thenReturn(messageBuilder);
     when(messageBuilder.addData(any(byte[].class))).thenReturn(messageBuilder);
-    when(messageBuilder.build()).thenReturn(mock(Message.class));
+    Message builtMessage = mock(Message.class);
+    when(messageBuilder.build()).thenReturn(builtMessage);
   }
 
   private void wireSuccessfulPublish() {

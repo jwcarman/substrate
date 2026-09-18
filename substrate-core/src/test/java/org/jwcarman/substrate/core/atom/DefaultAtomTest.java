@@ -617,8 +617,12 @@ class DefaultAtomTest {
 
       int deliveredCount = delivered.size();
       assertThat(atom.compareAndSet(current, "rejected", TTL)).isFalse();
-      Thread.sleep(300);
-      assertThat(delivered).hasSize(deliveredCount);
+      // A rejected compare-and-set must deliver nothing: hold the assertion for a window
+      // rather than sampling once, so a late delivery still fails the test.
+      await()
+          .during(Duration.ofMillis(300))
+          .atMost(Duration.ofSeconds(5))
+          .until(() -> delivered.size() == deliveredCount);
     } finally {
       sub.cancel();
     }
@@ -642,8 +646,9 @@ class DefaultAtomTest {
   @Test
   void compareAndSetThrowsWhenTtlExceedsMaxTtl() {
     Snapshot<String> current = atom.get();
+    Duration beyondMax = Duration.ofHours(25);
 
-    assertThatThrownBy(() -> atom.compareAndSet(current, "value", Duration.ofHours(25)))
+    assertThatThrownBy(() -> atom.compareAndSet(current, "value", beyondMax))
         .isInstanceOf(IllegalArgumentException.class);
   }
 }

@@ -97,8 +97,9 @@ class NatsDisablePropertyTest {
       when(jsm.addStream(any(StreamConfiguration.class))).thenReturn(null);
       KeyValueManagement kvm = mock(KeyValueManagement.class);
       when(conn.keyValueManagement()).thenReturn(kvm);
-      when(kvm.getStatus("substrate-atoms")).thenReturn(mock(KeyValueStatus.class));
-      when(kvm.getStatus("substrate-mailbox")).thenReturn(mock(KeyValueStatus.class));
+      KeyValueStatus status = mock(KeyValueStatus.class);
+      when(kvm.getStatus("substrate-atoms")).thenReturn(status);
+      when(kvm.getStatus("substrate-mailbox")).thenReturn(status);
       Dispatcher dispatcher = mock(Dispatcher.class);
       when(conn.createDispatcher(any(MessageHandler.class))).thenReturn(dispatcher);
       when(dispatcher.subscribe(any(String.class))).thenReturn(dispatcher);

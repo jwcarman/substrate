@@ -17,6 +17,7 @@ package org.jwcarman.substrate.nats.atom;
 
 import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;
+import io.nats.client.KeyValue;
 import io.nats.client.api.KeyValueEntry;
 import io.nats.client.api.KeyValueOperation;
 import java.io.IOException;
@@ -114,22 +115,33 @@ public class NatsAtomSpi extends AbstractAtomSpi {
       if (!decode(entry.getValue()).token().equals(expectedToken)) {
         return CasResult.TOKEN_MISMATCH;
       }
-      try {
-        kv.update(toKvKey(key), encode(value, newToken), entry.getRevision());
-        return CasResult.COMMITTED;
-      } catch (JetStreamApiException e) {
-        if (!isWrongLastSequence(e)) {
-          throw new IllegalStateException("Failed to compare-and-set atom in NATS KV", e);
-        }
-        KeyValueEntry latest = kv.get(toKvKey(key));
-        return latest == null || latest.getOperation() != KeyValueOperation.PUT
-            ? CasResult.ABSENT
-            : CasResult.TOKEN_MISMATCH;
-      }
+      return updateAtRevision(kv, key, value, newToken, entry.getRevision());
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to compare-and-set atom in NATS KV", e);
     } catch (JetStreamApiException e) {
       throw new IllegalStateException("Failed to compare-and-set atom in NATS KV", e);
+    }
+  }
+
+  /**
+   * Commits the new value only if the entry is still at the revision we read. A "wrong last
+   * sequence" rejection means another writer got there first, so the caller's token is stale —
+   * which is a compare-and-set outcome, not a failure.
+   */
+  private CasResult updateAtRevision(
+      KeyValue kv, String key, byte[] value, String newToken, long revision)
+      throws IOException, JetStreamApiException {
+    try {
+      kv.update(toKvKey(key), encode(value, newToken), revision);
+      return CasResult.COMMITTED;
+    } catch (JetStreamApiException e) {
+      if (!isWrongLastSequence(e)) {
+        throw new IllegalStateException("Failed to compare-and-set atom in NATS KV", e);
+      }
+      KeyValueEntry latest = kv.get(toKvKey(key));
+      return latest == null || latest.getOperation() != KeyValueOperation.PUT
+          ? CasResult.ABSENT
+          : CasResult.TOKEN_MISMATCH;
     }
   }
 

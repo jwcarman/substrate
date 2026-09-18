@@ -360,7 +360,8 @@ class NatsAtomSpiTest {
 
   private void wireConnectionForConstruction() throws Exception {
     when(connection.keyValueManagement()).thenReturn(kvm);
-    when(kvm.getStatus("substrate-atoms")).thenReturn(mock(KeyValueStatus.class));
+    KeyValueStatus status = mock(KeyValueStatus.class);
+    when(kvm.getStatus("substrate-atoms")).thenReturn(status);
   }
 
   private KeyValue mockKeyValue() throws Exception {

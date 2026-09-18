@@ -315,31 +315,41 @@ class InMemoryAtomSpiTest {
   }
 
   @Test
-  void compareAndSetReportsAbsentForExpiredAtom() throws InterruptedException {
+  void compareAndSetReportsAbsentForExpiredAtom() {
     String key = spi.atomKey("cas-expired");
     spi.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofMillis(50));
-    Thread.sleep(120);
 
-    CasResult result =
-        spi.compareAndSet(
-            key, "tok-1", "v2".getBytes(StandardCharsets.UTF_8), "tok-2", Duration.ofMinutes(5));
+    await()
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(
+            () -> {
+              CasResult result =
+                  spi.compareAndSet(
+                      key,
+                      "tok-1",
+                      "v2".getBytes(StandardCharsets.UTF_8),
+                      "tok-2",
+                      Duration.ofMinutes(5));
 
-    assertThat(result).isEqualTo(CasResult.ABSENT);
+              assertThat(result).isEqualTo(CasResult.ABSENT);
+            });
   }
 
   @Test
-  void compareAndSetResetsTtl() throws InterruptedException {
+  void compareAndSetResetsTtl() {
     String key = spi.atomKey("cas-ttl");
     spi.create(key, "v1".getBytes(StandardCharsets.UTF_8), "tok-1", Duration.ofMillis(100));
 
     spi.compareAndSet(
         key, "tok-1", "v2".getBytes(StandardCharsets.UTF_8), "tok-2", Duration.ofMinutes(5));
 
-    // Wait past the ORIGINAL 100ms TTL: without this the assertion below cannot fail, because
-    // the atom would still be alive on its create-time lease even if the commit ignored the TTL.
-    Thread.sleep(250);
-
-    assertThat(spi.exists(key)).isTrue();
+    // Hold the assertion past the ORIGINAL 100ms TTL: without that window the assertion
+    // cannot fail, because the atom would still be alive on its create-time lease even if
+    // the commit had ignored the new TTL.
+    await()
+        .during(Duration.ofMillis(250))
+        .atMost(Duration.ofSeconds(3))
+        .until(() -> spi.exists(key));
   }
 
   @Test

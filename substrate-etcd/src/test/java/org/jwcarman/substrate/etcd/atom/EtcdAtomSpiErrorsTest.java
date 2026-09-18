@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.etcd.jetcd.ByteSequence;
@@ -366,6 +367,6 @@ class EtcdAtomSpiErrorsTest {
     atom.create("substrate:atom:k", "v".getBytes(StandardCharsets.UTF_8), "tok", Duration.ZERO);
 
     // grant(1) was called because max(1, 0) == 1
-    org.mockito.Mockito.verify(lease).grant(1L);
+    verify(lease).grant(1L);
   }
 }

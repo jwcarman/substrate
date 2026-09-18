@@ -59,6 +59,10 @@ public class PostgresJournalSpi extends AbstractJournalSpi {
   /** Restricts a query to journals that have not passed their lease. */
   private static final String LIVE_JOURNAL = " (dies_at IS NULL OR dies_at > NOW())";
 
+  /** Removes every entry belonging to one journal. */
+  private static final String DELETE_ENTRIES_FOR_KEY =
+      "DELETE FROM substrate_journal_entries WHERE key = ?";
+
   private final JdbcTemplate jdbcTemplate;
   private final long maxLen;
   private final AtomicLong appendCounter = new AtomicLong(0);
@@ -90,7 +94,7 @@ public class PostgresJournalSpi extends AbstractJournalSpi {
     }
 
     // Replacing a dead journal must not leave its entries behind for the new one to read.
-    jdbcTemplate.update("DELETE FROM substrate_journal_entries WHERE key = ?", key);
+    jdbcTemplate.update(DELETE_ENTRIES_FOR_KEY, key);
   }
 
   @Override
@@ -193,7 +197,7 @@ public class PostgresJournalSpi extends AbstractJournalSpi {
 
   @Override
   public void delete(String key) {
-    jdbcTemplate.update("DELETE FROM substrate_journal_entries WHERE key = ?", key);
+    jdbcTemplate.update(DELETE_ENTRIES_FOR_KEY, key);
     jdbcTemplate.update("DELETE FROM substrate_journal WHERE key = ?", key);
   }
 
@@ -226,7 +230,7 @@ public class PostgresJournalSpi extends AbstractJournalSpi {
             maxToSweep);
 
     for (String key : keys) {
-      jdbcTemplate.update("DELETE FROM substrate_journal_entries WHERE key = ?", key);
+      jdbcTemplate.update(DELETE_ENTRIES_FOR_KEY, key);
     }
     return keys.size();
   }

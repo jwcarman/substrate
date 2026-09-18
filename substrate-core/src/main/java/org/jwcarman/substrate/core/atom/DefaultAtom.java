@@ -15,11 +15,11 @@
  */
 package org.jwcarman.substrate.core.atom;
 
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -213,6 +213,8 @@ public class DefaultAtom<T> implements Atom<T> {
 
   private static final int TOKEN_BYTES = 16;
 
+  private static final SecureRandom TOKEN_RANDOM = new SecureRandom();
+
   /**
    * Generates a fresh staleness token for a write. Each call returns a distinct 128-bit random
    * value, so a token identifies the <em>write</em> that produced it rather than the value it
@@ -221,7 +223,7 @@ public class DefaultAtom<T> implements Atom<T> {
    */
   static String nextToken() {
     byte[] bytes = new byte[TOKEN_BYTES];
-    ThreadLocalRandom.current().nextBytes(bytes);
+    TOKEN_RANDOM.nextBytes(bytes);
     return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
   }
 }

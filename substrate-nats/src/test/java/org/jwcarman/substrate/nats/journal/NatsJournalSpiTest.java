@@ -141,7 +141,8 @@ class NatsJournalSpiTest {
     wireConnectionForConstruction();
     var kvm = mock(KeyValueManagement.class);
     when(connection.keyValueManagement()).thenReturn(kvm);
-    when(kvm.getStatus(anyString())).thenReturn(mock(KeyValueStatus.class));
+    KeyValueStatus status = mock(KeyValueStatus.class);
+    when(kvm.getStatus(anyString())).thenReturn(status);
     var kv = mock(io.nats.client.KeyValue.class);
     when(connection.keyValue(anyString())).thenReturn(kv);
     JetStreamApiException apiException = mockApiException(500);
@@ -286,7 +287,8 @@ class NatsJournalSpiTest {
     wireConnectionForConstruction();
     var kvm = mock(KeyValueManagement.class);
     when(connection.keyValueManagement()).thenReturn(kvm);
-    when(kvm.getStatus(anyString())).thenReturn(mock(KeyValueStatus.class));
+    KeyValueStatus status = mock(KeyValueStatus.class);
+    when(kvm.getStatus(anyString())).thenReturn(status);
     var kv = mock(io.nats.client.KeyValue.class);
     when(connection.keyValue(anyString())).thenReturn(kv);
     var entry = mock(io.nats.client.api.KeyValueEntry.class);
@@ -301,7 +303,8 @@ class NatsJournalSpiTest {
     wireConnectionForConstruction();
     var kvm = mock(KeyValueManagement.class);
     when(connection.keyValueManagement()).thenReturn(kvm);
-    when(kvm.getStatus(anyString())).thenReturn(mock(KeyValueStatus.class));
+    KeyValueStatus status = mock(KeyValueStatus.class);
+    when(kvm.getStatus(anyString())).thenReturn(status);
     var kv = mock(io.nats.client.KeyValue.class);
     when(connection.keyValue(anyString())).thenReturn(kv);
 
@@ -318,7 +321,8 @@ class NatsJournalSpiTest {
     when(connection.keyValueManagement()).thenReturn(kvm);
     JetStreamApiException notFound = mockApiException(404);
     when(kvm.getStatus(anyString())).thenThrow(notFound);
-    when(kvm.create(any())).thenReturn(mock(KeyValueStatus.class));
+    KeyValueStatus status = mock(KeyValueStatus.class);
+    when(kvm.create(any())).thenReturn(status);
     var kv = mock(io.nats.client.KeyValue.class);
     when(connection.keyValue(anyString())).thenReturn(kv);
     var entry = mock(io.nats.client.api.KeyValueEntry.class);

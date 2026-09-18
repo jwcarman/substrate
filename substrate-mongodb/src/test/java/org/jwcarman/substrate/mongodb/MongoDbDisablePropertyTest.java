@@ -88,7 +88,8 @@ class MongoDbDisablePropertyTest {
     @Bean
     MongoTemplate mongoTemplate() {
       MongoTemplate template = mock(MongoTemplate.class);
-      when(template.indexOps(anyString())).thenReturn(mock(IndexOperations.class));
+      IndexOperations indexOps = mock(IndexOperations.class);
+      when(template.indexOps(anyString())).thenReturn(indexOps);
       return template;
     }
   }

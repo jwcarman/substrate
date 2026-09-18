@@ -64,8 +64,8 @@ class SilencePullStatusWarningsTest {
     handler =
         new Handler() {
           @Override
-          public void publish(LogRecord record) {
-            records.add(record);
+          public void publish(LogRecord logRecord) {
+            records.add(logRecord);
           }
 
           @Override
@@ -110,9 +110,9 @@ class SilencePullStatusWarningsTest {
         .hasSize(1)
         .first()
         .satisfies(
-            record -> {
-              assertThat(record.getLevel()).isEqualTo(Level.WARNING);
-              assertThat(record.getMessage()).contains("409");
+            logRecord -> {
+              assertThat(logRecord.getLevel()).isEqualTo(Level.WARNING);
+              assertThat(logRecord.getMessage()).contains("409");
             });
   }
 

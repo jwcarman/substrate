@@ -83,7 +83,8 @@ class NatsAtomAutoConfigurationTest {
       Connection conn = mock(Connection.class);
       KeyValueManagement kvm = mock(KeyValueManagement.class);
       when(conn.keyValueManagement()).thenReturn(kvm);
-      when(kvm.getStatus(anyString())).thenReturn(mock(KeyValueStatus.class));
+      KeyValueStatus status = mock(KeyValueStatus.class);
+      when(kvm.getStatus(anyString())).thenReturn(status);
       return conn;
     }
   }

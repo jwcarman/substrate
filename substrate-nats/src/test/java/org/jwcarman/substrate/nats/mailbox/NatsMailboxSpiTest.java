@@ -297,7 +297,8 @@ class NatsMailboxSpiTest {
     JetStreamApiException notFound = mockApiException();
     when(connection.keyValueManagement()).thenReturn(kvm);
     when(kvm.getStatus("substrate-mailbox")).thenThrow(notFound);
-    when(kvm.create(any())).thenReturn(mock(KeyValueStatus.class));
+    KeyValueStatus status = mock(KeyValueStatus.class);
+    when(kvm.create(any())).thenReturn(status);
 
     NatsMailboxSpi mailbox = createMailbox();
     assertThat(mailbox).isNotNull();
@@ -328,7 +329,8 @@ class NatsMailboxSpiTest {
 
   private void wireConnectionForConstruction() throws Exception {
     when(connection.keyValueManagement()).thenReturn(kvm);
-    when(kvm.getStatus("substrate-mailbox")).thenReturn(mock(KeyValueStatus.class));
+    KeyValueStatus status = mock(KeyValueStatus.class);
+    when(kvm.getStatus("substrate-mailbox")).thenReturn(status);
   }
 
   private NatsMailboxSpi createMailbox() {

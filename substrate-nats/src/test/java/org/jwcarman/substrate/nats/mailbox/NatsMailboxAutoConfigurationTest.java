@@ -73,7 +73,8 @@ class NatsMailboxAutoConfigurationTest {
       Connection conn = mock(Connection.class);
       KeyValueManagement kvm = mock(KeyValueManagement.class);
       when(conn.keyValueManagement()).thenReturn(kvm);
-      when(kvm.getStatus("substrate-mailbox")).thenReturn(mock(KeyValueStatus.class));
+      KeyValueStatus status = mock(KeyValueStatus.class);
+      when(kvm.getStatus("substrate-mailbox")).thenReturn(status);
       return conn;
     }
 

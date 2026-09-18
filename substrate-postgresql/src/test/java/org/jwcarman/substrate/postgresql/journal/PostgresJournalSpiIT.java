@@ -22,6 +22,7 @@ import static org.awaitility.Awaitility.await;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +37,8 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 
 class PostgresJournalSpiIT {
+
+  private static final Duration ONE_HOUR = Duration.ofHours(1);
 
   private PostgresJournalSpi journal;
   private JdbcTemplate jdbcTemplate;
@@ -306,14 +309,23 @@ class PostgresJournalSpiIT {
   }
 
   @Test
-  void appendPushesOutTheInactivityDeadline() throws InterruptedException {
+  void appendPushesOutTheInactivityDeadline() {
     String key = journal.journalKey("inactivity-reset");
     journal.create(key, Duration.ofMillis(500));
+    AtomicInteger appended = new AtomicInteger();
 
-    for (int i = 0; i < 4; i++) {
-      Thread.sleep(200);
-      journal.append(key, ("event-" + i).getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
-    }
+    // Append every 200ms for longer than the 500ms inactivity TTL. Each append has to
+    // push the deadline out; if one does not, the journal dies and append throws.
+    await()
+        .pollDelay(Duration.ofMillis(200))
+        .pollInterval(Duration.ofMillis(200))
+        .atMost(Duration.ofSeconds(5))
+        .until(
+            () -> {
+              journal.append(
+                  key, ("event-" + appended.get()).getBytes(StandardCharsets.UTF_8), ONE_HOUR);
+              return appended.incrementAndGet() == 4;
+            });
 
     assertThat(journal.exists(key)).isTrue();
     assertThat(journal.readLast(key, 100)).hasSize(4);
@@ -322,27 +334,23 @@ class PostgresJournalSpiIT {
   @Test
   void appendThrowsOnceTheJournalIsDead() {
     String key = journal.journalKey("append-after-death");
+    byte[] late = "late".getBytes(StandardCharsets.UTF_8);
     journal.create(key, Duration.ofMillis(50));
 
     await()
         .atMost(Duration.ofSeconds(2))
         .untilAsserted(
             () ->
-                assertThatThrownBy(
-                        () ->
-                            journal.append(
-                                key, "late".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1)))
+                assertThatThrownBy(() -> journal.append(key, late, ONE_HOUR))
                     .isInstanceOf(JournalExpiredException.class));
   }
 
   @Test
   void appendThrowsForAJournalThatWasNeverCreated() {
-    assertThatThrownBy(
-            () ->
-                journal.append(
-                    journal.journalKey("never-created"),
-                    "data".getBytes(StandardCharsets.UTF_8),
-                    Duration.ofHours(1)))
+    String key = journal.journalKey("never-created");
+    byte[] data = "data".getBytes(StandardCharsets.UTF_8);
+
+    assertThatThrownBy(() -> journal.append(key, data, ONE_HOUR))
         .isInstanceOf(JournalExpiredException.class);
   }
 
@@ -379,7 +387,7 @@ class PostgresJournalSpiIT {
     String key = journal.journalKey("duplicate-create");
     journal.create(key, Duration.ofHours(1));
 
-    assertThatThrownBy(() -> journal.create(key, Duration.ofHours(1)))
+    assertThatThrownBy(() -> journal.create(key, ONE_HOUR))
         .isInstanceOf(JournalAlreadyExistsException.class);
   }
 
@@ -405,8 +413,9 @@ class PostgresJournalSpiIT {
     journal.append(key, "data".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1));
     journal.complete(key, Duration.ofHours(1));
 
-    assertThatThrownBy(
-            () -> journal.append(key, "late".getBytes(StandardCharsets.UTF_8), Duration.ofHours(1)))
+    byte[] late = "late".getBytes(StandardCharsets.UTF_8);
+
+    assertThatThrownBy(() -> journal.append(key, late, ONE_HOUR))
         .isInstanceOf(JournalCompletedException.class);
   }
 
@@ -459,7 +468,7 @@ class PostgresJournalSpiIT {
         .atMost(Duration.ofSeconds(2))
         .untilAsserted(
             () ->
-                assertThatThrownBy(() -> journal.complete(key, Duration.ofHours(1)))
+                assertThatThrownBy(() -> journal.complete(key, ONE_HOUR))
                     .isInstanceOf(JournalExpiredException.class));
   }
 
