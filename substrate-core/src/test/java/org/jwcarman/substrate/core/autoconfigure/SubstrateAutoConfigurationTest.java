@@ -23,9 +23,9 @@ import java.util.Optional;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.jwcarman.codec.jackson.JacksonCodecAutoConfiguration;
+import org.jwcarman.codec.CodecFactory;
+import org.jwcarman.codec.autoconfigure.JacksonCodecAutoConfiguration;
 import org.jwcarman.codec.jackson.JacksonCodecFactory;
-import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.substrate.atom.AtomFactory;
 import org.jwcarman.substrate.core.journal.JournalSpi;
 import org.jwcarman.substrate.core.journal.RawJournalEntry;
@@ -220,9 +220,9 @@ class SubstrateAutoConfigurationTest {
     assertThat(annotation).isNotNull();
     assertThat(annotation.afterName())
         .contains(
-            "org.jwcarman.codec.jackson.JacksonCodecAutoConfiguration",
-            "org.jwcarman.codec.gson.GsonCodecAutoConfiguration",
-            "org.jwcarman.codec.protobuf.ProtobufCodecAutoConfiguration");
+            "org.jwcarman.codec.autoconfigure.JacksonCodecAutoConfiguration",
+            "org.jwcarman.codec.autoconfigure.GsonCodecAutoConfiguration",
+            "org.jwcarman.codec.autoconfigure.ProtobufCodecAutoConfiguration");
   }
 
   @Test

@@ -54,7 +54,7 @@ implementations that backend supports.
     <dependency>
         <groupId>org.jwcarman.codec</groupId>
         <artifactId>codec-jackson</artifactId>
-        <version>0.1.0</version>
+        <version>0.10.0</version>
     </dependency>
 
     <!-- Pick a backend module (one per backend, not one per SPI) -->
@@ -413,7 +413,7 @@ When the value type has its own type parameters (`List<Order>`,
 the generic parameter at runtime. Use the `TypeRef<T>` overload instead:
 
 ```java
-import org.jwcarman.codec.spi.TypeRef;
+import org.jwcarman.codec.TypeRef;
 
 Atom<List<Order>> orders = atomFactory.create(
     "orders:cart:42",

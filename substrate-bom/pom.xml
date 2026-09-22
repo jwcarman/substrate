@@ -21,16 +21,76 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <parent>
-        <groupId>org.jwcarman.substrate</groupId>
-        <artifactId>substrate-parent</artifactId>
-        <version>0.10.0-SNAPSHOT</version>
-    </parent>
+    <!--
+        This module deliberately has NO <parent>.
 
+        A child inherits its parent's dependencyManagement, and importing a BOM pulls in that BOM's
+        *effective* dependencyManagement — after inheritance. Because substrate-parent inherits
+        from spring-boot-starter-parent, inheriting from it made substrate-bom re-export all ~1900
+        of Spring Boot's managed versions to every consumer: 1929 managed entries, of which only 13
+        were substrate's own. That silently overrode consumers' own pins — it held one downstream
+        reactor at Boot 4.0.5 and Spring Framework 7.0.6 despite it pinning 4.1.1. A published BOM
+        must not inherit dependencyManagement; junit-bom, spring-boot-dependencies,
+        testcontainers-bom and codec-bom are all parentless for the same reason.
+
+        The consequence is that everything this module needs must be declared here: coordinates,
+        Maven Central metadata, and the release profile. That duplication is the price of the
+        guarantee. Build configuration is NOT duplicated — a BOM has no sources, so the compiler,
+        surefire and jacoco setup in substrate-parent is irrelevant here.
+
+        Two further consequences, both verified:
+          - `mvn versions:set` walks parent references and therefore skips this module. The publish
+            workflow passes -DprocessAllModules=true so the BOM does not deploy still carrying
+            -SNAPSHOT. Do not remove that flag.
+          - The `license` profile lives in substrate-parent, so the header check no longer covers
+            this file. The header above is correct; keep it when editing.
+    -->
+    <groupId>org.jwcarman.substrate</groupId>
     <artifactId>substrate-bom</artifactId>
+    <version>0.10.0-SNAPSHOT</version>
     <packaging>pom</packaging>
+
     <name>Substrate BOM</name>
     <description>Bill of Materials for Substrate — version alignment for consumers</description>
+    <url>https://github.com/jwcarman/substrate</url>
+    <inceptionYear>2026</inceptionYear>
+
+    <developers>
+        <developer>
+            <id>jwcarman</id>
+            <name>James Carman</name>
+        </developer>
+    </developers>
+
+    <licenses>
+        <license>
+            <name>Apache 2</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+            <comments>A business-friendly OSS license</comments>
+        </license>
+    </licenses>
+
+    <scm>
+        <url>https://github.com/jwcarman/substrate</url>
+        <connection>scm:git:git@github.com:jwcarman/substrate.git</connection>
+        <developerConnection>scm:git:git@github.com:jwcarman/substrate.git</developerConnection>
+    </scm>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <!-- Nothing to analyze: this module has no sources. -->
+        <sonar.skip>true</sonar.skip>
+
+        <!-- Plugin versions. Duplicated from substrate-parent because there is no parent to
+             inherit them from; keep them in sync when bumping there. -->
+        <spotless.version>3.4.0</spotless.version>
+        <gpg.plugin.version>3.2.8</gpg.plugin.version>
+        <sonatype.plugin.version>0.10.0</sonatype.plugin.version>
+        <sonar.plugin.version>5.5.0.6356</sonar.plugin.version>
+    </properties>
 
     <dependencyManagement>
         <dependencies>
@@ -101,4 +161,69 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <build>
+        <plugins>
+            <!--
+                Declared solely so that `mvn spotless:apply` and `mvn sonar:sonar` resolve their
+                prefixes on this module. Maven resolves a plugin prefix from the project's own build
+                plugins or from the default plugin groups; a parentless module inherits neither, so
+                a third-party prefix fails here and takes the whole reactor down with it. Both are
+                no-ops on a module with no sources.
+            -->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>${spotless.version}</version>
+            </plugin>
+            <plugin>
+                <groupId>org.sonarsource.scanner.maven</groupId>
+                <artifactId>sonar-maven-plugin</artifactId>
+                <version>${sonar.plugin.version}</version>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <!-- Release profile for Maven Central publishing. Mirrors substrate-parent's, minus the
+             source and javadoc plugins: a pom-packaged module has neither to attach. -->
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>${sonatype.plugin.version}</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <tokenAuth>true</tokenAuth>
+                            <autoPublish>true</autoPublish>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>${gpg.plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <gpgArguments>
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

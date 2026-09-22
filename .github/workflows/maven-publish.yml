@@ -23,8 +23,11 @@ jobs:
           gpg-private-key: ${{ secrets.GPG_SIGNING_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
 
+      # -DprocessAllModules is required: versions:set walks parent references, and
+      # substrate-bom deliberately has no parent (see the comment in its POM), so without
+      # this flag the BOM is skipped and deploys still carrying -SNAPSHOT.
       - name: Set version
-        run: mvn versions:set -DnewVersion=${{ github.event.release.tag_name }}
+        run: mvn versions:set -DnewVersion=${{ github.event.release.tag_name }} -DprocessAllModules=true
 
       - name: Publish package
         run: mvn -P release --batch-mode deploy -DskipTests

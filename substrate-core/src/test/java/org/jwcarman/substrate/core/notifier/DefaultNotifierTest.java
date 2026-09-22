@@ -22,8 +22,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.codec.CodecFactory;
 import org.jwcarman.codec.jackson.JacksonCodecFactory;
-import org.jwcarman.codec.spi.CodecFactory;
 import org.jwcarman.substrate.core.memory.notifier.InMemoryNotifier;
 import tools.jackson.databind.json.JsonMapper;
 

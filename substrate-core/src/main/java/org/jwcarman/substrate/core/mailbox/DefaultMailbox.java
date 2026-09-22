@@ -18,7 +18,7 @@ package org.jwcarman.substrate.core.mailbox;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
-import org.jwcarman.codec.spi.Codec;
+import org.jwcarman.codec.Codec;
 import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.Subscriber;
 import org.jwcarman.substrate.SubscriberConfig;

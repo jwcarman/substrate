@@ -20,7 +20,7 @@ package org.jwcarman.substrate.atom;
  * exists in the backend.
  *
  * @see AtomFactory#create(String, Class, Object, java.time.Duration)
- * @see AtomFactory#create(String, org.jwcarman.codec.spi.TypeRef, Object, java.time.Duration)
+ * @see AtomFactory#create(String, org.jwcarman.codec.TypeRef, Object, java.time.Duration)
  */
 public class AtomAlreadyExistsException extends RuntimeException {
 

@@ -21,8 +21,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.jwcarman.codec.spi.Codec;
-import org.jwcarman.codec.spi.CodecFactory;
+import org.jwcarman.codec.Codec;
+import org.jwcarman.codec.CodecFactory;
 
 /**
  * Default {@link Notifier}, routing every primitive's notifications over a single {@link

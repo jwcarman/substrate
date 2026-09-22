@@ -23,7 +23,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import org.jwcarman.codec.spi.Codec;
+import org.jwcarman.codec.Codec;
 import org.jwcarman.substrate.BlockingSubscription;
 import org.jwcarman.substrate.Subscriber;
 import org.jwcarman.substrate.SubscriberConfig;
