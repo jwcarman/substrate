@@ -16,7 +16,7 @@
 package org.jwcarman.substrate.journal;
 
 import java.time.Duration;
-import org.jwcarman.codec.spi.TypeRef;
+import org.jwcarman.codec.TypeRef;
 
 /**
  * Factory for constructing and connecting to {@link Journal} instances.

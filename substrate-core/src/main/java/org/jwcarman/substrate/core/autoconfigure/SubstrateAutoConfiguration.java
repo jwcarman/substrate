@@ -17,7 +17,7 @@ package org.jwcarman.substrate.core.autoconfigure;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.jwcarman.codec.spi.CodecFactory;
+import org.jwcarman.codec.CodecFactory;
 import org.jwcarman.substrate.atom.Atom;
 import org.jwcarman.substrate.atom.AtomFactory;
 import org.jwcarman.substrate.core.atom.AtomSpi;
@@ -60,9 +60,9 @@ import org.springframework.context.annotation.PropertySource;
 // class makes the entry a no-op.
 @AutoConfiguration(
     afterName = {
-      "org.jwcarman.codec.jackson.JacksonCodecAutoConfiguration",
-      "org.jwcarman.codec.gson.GsonCodecAutoConfiguration",
-      "org.jwcarman.codec.protobuf.ProtobufCodecAutoConfiguration"
+      "org.jwcarman.codec.autoconfigure.JacksonCodecAutoConfiguration",
+      "org.jwcarman.codec.autoconfigure.GsonCodecAutoConfiguration",
+      "org.jwcarman.codec.autoconfigure.ProtobufCodecAutoConfiguration"
     })
 @EnableConfigurationProperties(SubstrateProperties.class)
 @PropertySource("classpath:substrate-defaults.properties")

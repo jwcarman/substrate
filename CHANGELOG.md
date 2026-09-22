@@ -10,6 +10,25 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+### Breaking changes
+
+- `substrate-bom` no longer inherits Spring Boot's managed versions. It had a
+  `<parent>`, and importing a BOM pulls in that BOM's *effective*
+  dependencyManagement — after inheritance — so it re-exported every version
+  Spring Boot manages to every consumer: 1929 managed entries, of which 13 were
+  substrate's own. That silently overrode consumers' own pins; one downstream
+  reactor sat on Boot 4.0.5 and Spring Framework 7.0.6 despite pinning 4.1.1.
+  The BOM is now parentless and manages only substrate's own modules. If you were
+  relying on substrate-bom to supply a third-party version, you now need to manage
+  it yourself — which is the point.
+- codec 0.10.0 (was 0.1.0). The `spi` package segment is gone:
+  `org.jwcarman.codec.spi.{Codec, CodecFactory, TypeRef}` are now
+  `org.jwcarman.codec.{Codec, CodecFactory, TypeRef}`. Substrate's public API
+  exposes these types — `AtomFactory`, `JournalFactory` and `MailboxFactory` all
+  take a `TypeRef` — so consumers must update their own imports. The codec
+  auto-configuration classes also moved to a new `codec-autoconfigure` artifact
+  under `org.jwcarman.codec.autoconfigure`.
+
 ### Requirements
 
 - Spring Boot 4.1.1 (was 4.0.5). Substrate's parent drives the versions consumers

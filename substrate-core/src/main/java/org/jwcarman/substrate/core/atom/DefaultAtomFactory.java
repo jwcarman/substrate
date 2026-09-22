@@ -16,9 +16,9 @@
 package org.jwcarman.substrate.core.atom;
 
 import java.time.Duration;
-import org.jwcarman.codec.spi.Codec;
-import org.jwcarman.codec.spi.CodecFactory;
-import org.jwcarman.codec.spi.TypeRef;
+import org.jwcarman.codec.Codec;
+import org.jwcarman.codec.CodecFactory;
+import org.jwcarman.codec.TypeRef;
 import org.jwcarman.substrate.atom.Atom;
 import org.jwcarman.substrate.atom.AtomFactory;
 import org.jwcarman.substrate.core.lifecycle.ShutdownCoordinator;
