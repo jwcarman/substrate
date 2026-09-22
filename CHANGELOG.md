@@ -10,6 +10,8 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-22
+
 ### Breaking changes
 
 - `substrate-bom` no longer inherits Spring Boot's managed versions. It had a
@@ -874,6 +876,7 @@ abstractions:
 
 - **BOM** (`substrate-bom`) for version alignment across all modules
 
+[0.10.0]: https://github.com/jwcarman/substrate/releases/tag/0.10.0
 [0.9.0]: https://github.com/jwcarman/substrate/releases/tag/0.9.0
 [0.8.2]: https://github.com/jwcarman/substrate/releases/tag/0.8.2
 [0.8.1]: https://github.com/jwcarman/substrate/releases/tag/0.8.1
