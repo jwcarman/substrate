@@ -10,6 +10,16 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+### Requirements
+
+- Spring Boot 4.1.1 (was 4.0.5). Substrate's parent drives the versions consumers
+  inherit, so this is a compatibility statement, not just a build detail. Two of the
+  versions it carries are major bumps: Lettuce 6.8.2 to 7.5.2 and the RabbitMQ
+  stream client 0.23.0 to 1.6.0. Neither touches an API substrate calls — every
+  signature in use is unchanged — and the full backend integration suite passes
+  against both. Also moves Spring Data to the 2026.0.1 train, the MongoDB driver to
+  5.8.1, and Spring Framework to 7.0.9.
+
 ## [0.9.0] - 2026-09-18
 
 ### Breaking changes
