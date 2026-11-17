@@ -1,5 +1,7 @@
 {
   "$schema": "https://context7.com/schema/context7.json",
+  "url": "https://context7.com/jwcarman/substrate",
+  "public_key": "pk_teuqTJ1f9Z3tSlPtgF1K9",
   "projectTitle": "Substrate (distributed primitives for Java)",
   "description": "Substrate (org.jwcarman.substrate) gives Java 25 / Spring Boot 4 applications three distributed primitives: Atom (a leased AtomicReference with compare-and-set), Journal (an ordered, replayable stream) and Mailbox (a distributed CompletableFuture), backed by Redis, PostgreSQL, Hazelcast, NATS, MongoDB, DynamoDB, Cassandra, etcd, RabbitMQ or SNS, with one blocking-or-callback subscription model and optional AES-GCM encryption at rest.",
   "folders": [
