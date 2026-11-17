@@ -91,3 +91,6 @@ documents what the code does today.
 16. **Properties with no effect.** `substrate.{hazelcast,mongodb,dynamodb}.mailbox.default-ttl` and
     `substrate.dynamodb.journal.ttl` are bound but unused; `substrate.{redis,cassandra}.journal.default-ttl`
     apply only when the entry TTL is `null`, which `DefaultJournal` never passes.
+17. **AES-GCM without associated data.** `AesGcmPayloadTransformer` does not bind ciphertext to the
+    key it is stored under (no AAD), so someone with write access to the backend can move or replay
+    valid ciphertexts between primitives undetected. The encryption guide states this limit.

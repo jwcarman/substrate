@@ -104,6 +104,7 @@ nav:
       - Encryption at Rest: guides/encryption.md
       - Testing: guides/testing.md
       - Operating in Production: guides/operating.md
+      - Native Images: guides/native.md
   - Concepts: concepts/index.md
   - Primitives:
       - Atom: primitives/atom.md
