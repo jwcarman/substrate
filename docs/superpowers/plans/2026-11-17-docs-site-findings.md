@@ -42,3 +42,15 @@ documents what the code does today.
    `RedisConnectionFactory` to `LettuceConnectionFactory` and its native client to `RedisClient`.
    An application using Jedis, or Lettuce in cluster mode (`RedisClusterClient`), fails at startup
    with a `ClassCastException`.
+10. **`substrate-sns` alongside another notifier registers two `NotifierSpi` beans.**
+    `SnsNotifierAutoConfiguration` guards its bean with `@ConditionalOnMissingBean(SnsNotifierSpi.class)`
+    rather than `NotifierSpi`, so with PostgreSQL, Redis, NATS, Hazelcast or RabbitMQ also on the
+    classpath both notifiers register and injecting the single `NotifierSpi` in
+    `SubstrateAutoConfiguration.notifier` is ambiguous. The README suggests exactly this pairing
+    ("use substrate-postgresql for storage and add … substrate-sns purely for the cross-node
+    wake-up"). The docs tell users to switch the other notifier off
+    (`substrate.<backend>.notifier.enabled=false`).
+11. **Two modules for the same primitive: the winner is decided by ordering.** Every SPI bean is
+    `@ConditionalOnMissingBean(<Primitive>Spi.class)`, and the backend auto-configurations do not
+    order themselves against each other, so which module serves a primitive both support depends on
+    auto-configuration ordering. The docs tell users to disable the one they don't want.
