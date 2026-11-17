@@ -81,7 +81,9 @@ from your KMS or vault once and cache them; don't call a remote service per payl
 4. Retire key 7 only once nothing encrypted with it remains. Waiting for the longest TTL you use
    — at most your largest configured [ceiling](../concepts/index.md#upper-limits) — is enough,
    unless you append journal entries or complete journals with `Duration.ZERO`, which never
-   expire.
+   expire, or you use a backend that keeps data past its TTL: DynamoDB (until AWS deletes it,
+   or forever without TTL enabled), MongoDB journals with `substrate.mongodb.journal.ttl` set to
+   zero, and NATS buckets whose age is longer than your ceiling.
 
 !!! danger "A retired key makes its data unreadable"
     If `lookup` can no longer return a key that stored data was encrypted with, that data cannot

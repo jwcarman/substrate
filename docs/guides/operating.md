@@ -91,8 +91,13 @@ Sweep failures are logged as warnings and retried on the next tick.
 
 - **Writes and reads** — `set`, `append`, `deliver`, `get` and the rest — throw the exception the
   backend client raised, sometimes wrapped in an `UncheckedIOException` or
-  `IllegalStateException`. Handle it as you would any failed call to that store.
+  `IllegalStateException`. Handle it as you would any failed call to that store. A write
+  notifies other nodes after storing, so a failed notification can make a write throw after the
+  data was saved: a retried `append` then stores the entry twice, and a retried `deliver` throws
+  `MailboxFullException`.
 - **Subscriptions** end with `Errored` (or `onError`) carrying the cause, and are then finished.
+  The NATS, Hazelcast and RabbitMQ journals are the exception: their reads treat a client error
+  as no new entries, so their subscriptions keep returning `Timeout` through an outage.
   To keep watching, open a new subscription once the backend is back. For a Journal, resume with
   `subscribeAfter` and the last ID you processed, and nothing is missed that the backend still
   holds.

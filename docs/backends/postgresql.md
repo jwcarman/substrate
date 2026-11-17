@@ -69,7 +69,7 @@ Two consequences of sweeping:
 | `substrate.postgresql.atom.auto-create-schema` | `true` | Create the atom table at startup. |
 | `substrate.postgresql.journal.enabled` | `true` | Serve Journal from PostgreSQL. |
 | `substrate.postgresql.journal.prefix` | `substrate:journal:` | Prefix of the stored key. |
-| `substrate.postgresql.journal.max-len` | `100000` | Maximum entries kept per journal; older entries are deleted. |
+| `substrate.postgresql.journal.max-len` | `100000` | Approximate maximum entries per journal. Trimming runs every 100 appends per node, so a journal can exceed it for a while. |
 | `substrate.postgresql.journal.auto-create-schema` | `true` | Create the journal tables at startup. |
 | `substrate.postgresql.mailbox.enabled` | `true` | Serve Mailbox from PostgreSQL. |
 | `substrate.postgresql.mailbox.prefix` | `substrate:mailbox:` | Prefix of the stored key. |

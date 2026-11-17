@@ -22,7 +22,7 @@ own; see [Notifiers](index.md#notifiers).
 | Primitive | Storage |
 |---|---|
 | Atom | One document per atom in `substrate_atom`, with an `expireAt` date. |
-| Journal | One document per entry in `substrate_journal`, indexed by journal key and entry ID, plus a marker document once completed. Entry IDs are time-ordered UUIDs (version 7). |
+| Journal | One document per entry in `substrate_journal`, indexed by journal key and entry ID, plus a marker document once completed. Entry IDs are time-ordered UUIDs (version 7) generated on the appending node, so concurrent appenders can make subscribers skip entries; see [Ordering with concurrent appenders](../primitives/journal.md#ordering-with-concurrent-appenders). |
 | Mailbox | One document per mailbox in `substrate_mailbox`, with an `expireAt` date. |
 
 At startup each collection gets a TTL index on `expireAt`, and the journal collection a compound
@@ -33,7 +33,8 @@ index on key and entry ID.
 MongoDB deletes expired documents itself, through its TTL monitor, which runs about once a
 minute. Until it does:
 
-- atoms and mailboxes are already treated as expired, because reads check `expireAt`;
+- atoms and mailboxes are already treated as expired, because reads check `expireAt`, but an
+  expired atom's name stays taken: `create` on it throws `AtomAlreadyExistsException`;
 - journal entries are not checked on read, so an expired entry can still be replayed by
   `subscribeLast` or `subscribeAfter` until the monitor removes it.
 

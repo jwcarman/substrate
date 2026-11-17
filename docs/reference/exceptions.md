@@ -21,7 +21,7 @@ when another writer got there first.
 | `JournalAlreadyExistsException` | `JournalFactory.create` | A journal with that name exists. |
 | `JournalNotFoundException` | the first operation on a `connect` handle | No journal has that name. |
 | `JournalCompletedException` | `append` | The journal has been completed. |
-| `JournalExpiredException` | `append`, `complete` | The journal expired or was deleted. |
+| `JournalExpiredException` | `append`, `complete`; on PostgreSQL and the in-memory backend also `subscribe` and `subscribeLast` | The journal expired or was deleted. |
 
 Not every backend raises `JournalAlreadyExistsException`, `JournalCompletedException` and
 `JournalExpiredException`; see [How backends differ](../primitives/journal.md#how-backends-differ).
@@ -52,4 +52,5 @@ exception; see [When the backend is unavailable](../guides/operating.md#when-the
 Subscriptions don't throw for the primitive's lifecycle; they report it. Expiry, deletion,
 completion, cancellation and failures arrive as [`NextResult`](../concepts/index.md#outcomes)
 cases, or as the matching `Subscriber` callbacks. The exceptions above are thrown by `subscribe`
-methods only for a `connect` handle whose primitive doesn't exist.
+methods only for a `connect` handle whose primitive doesn't exist, and, on PostgreSQL and the
+in-memory backend, by a Journal `subscribe` or `subscribeLast` on an expired journal.

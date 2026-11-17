@@ -25,9 +25,15 @@ Atom<Session> session =
 Atom<Session> same = atoms.connect("session:" + id, Session.class);
 ```
 
-`create` throws `AtomAlreadyExistsException` if an atom with that name exists. On backends that
-remove expired data with a [sweeper](../guides/operating.md#sweeping) rather than natively, such
-as PostgreSQL, an expired atom keeps its name until the sweeper deletes it. A handle from
+`create` throws `AtomAlreadyExistsException` if an atom with that name exists. On some backends
+an expired atom keeps its name until its data is actually deleted:
+
+- PostgreSQL: until the [sweeper](../guides/operating.md#sweeping) runs, up to one interval;
+- MongoDB: until its TTL monitor runs, about once a minute;
+- DynamoDB: until AWS deletes the item, typically within days, and never if
+  [TTL is not enabled](../backends/dynamodb.md#enable-ttl-on-every-table).
+
+Elsewhere the name is free as soon as the atom expires. A handle from
 `connect` throws `AtomNotFoundException` on its first operation if none does. Generic value
 types take a `TypeRef` in place of the `Class`; see
 [Creating and connecting](../concepts/index.md#creating-and-connecting) and
@@ -165,7 +171,8 @@ try (var sub = session.subscribe(initial)) {
 ```
 
 If the atom has changed since that snapshot, the first `next` returns the current value at
-once; if not, it waits for the next write. Passing `null` is the same as `subscribe()`. Every
+once; if not, it waits for the next write. Passing a `null` snapshot is the same as `subscribe()`; a bare `null` literal is ambiguous
+between the overloads, so pass a variable of type `Snapshot<T>`. Every
 `subscribe` overload, blocking or callback, has a form that takes a starting snapshot.
 
 ## Methods
@@ -204,9 +211,10 @@ void heartbeat(Atom<String> owner) {
 }
 ```
 
-A lapsed lease is noticed on the next read or write, not the instant it expires. On a backend
-that relies on the sweeper, the name stays claimed until the sweeper runs, so another worker may
-wait up to one sweep interval longer to take over. Choose a TTL
+A lapsed lease is noticed on the next read or write, not the instant it expires. On PostgreSQL
+and MongoDB the name stays claimed until the expired data is deleted, so another worker may wait
+up to a sweep interval or a minute longer to take over. Don't use this pattern on DynamoDB: there
+the name can stay claimed for days. Choose a TTL
 comfortably longer than the heartbeat interval, and do not treat an atom lease as a strict
 mutual-exclusion lock: clocks, pauses and network delays can leave two workers briefly believing
 they hold it.

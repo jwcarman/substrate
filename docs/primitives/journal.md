@@ -49,8 +49,10 @@ its own. It may not be negative or exceed `substrate.journal.max-entry-ttl` (7 d
 Backends that manage retention for the whole stream rather than per entry ignore it; their
 pages say so.
 
-Any number of nodes may append to the same journal at once. Entries are ordered as the backend
-receives them.
+Any number of nodes may append to the same journal at once. On Redis, NATS, Hazelcast and the
+in-memory backend the store assigns IDs in the order it receives entries. On PostgreSQL, MongoDB,
+DynamoDB, Cassandra and RabbitMQ it does not, as [Ordering with concurrent
+appenders](#ordering-with-concurrent-appenders) explains.
 
 `append` throws:
 
@@ -59,8 +61,9 @@ receives them.
 
 ## Reading
 
-There are three ways to subscribe. All of them deliver every entry from their starting point
-onward, in order, then keep delivering new entries as they are appended.
+There are three ways to subscribe. All of them deliver the entries from their starting point
+onward, in ID order, then keep delivering new entries as they are appended — subject to the
+[limits below](#ordering-with-concurrent-appenders).
 
 | Method | Starts with |
 |---|---|
@@ -98,7 +101,8 @@ Subscription sub = events.subscribeAfter(lastEventId, (SubscriberConfig<JournalE
 ### Resuming after a disconnect
 
 Save the ID of the last entry you processed. To resume, pass it to `subscribeAfter`; you receive
-exactly the entries you have not seen, then live ones.
+the entries after it, then live ones. On a completed Redis journal, see the
+[completion limit](#completing) below.
 
 ```java
 // The client reconnects with the ID of the last event it received.
@@ -128,9 +132,16 @@ events.complete(Duration.ofMinutes(10));
 TTL* you pass, then the journal expires. `Duration.ZERO` means retain with no TTL; the maximum is
 `substrate.journal.max-retention-ttl` (30 days by default).
 
-Subscribers see completion only after they have read everything: each one receives every
-remaining entry, then `Completed`. A subscription opened on an already completed journal does the
-same — `subscribeLast(20)` on a finished journal delivers up to 20 entries and then `Completed`.
+Subscribers see completion after they have read what remains: each one receives the remaining
+entries, then `Completed`. A subscription opened on an already completed journal does the same —
+`subscribeLast(20)` on a finished journal delivers up to 20 entries and then `Completed`.
+
+!!! warning "Redis: at most about 200 entries after completion"
+    Redis reads a journal 100 entries at a time, and a subscription on a completed journal reads
+    one more batch before it ends with `Completed`. A subscriber more than about 200 entries
+    behind when the journal completes — or resuming with `subscribeAfter` that far back —
+    receives those entries and `Completed`, and never the rest. On Redis, keep subscribers close
+    to the head, or don't complete a journal until its consumers have caught up.
 
 Completing is the clean way to end a stream. Consumers can tell "the producer finished"
 (`Completed`) from "the journal timed out" (`Expired`) and "someone removed it" (`Deleted`).
@@ -143,7 +154,8 @@ events.delete();
 
 `delete` removes the journal and all its entries at once, in any state, and notifies subscribers,
 which end with `Deleted`. A subscriber that misses the notification may instead end with
-`Expired` when its next read finds the journal gone. Deleting a journal that doesn't exist does nothing.
+`Expired`, or on most backends keep waiting, because its next read finds nothing. Deleting a
+journal that doesn't exist does nothing.
 
 ## Lifecycle at a glance
 
@@ -164,7 +176,7 @@ which end with `Deleted`. A subscriber that misses the notification may instead 
 
 | Backend | `create` on a taken name | Inactivity TTL | `append` after `complete` | Entry TTL | Retention TTL | Expired or deleted journal |
 |---|---|---|---|---|---|---|
-| In-memory, [PostgreSQL](../backends/postgresql.md) | throws | enforced | throws | per entry | enforced | `Expired` |
+| In-memory, [PostgreSQL](../backends/postgresql.md) | throws | enforced | throws | per entry | enforced | `Expired` while the journal's record remains; once it is deleted or swept, reads as empty |
 | [Redis](../backends/redis.md) | not checked | not enforced | accepted | resets the whole stream's expiry | expires the stream | reads as empty |
 | [Hazelcast](../backends/hazelcast.md) | not checked | not enforced | accepted | ignored; ring-buffer TTL and capacity apply | clears the completed flag only | reads as empty |
 | [NATS](../backends/nats.md) | not checked | not enforced | accepted | ignored; stream max age and size apply | ignored | reads as empty |
@@ -184,6 +196,25 @@ What the differences mean in practice on the backends other than PostgreSQL and 
   own end-of-stream entry.
 - Calling `complete` once is the producer's responsibility; nothing stops a late `append`, but
   subscribers that have already drained and completed will not see it.
+
+## Ordering with concurrent appenders
+
+Subscribers read entries in ID order and remember the last ID they delivered. That is exact when
+IDs are assigned in the order entries become visible, which holds on Redis, NATS, Hazelcast and the
+in-memory backend.
+
+On the other backends an ID can be lower than one already visible:
+
+- **MongoDB, DynamoDB and RabbitMQ** generate the ID on the appending node, from its clock;
+  **Cassandra** uses a time-based UUID the same way.
+- **PostgreSQL** takes the ID from a sequence when the entry is inserted, and two concurrent
+  appends can commit in the opposite order.
+
+With one appender per journal, which is the usual shape (one job, one producer), none of this
+matters. With several nodes appending to the same journal at the same moment, a subscriber can
+move past an entry that becomes visible a moment later with a lower ID, and never receive it. On
+RabbitMQ it can also receive an entry twice. If you need concurrent appenders with no gaps, use
+Redis, NATS or Hazelcast.
 
 ## Methods
 
@@ -212,7 +243,9 @@ for (Step step : steps) {
   progress.append(new Progress(step.name(), step.percent()), Duration.ofHours(1));
 }
 progress.complete(Duration.ofMinutes(30));
+```
 
+```java
 // A web node, streaming to a client.
 Journal<Progress> progress = journals.connect("job:" + jobId, Progress.class);
 try (var sub = lastSeen == null ? progress.subscribeLast(100) : progress.subscribeAfter(lastSeen)) {
@@ -224,5 +257,7 @@ try (var sub = lastSeen == null ? progress.subscribeLast(100) : progress.subscri
 }
 ```
 
-The inactivity TTL also catches a worker that dies mid-job: if no progress is appended for 15
-minutes, the journal expires and every client sees `Expired` instead of waiting forever.
+On PostgreSQL and the in-memory backend, the inactivity TTL also catches a worker that dies
+mid-job: if no progress is appended for 15 minutes, the journal expires and every client sees
+`Expired` instead of waiting forever. The other backends don't enforce the inactivity TTL (see
+[How backends differ](#how-backends-differ)); there, give the client its own deadline.

@@ -108,9 +108,14 @@ greater than zero; the entry and retention TTLs accept `Duration.ZERO`, meaning 
 
 An expired primitive is treated as gone from the moment its TTL runs out: operations throw the
 matching `*ExpiredException` and subscriptions end with `Expired`. Removing the data from storage
-is the backend's job. Backends with native expiry — Redis, DynamoDB, MongoDB and others — do it
-themselves. For those without it, such as PostgreSQL, a background sweeper deletes expired rows
-on a schedule; see [Operating in Production](../guides/operating.md#sweeping).
+is the backend's job. Backends with native expiry — Redis, MongoDB, Cassandra and others — do it
+themselves. For PostgreSQL and the in-memory backend, a background sweeper deletes expired rows on
+a schedule; see [Operating in Production](../guides/operating.md#sweeping). DynamoDB needs its
+table TTL enabled by you.
+
+Some backends treat expired data as gone only once it is actually deleted, not the moment its TTL
+passes; each backend's page says where. The [Journal](../primitives/journal.md#how-backends-differ)
+and [Atom](../primitives/atom.md#creating-and-connecting) pages list the visible effects.
 
 ## Lifecycles
 
@@ -212,8 +217,14 @@ names all seven needs no `default`, and the compiler reports a missing one.
 | `Cancelled()` | `onCancelled()` | This subscription was cancelled locally — by `cancel()`, `close()` or application shutdown. The primitive itself is unaffected. | yes |
 
 `isTerminal()` on a result tells you whether it ended the subscription. After a terminal result,
-`isActive()` is `false` and every further `next` returns the same result. If the thread blocked
-in `next` is interrupted, the subscription ends and the interrupt flag is restored.
+`isActive()` is `false` and every further `next` returns the same result.
+
+!!! warning "Don't rely on interrupting `next`"
+    If the thread blocked in `next` is interrupted, `next` returns with the interrupt flag
+    restored, but in 0.10.0 the subscription's feeder keeps running, and a later `close()` or
+    `cancel()` does not stop it. Cancel a subscription with `cancel()` or `close()` instead of
+    interrupting the thread that reads it; where a framework interrupts that thread (for
+    example, on a client disconnect), cancel from the disconnect callback first.
 
 What a subscription delivers differs by primitive:
 
@@ -298,7 +309,8 @@ Two consequences:
 
 Each subscription runs a *feeder* on its own virtual thread, which reads the backend and hands
 results to the subscription. A callback subscription adds a second virtual thread that calls
-your `Subscriber`. Both end when the subscription ends.
+your `Subscriber`. Both end when the subscription is cancelled, closed, or ends with a terminal
+result (but see the warning on interrupting `next`, above).
 
 When the Spring context shuts down, Substrate cancels every open subscription before the web
 server's graceful shutdown starts. Blocked `next` calls return `Cancelled`, callbacks receive

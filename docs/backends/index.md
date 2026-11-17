@@ -35,9 +35,11 @@ Then weigh what matters to the application:
 - **One dependency, everything included.** Redis, PostgreSQL, Hazelcast or NATS.
 - **Fast change notification across nodes.** Pick a module with a notifier, or add one (below).
   Without one, other nodes notice changes only through their once-a-second re-read.
-- **Expired data cleaned up by the store itself.** Every backend except PostgreSQL expires data
-  natively. PostgreSQL relies on Substrate's [sweeper](../guides/operating.md#sweeping), a
-  scheduled delete that runs on every node.
+- **Expired data cleaned up by the store itself.** Redis, Hazelcast, NATS, MongoDB, Cassandra,
+  etcd and RabbitMQ expire data natively. PostgreSQL and the in-memory backend rely on
+  Substrate's [sweeper](../guides/operating.md#sweeping), a scheduled delete that runs on every
+  node. DynamoDB deletes expired items only once you
+  [enable TTL on its tables](dynamodb.md#enable-ttl-on-every-table), and then within days.
 - **Already on AWS without Redis.** DynamoDB for storage, with `substrate-sns` as the notifier.
 - **A coordination store you already operate.** etcd for Atom, with another module for Journal
   and Mailbox.
@@ -61,8 +63,9 @@ Modules can be mixed. A common reason is a primitive your main backend lacks:
 </dependency>
 ```
 
-When two modules on the classpath both provide a primitive, only one is used, and which one is
-decided by auto-configuration order, not by anything you declare. Make the choice explicit by
+When two modules on the classpath both provide a primitive, which one is used is decided by
+auto-configuration order, not by anything you declare — and with MongoDB's Journal or Mailbox,
+both register and the application fails to start. Make the choice explicit by
 switching off the one you don't want. Every module has an `enabled` property per primitive:
 
 ```yaml
@@ -81,7 +84,8 @@ explains the mechanism. The notifier needn't be the storage technology:
 - **MongoDB, DynamoDB, Cassandra and etcd have no notifier.** On their own, a change made on one
   node reaches subscribers on another within about a second, through the re-read every
   subscription does. Add `substrate-sns`, `substrate-rabbitmq` or another notifier module when
-  that delay matters.
+  that delay matters. For `substrate-rabbitmq` as a notifier only, switch its Journal off
+  ([RabbitMQ](rabbitmq.md#the-notifier)).
 - **Storage with a notifier, plus a different notifier.** Switch the storage module's notifier off
   so exactly one is active:
 

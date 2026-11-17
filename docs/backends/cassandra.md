@@ -22,7 +22,7 @@ notifier; add another module for those (see [Combining modules](index.md#combini
 
 | Primitive | Storage |
 |---|---|
-| Atom | One row per atom in `substrate_atoms`, written `USING TTL`. Every write is a lightweight transaction: `IF NOT EXISTS` for create, `IF EXISTS` for set and touch, a token condition for compare-and-set. |
+| Atom | One row per atom in `substrate_atoms`, written `USING TTL`. Every write is a lightweight transaction: `IF NOT EXISTS` for create, `IF EXISTS` for set, a token condition for touch and compare-and-set. |
 | Journal | One row per entry in `substrate_journal`, partitioned by journal key, written `USING TTL`; a marker row once completed. |
 
 With `auto-create-schema` (the default) the tables are created at startup if they don't exist.

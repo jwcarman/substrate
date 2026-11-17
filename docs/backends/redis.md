@@ -49,8 +49,11 @@ Expiry is native: Redis deletes expired keys itself, and Substrate's sweeper has
 
 ## Behaviour to know
 
-- **TTLs are whole seconds.** Atom and mailbox TTLs are rounded down to whole seconds, with a
-  minimum of one.
+- **TTLs are whole seconds.** Atom TTLs are rounded down to whole seconds, with a minimum of one.
+  Mailbox TTLs are rounded down too, with no minimum: a mailbox TTL under one second fails.
+- **Completed journals drain at most about 200 entries.** A subscriber further behind than that
+  when a journal completes ends with `Completed` without the rest; see
+  [Completing](../primitives/journal.md#completing).
 - **Journal TTLs apply to the whole stream.** Redis expires keys, not stream entries. Each
   `append` sets the stream's expiry to that entry's TTL, so the journal lives until the most
   recent entry's TTL runs out, and older entries live exactly as long. An entry TTL of

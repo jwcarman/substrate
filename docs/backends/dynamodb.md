@@ -52,11 +52,16 @@ tables yourself with the capacity mode you want, and set `auto-create-table` to 
 Even with TTL enabled, DynamoDB deletes expired items in the background, typically within a few
 days. Until then:
 
-- atoms and mailboxes are already treated as expired, because reads compare `ttl` with the
-  current time;
+- atoms are already treated as expired, because reads compare `ttl` with the current time, but
+  an expired atom's name stays taken: `create` on it throws `AtomAlreadyExistsException`;
+- mailboxes are not checked at all: a late `deliver` succeeds and subscribers wait rather than
+  end with `Expired`;
 - journal entries are not checked on read, so an expired entry can still be replayed by
   `subscribeLast` or `subscribeAfter`.
 
+Journal entry IDs are generated on the appending node, so concurrent appenders can make
+subscribers skip entries; see
+[Ordering with concurrent appenders](../primitives/journal.md#ordering-with-concurrent-appenders).
 The Journal lifecycle is partly enforced; the retention TTL applies only to the completion marker.
 See [How backends differ](../primitives/journal.md#how-backends-differ).
 

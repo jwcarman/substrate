@@ -123,7 +123,8 @@ String id = journal.append(new OrderEvent("created"), Duration.ofDays(1));
 ```
 
 The first `Duration` is the journal's inactivity TTL: if nothing is appended for an hour, it
-expires. The second is how long this entry is kept. A consumer, on any node, tails it from a
+expires — on PostgreSQL and the in-memory backend. Redis and most other backends don't enforce it;
+see [How backends differ](../primitives/journal.md#how-backends-differ). The second is how long this entry is kept. A consumer, on any node, tails it from a
 virtual thread:
 
 ```java

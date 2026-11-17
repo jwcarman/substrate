@@ -66,8 +66,10 @@ documents what the code does today.
     ("use substrate-postgresql for storage and add … substrate-sns purely for the cross-node
     wake-up"). The docs tell users to switch the other notifier off
     (`substrate.<backend>.notifier.enabled=false`).
-11. **Two modules for the same primitive: the winner is decided by ordering.** Every SPI bean is
-    `@ConditionalOnMissingBean(<Primitive>Spi.class)`, and the backend auto-configurations do not
+11. **Two modules for the same primitive: the winner is decided by ordering.** Most SPI beans are
+    `@ConditionalOnMissingBean(<Primitive>Spi.class)` (MongoDB's Journal and Mailbox use a bare
+    `@ConditionalOnMissingBean`, so they register beside another module's and startup fails on an
+    ambiguous SPI), and the backend auto-configurations do not
     order themselves against each other, so which module serves a primitive both support depends on
     auto-configuration ordering. The docs tell users to disable the one they don't want.
 12. **NATS ignores per-call TTLs for Atom and Mailbox.** `NatsAtomSpi` and `NatsMailboxSpi` never
@@ -79,7 +81,9 @@ documents what the code does today.
     they can recreate an atom deleted between the two calls.
 13. **DynamoDB never enables TTL on its tables.** The auto-created tables store an epoch-seconds
     `ttl` attribute but nothing calls `UpdateTimeToLive`, and the DynamoDB SPIs inherit the no-op
-    sweep. Expired atoms and mailboxes are hidden by read-time checks but never deleted; journal
+    sweep. Expired atoms are hidden by read-time checks but never deleted, and their names stay taken
+    (`create` throws `AtomAlreadyExistsException`); mailboxes are not checked on read at all, so they
+    never expire; journal
     entries are neither filtered on read nor deleted, so expired entries are replayed by
     `subscribeLast`/`subscribeAfter`. Tables are created with provisioned throughput of 5/5.
 14. **RabbitMQ journal reads the whole stream on every poll.** `readAfter` consumes the stream from
@@ -101,3 +105,26 @@ documents what the code does today.
     javac against 0.10.0). The README's callback examples did not compile. The site uses explicitly
     typed parameters, as the core tests do, and says why. A distinct name for the customizer form
     (e.g. `subscribe(SubscriberConfig…)` → `subscribeWith`) would remove the trap.
+
+## Found by the final review
+
+19. **Redis: completed journals drain at most ~200 entries.** `RedisJournalSpi.readAfter` returns
+    at most 100 entries (`READ_BATCH_SIZE`); `DefaultJournal.drainIfCompleted` reads one more batch
+    and marks the subscription Completed. Subscribers further behind lose the rest silently.
+    Fix: loop until an empty batch in `drainIfCompleted`.
+20. **Concurrent appenders can skip entries** on MongoDB, DynamoDB, RabbitMQ (IDs from the
+    producer's clock), Cassandra (time-based UUIDs) and PostgreSQL (`BIGSERIAL` order is not commit
+    order). RabbitMQ can also redeliver. Readers use `id > checkpoint`.
+21. **An interrupted blocking subscription leaks its feeder.** `DefaultBlockingSubscription.next`
+    on interrupt calls `markDone()` without running the canceller; `cancel()`/`close()` then do
+    nothing, so the feeder thread and notifier registration live on.
+22. **DynamoDB atom and mailbox expiry.** Mailboxes never check `ttl`; `DynamoDbAtomSpi.create`
+    is conditional on `attribute_not_exists`, so an expired atom's name stays taken until AWS
+    deletes the item — forever without TTL enabled. MongoDB has the same name collision until its
+    TTL monitor runs.
+23. **Smaller code observations:** NATS/Hazelcast/RabbitMQ journal reads swallow client errors (no
+    `Errored` during an outage); Redis mailbox TTL has no one-second floor; NATS KV maps `:` `.` `-`
+    to the same key; a NATS completion record survives `delete`; a failed notification makes a
+    successful write throw (retries duplicate journal entries); PostgreSQL `max-len` trimming is
+    every 100 appends per JVM; `substrate-rabbitmq` fails to start without an `Environment` bean
+    unless its Journal is switched off.

@@ -27,6 +27,12 @@ The `Duration` is the mailbox's lifetime. It must be greater than zero and at mo
 `substrate.mailbox.max-ttl` (30 minutes by default), and it is never renewed: after five minutes
 this mailbox is gone, delivered or not.
 
+!!! warning "DynamoDB mailboxes do not expire on read"
+    The DynamoDB backend does not check a mailbox's lifetime when reading or delivering. Its
+    mailboxes last until DynamoDB's TTL deletes the item, typically days later, or forever if
+    [TTL is not enabled](../backends/dynamodb.md#enable-ttl-on-every-table). Until then a late
+    `deliver` succeeds and subscribers wait instead of ending with `Expired`.
+
 Unlike the other factories, `MailboxFactory.create` does not fail when the name is taken. It
 replaces the existing mailbox, discarding any value it held, and starts the new lifetime. Use
 names that are unique per exchange, such as a request ID.

@@ -27,7 +27,9 @@ The notifier declares a durable fanout exchange, `substrate-notify`. Each node d
 server-named, exclusive, auto-delete queue bound to it, so every node receives every notification,
 and a node's queue disappears when it disconnects.
 
-To use only the notifier with another module's Journal, switch the Journal off:
+The Journal needs the `Environment` bean described above, and the stream client is always on the
+classpath, so without that bean the application fails to start. To use only the notifier, switch
+the Journal off:
 
 ```yaml
 substrate:

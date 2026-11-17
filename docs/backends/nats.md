@@ -33,8 +33,9 @@ core NATS subject. It suits applications that already run NATS with JetStream.
 | Mailbox | Keys in the key-value bucket `substrate-mailbox`. |
 | Notifier | The core NATS subject `substrate.notifications`. |
 
-The buckets and the stream are created at startup if they don't exist. Colons in names become
-dots in keys and subjects.
+The buckets and the stream are created at startup if they don't exist. In journal subjects,
+colons become dots. In key-value keys, both colons and dots become dashes, so atom or mailbox
+names that differ only by `:`, `.` or `-` share a key.
 
 ## TTLs are per bucket, not per call
 
@@ -53,7 +54,8 @@ The Journal is limited the same way: retention is set for the whole stream, by
 messages across all journals together). Per-entry and retention TTLs are ignored, and the rest of
 the Journal lifecycle is partly enforced; see
 [How backends differ](../primitives/journal.md#how-backends-differ). Deleting a journal purges its
-entries but leaves its completion record in place.
+entries but leaves its completion record in place, so subscribers to a deleted completed journal
+end with `Completed`, and a new journal created under the same name is complete from the start.
 
 ## Configuration
 
