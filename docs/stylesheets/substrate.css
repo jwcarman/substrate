@@ -1,0 +1,39 @@
+/*
+ * Substrate's styles layered on the shared jwcarman theme: the strata under the home page's
+ * title, three bands for the three primitives resting on one foundation.
+ */
+
+.jw-strata {
+  display: grid;
+  gap: 0.3rem;
+  max-width: 22rem;
+  margin: 1.1rem 0 1.4rem;
+}
+
+.jw-strata span {
+  display: block;
+  height: 0.55rem;
+  border-radius: 0.15rem;
+  background-color: var(--jw-cobalt);
+}
+
+.jw-strata span:nth-child(2) {
+  opacity: 0.7;
+  margin-right: 12%;
+}
+
+.jw-strata span:nth-child(3) {
+  opacity: 0.45;
+  margin-right: 24%;
+}
+
+.jw-strata span:last-child {
+  height: 0.8rem;
+  background-color: var(--jw-signal);
+  margin-right: 0;
+  opacity: 1;
+}
+
+[data-md-color-scheme="slate"] .jw-strata span:not(:last-child) {
+  background-color: var(--jw-cobalt-soft);
+}

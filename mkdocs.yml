@@ -1,0 +1,129 @@
+#
+# Copyright © 2026 James Carman
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+site_name: Substrate
+site_description: Distributed primitives for Java, on the infrastructure you already run.
+site_url: https://jwcarman.github.io/substrate/
+repo_url: https://github.com/jwcarman/substrate
+repo_name: jwcarman/substrate
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+
+validation:
+  anchors: warn
+  links:
+    absolute_links: warn
+
+# Design specs, plans and working notes stay out of the site.
+exclude_docs: |
+  /requirements.*
+  /superpowers/
+  /plans/
+  /native-image-hints.md
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Source Sans 3
+    code: JetBrains Mono
+  features:
+    - navigation.tabs
+    - navigation.top
+    - navigation.footer
+    - navigation.indexes
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+extra_css:
+  - stylesheets/jwcarman.css
+  - stylesheets/substrate.css
+
+plugins:
+  - search
+  # https://llmstxt.org: an index of the docs for coding agents at /llms.txt, every page in
+  # one file at /llms-full.txt, and a Markdown copy of each page beside its HTML.
+  - llmstxt:
+      full_output: llms-full.txt
+      markdown_description: |
+        Substrate gives Java distributed primitives (Atom, Journal and Mailbox) on the
+        infrastructure you already run.
+      sections:
+        Start here:
+          - index.md
+
+nav:
+  - Home: index.md
+  - Guides:
+      - Getting Started: guides/getting-started.md
+      - Encryption at Rest: guides/encryption.md
+      - Testing: guides/testing.md
+      - Operating in Production: guides/operating.md
+  - Concepts: concepts/index.md
+  - Primitives:
+      - Atom: primitives/atom.md
+      - Journal: primitives/journal.md
+      - Mailbox: primitives/mailbox.md
+  - Backends:
+      - Choosing a Backend: backends/index.md
+      - In-Memory: backends/in-memory.md
+      - Redis: backends/redis.md
+      - PostgreSQL: backends/postgresql.md
+      - Hazelcast: backends/hazelcast.md
+      - NATS: backends/nats.md
+      - MongoDB: backends/mongodb.md
+      - DynamoDB: backends/dynamodb.md
+      - Cassandra: backends/cassandra.md
+      - etcd: backends/etcd.md
+      - RabbitMQ: backends/rabbitmq.md
+      - SNS and SQS: backends/sns.md
+  - Reference:
+      - Configuration: reference/configuration.md
+      - Exceptions: reference/exceptions.md
+      - Design Principles: reference/design-principles.md
+      - API (Javadoc): https://jwcarman.github.io/substrate/api/latest/
+      - Changelog: https://github.com/jwcarman/substrate/blob/main/CHANGELOG.md

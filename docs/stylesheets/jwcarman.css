@@ -1,0 +1,200 @@
+/*
+ * jwcarman docs theme — shared across the jwcarman OSS documentation sites.
+ *
+ * Tokens: Ink (header, dark ground), Cobalt (links, actions), Signal (amber —
+ * rationed to focus rings, dark-mode link hover, and whatever per-project
+ * signature element a site chooses), Paper and Slate (light and dark page
+ * grounds).
+ *
+ * This file is the shared theme and carries nothing project-specific. To
+ * adopt it: copy it, paste the theme block into mkdocs.yml, and give the
+ * landing page a .jw-hero (title, .jw-hero__tagline, .jw-hero__actions).
+ * A site's signature element, if it has one, lives in its own stylesheet
+ * next to this one (codec's hex tape is in codec.css).
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@600;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap");
+
+:root {
+  --jw-ink: #171b3a;
+  --jw-ink-light: #2a2f5a;
+  --jw-ink-dark: #0b0e1f;
+  --jw-cobalt: #3a4bc7;
+  --jw-cobalt-deep: #2c3a9e;
+  --jw-cobalt-soft: #9aa6f0;
+  --jw-signal: #f2a93b;
+  --jw-paper: #f7f7fb;
+  --jw-slate: #0f1226;
+  --jw-slate-raised: #161a38;
+  --jw-display: "Instrument Sans", "Source Sans 3", system-ui, sans-serif;
+}
+
+/* ---------- Material palette hooks ---------- */
+
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: var(--jw-ink);
+  --md-primary-fg-color--light: var(--jw-ink-light);
+  --md-primary-fg-color--dark: var(--jw-ink-dark);
+  --md-accent-fg-color: var(--jw-cobalt);
+  --md-accent-fg-color--transparent: rgba(58, 75, 199, 0.1);
+  --md-typeset-a-color: var(--jw-cobalt);
+  --md-default-bg-color: var(--jw-paper);
+  --md-code-bg-color: #eeeff7;
+  --md-code-hl-color: rgba(242, 169, 59, 0.25);
+}
+
+[data-md-color-scheme="slate"] {
+  --md-hue: 232;
+  --md-primary-fg-color: var(--jw-ink);
+  --md-primary-fg-color--light: var(--jw-ink-light);
+  --md-primary-fg-color--dark: var(--jw-ink-dark);
+  --md-accent-fg-color: var(--jw-signal);
+  --md-accent-fg-color--transparent: rgba(242, 169, 59, 0.12);
+  --md-typeset-a-color: var(--jw-cobalt-soft);
+  --md-default-bg-color: var(--jw-slate);
+  --md-code-bg-color: var(--jw-slate-raised);
+  --md-code-hl-color: rgba(242, 169, 59, 0.2);
+}
+
+/* ---------- Header and tabs ---------- */
+
+.md-header,
+.md-tabs {
+  background-color: var(--jw-ink);
+}
+
+.md-header__title {
+  font-family: var(--jw-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.md-tabs__link--active {
+  font-weight: 600;
+}
+
+/* ---------- Typography ---------- */
+
+.md-typeset h1,
+.md-typeset h2 {
+  font-family: var(--jw-display);
+  letter-spacing: -0.02em;
+}
+
+.md-typeset h1 {
+  font-weight: 700;
+  color: var(--jw-ink);
+}
+
+[data-md-color-scheme="slate"] .md-typeset h1 {
+  color: #fff;
+}
+
+.md-typeset h2 {
+  font-weight: 600;
+}
+
+.md-typeset pre > code {
+  border-left: 3px solid var(--jw-cobalt);
+}
+
+[data-md-color-scheme="slate"] .md-typeset a:hover {
+  color: var(--jw-signal);
+}
+
+:focus-visible {
+  outline: 2px solid var(--jw-signal);
+  outline-offset: 2px;
+}
+
+/* ---------- Buttons ---------- */
+
+.md-typeset .md-button--primary {
+  background-color: var(--jw-cobalt);
+  border-color: var(--jw-cobalt);
+  color: #fff;
+}
+
+.md-typeset .md-button--primary:hover,
+.md-typeset .md-button--primary:focus {
+  background-color: var(--jw-cobalt-deep);
+  border-color: var(--jw-cobalt-deep);
+  color: #fff;
+}
+
+.md-typeset .md-button:not(.md-button--primary) {
+  border-color: var(--jw-cobalt);
+  color: var(--jw-cobalt);
+}
+
+[data-md-color-scheme="slate"] .md-typeset .md-button:not(.md-button--primary) {
+  border-color: var(--jw-cobalt-soft);
+  color: var(--jw-cobalt-soft);
+}
+
+.md-typeset .md-button:not(.md-button--primary):hover,
+.md-typeset .md-button:not(.md-button--primary):focus {
+  background-color: var(--md-accent-fg-color--transparent);
+  border-color: var(--md-accent-fg-color);
+  color: var(--md-accent-fg-color);
+}
+
+/* ---------- Landing page hero ---------- */
+
+.jw-hero {
+  max-width: 46rem;
+  padding: 1.25rem 0 0.75rem;
+}
+
+.md-typeset .jw-hero h1 {
+  margin: 0 0 0.35rem;
+  font-size: clamp(2.6rem, 6vw, 4.2rem);
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.md-typeset .jw-hero__tagline {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--md-default-fg-color--light);
+}
+
+.md-typeset .jw-hero__actions {
+  margin: 0.25rem 0 1.5rem;
+}
+
+.md-typeset .jw-hero__actions .md-button {
+  margin: 0.35rem 0.6rem 0 0;
+}
+
+/* ---------- Feature cards ---------- */
+
+.md-typeset .grid.cards > ul > li {
+  border-color: rgba(58, 75, 199, 0.22);
+  transition: border-color 0.2s ease;
+}
+
+.md-typeset .grid.cards > ul > li:hover {
+  border-color: var(--jw-cobalt);
+}
+
+[data-md-color-scheme="slate"] .md-typeset .grid.cards > ul > li {
+  background-color: var(--jw-slate-raised);
+  border-color: rgba(154, 166, 240, 0.2);
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+/* Scheme-scoped so it outranks the scheme-scoped resting rule above. */
+[data-md-color-scheme="slate"] .md-typeset .grid.cards > ul > li:hover {
+  background-color: #1b2046;
+  border-color: var(--jw-cobalt-soft);
+}
+
+.md-typeset .grid.cards > ul > li > p:first-child {
+  font-family: var(--jw-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
