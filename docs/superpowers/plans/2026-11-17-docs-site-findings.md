@@ -31,3 +31,14 @@ documents what the code does today.
 6. **`MailboxSpi.get` Javadoc** says it returns empty when the mailbox has expired; the
    implementations checked (in-memory, Redis) throw `MailboxExpiredException`, which is what
    `DefaultMailbox` relies on.
+7. **Expired names stay taken on sweeper backends.** `PostgresAtomSpi.create` inserts with
+   `ON CONFLICT (key) DO NOTHING`, so an atom that has expired but not yet been swept still makes
+   `create` throw `AtomAlreadyExistsException`. Backends with native expiry free the name at once.
+   Get-or-create and lease-takeover code behaves differently by backend.
+8. **Two clocks in the PostgreSQL atom.** `expires_at` is written from the application's clock
+   (`Instant.now().plus(ttl)`) and compared against the database's (`NOW()`). Skew between them
+   shortens or lengthens every lease by the skew.
+9. **Redis needs Lettuce, single-node.** `RedisAtomAutoConfiguration` (and its siblings) cast the
+   `RedisConnectionFactory` to `LettuceConnectionFactory` and its native client to `RedisClient`.
+   An application using Jedis, or Lettuce in cluster mode (`RedisClusterClient`), fails at startup
+   with a `ClassCastException`.

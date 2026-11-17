@@ -1,3 +1,196 @@
 # Journal
 
-This page is being written.
+A Journal is an ordered, append-only stream. Producers on any node append entries; consumers on
+any node read them in order, either from now, from the last few entries, or from an entry they
+saw earlier. A journal can be marked complete, after which it stays readable for a while and then
+goes away.
+
+Use a Journal when every change matters and order matters:
+
+- progress or status updates for a long-running task;
+- an event feed for one order, document or conversation;
+- the backing store for a resumable stream, such as Server-Sent Events with `Last-Event-ID`.
+
+When only the latest value matters, use an [Atom](atom.md).
+
+## Creating and connecting
+
+```java
+@Autowired JournalFactory journals;
+
+Journal<OrderEvent> events =
+    journals.create("order-events:" + orderId, OrderEvent.class, Duration.ofHours(1));
+
+// Elsewhere:
+Journal<OrderEvent> same = journals.connect("order-events:" + orderId, OrderEvent.class);
+```
+
+The `Duration` given to `create` is the *inactivity TTL*: if nothing is appended for that long,
+the journal expires. It must be greater than zero and at most
+`substrate.journal.max-inactivity-ttl` (24 hours by default).
+
+`create` throws `JournalAlreadyExistsException` if the name is taken; a `connect` handle throws
+`JournalNotFoundException` on first use if it isn't. See
+[Creating and connecting](../concepts/index.md#creating-and-connecting).
+
+## Appending
+
+```java
+String id = events.append(new OrderEvent("shipped"), Duration.ofDays(1));
+```
+
+`append` stores the entry, resets the journal's inactivity timer, notifies subscribers on every
+node, and returns the entry's ID. Within a journal, each ID is greater than the IDs of entries
+appended before it, so IDs work as checkpoints. Their format depends on the backend; treat them
+as opaque strings.
+
+The `Duration` is the *entry TTL*: how long this entry is kept. `Duration.ZERO` means no TTL of
+its own. It may not be negative or exceed `substrate.journal.max-entry-ttl` (7 days by default).
+Backends that manage retention for the whole stream rather than per entry ignore it; their
+pages say so.
+
+Any number of nodes may append to the same journal at once. Entries are ordered as the backend
+receives them.
+
+`append` throws:
+
+- `JournalCompletedException` once the journal has been completed;
+- `JournalExpiredException` once it has expired or been deleted.
+
+## Reading
+
+There are three ways to subscribe. All of them deliver every entry from their starting point
+onward, in order, then keep delivering new entries as they are appended.
+
+| Method | Starts with |
+|---|---|
+| `subscribe()` | The next entry appended after you subscribe. Nothing already in the journal is replayed. |
+| `subscribeLast(int count)` | The last `count` entries still retained, then new ones. |
+| `subscribeAfter(String afterId)` | Every retained entry after `afterId`, then new ones. |
+
+```java
+try (BlockingSubscription<JournalEntry<OrderEvent>> sub = events.subscribeLast(20)) {
+  while (sub.isActive()) {
+    switch (sub.next(Duration.ofSeconds(15))) {
+      case NextResult.Value<JournalEntry<OrderEvent>>(var entry) -> send(entry.id(), entry.data());
+      case NextResult.Timeout<JournalEntry<OrderEvent>> _ -> sendKeepAlive();
+      case NextResult.Completed<JournalEntry<OrderEvent>> _ -> sendDone();
+      case NextResult.Expired<JournalEntry<OrderEvent>> _ -> sendGone();
+      case NextResult.Deleted<JournalEntry<OrderEvent>> _ -> sendGone();
+      case NextResult.Errored<JournalEntry<OrderEvent>>(var cause) -> log.error("failed", cause);
+      case NextResult.Cancelled<JournalEntry<OrderEvent>> _ -> {}
+    }
+  }
+}
+```
+
+Each entry arrives as a [`JournalEntry<T>`](../concepts/index.md#journal-entries) with its ID,
+the journal's key, the payload and the time it was appended. Each method also has callback
+forms taking a `Subscriber` or a `SubscriberConfig` customizer:
+
+```java
+Subscription sub = events.subscribeAfter(lastEventId, cfg -> cfg
+    .onNext(entry -> send(entry.id(), entry.data()))
+    .onCompleted(this::sendDone)
+    .onExpired(this::sendGone));
+```
+
+### Resuming after a disconnect
+
+Save the ID of the last entry you processed. To resume, pass it to `subscribeAfter`; you receive
+exactly the entries you have not seen, then live ones.
+
+```java
+// The client reconnects with the ID of the last event it received.
+var sub = (lastEventId == null) ? events.subscribeLast(50) : events.subscribeAfter(lastEventId);
+```
+
+`subscribeAfter` can only replay what the backend still holds. Entries whose TTL has run out,
+or that the backend trimmed to stay under its length limit, are gone, and the subscription does
+not tell you that something was skipped. Size entry TTLs and length limits for the longest
+reconnect you need to survive. Pass only IDs that this journal returned.
+
+### Backpressure
+
+Each subscription keeps a bounded queue of entries read from the backend but not yet taken by
+`next` (`substrate.journal.subscription.queue-capacity`, 1024 by default). When a consumer falls
+behind and its queue fills, that subscription stops reading from the backend until the consumer
+catches up. Nothing is dropped, and other subscriptions are unaffected. A consumer that stops
+calling `next` altogether holds its feeder thread until the subscription is cancelled or closed.
+
+## Completing
+
+```java
+events.complete(Duration.ofMinutes(10));
+```
+
+`complete` closes the journal to new entries. Existing entries stay readable for the *retention
+TTL* you pass, then the journal expires. `Duration.ZERO` means retain with no TTL; the maximum is
+`substrate.journal.max-retention-ttl` (30 days by default).
+
+Subscribers see completion only after they have read everything: each one receives every
+remaining entry, then `Completed`. A subscription opened on an already completed journal does the
+same — `subscribeLast(20)` on a finished journal delivers up to 20 entries and then `Completed`.
+
+Completing is the clean way to end a stream. Consumers can tell "the producer finished"
+(`Completed`) from "the journal timed out" (`Expired`) and "someone removed it" (`Deleted`).
+
+## Deleting
+
+```java
+events.delete();
+```
+
+`delete` removes the journal and all its entries at once, in any state, and notifies subscribers,
+which end with `Deleted`. A subscriber that misses the notification may instead end with
+`Expired` when its next read finds the journal gone. Deleting a journal that doesn't exist does nothing.
+
+## Lifecycle at a glance
+
+| State | `append` | Subscriptions | Ends when |
+|---|---|---|---|
+| Active | accepted; resets the inactivity TTL | deliver entries | `complete`, inactivity TTL, `delete` |
+| Completed | throws `JournalCompletedException` | drain, then `Completed` | retention TTL, `delete` |
+| Expired or deleted | throws `JournalExpiredException` | end with `Expired` or `Deleted` | — |
+
+## Methods
+
+| Method | Does |
+|---|---|
+| `String append(T data, Duration ttl)` | Appends an entry; returns its ID. |
+| `void complete(Duration retentionTtl)` | Closes the journal to appends; keeps it readable for `retentionTtl`. |
+| `void delete()` | Removes the journal and its entries; safe to repeat. |
+| `BlockingSubscription<JournalEntry<T>> subscribe()` | Reads entries appended from now on. |
+| `BlockingSubscription<JournalEntry<T>> subscribeLast(int count)` | Replays the last `count` entries, then reads on. |
+| `BlockingSubscription<JournalEntry<T>> subscribeAfter(String afterId)` | Replays entries after `afterId`, then reads on. |
+| `subscribe`, `subscribeLast`, `subscribeAfter` with a `Subscriber` or `SubscriberConfig` customizer | The callback forms. |
+| `String key()` | The backend key. |
+
+## Example: progress for a background job
+
+The node running the job appends progress and completes the journal when it finishes. Any node
+can serve a client that asks how the job is going, including after a reconnect.
+
+```java
+// The worker.
+Journal<Progress> progress =
+    journals.create("job:" + jobId, Progress.class, Duration.ofMinutes(15));
+for (Step step : steps) {
+  step.run();
+  progress.append(new Progress(step.name(), step.percent()), Duration.ofHours(1));
+}
+progress.complete(Duration.ofMinutes(30));
+
+// A web node, streaming to a client.
+Journal<Progress> progress = journals.connect("job:" + jobId, Progress.class);
+try (var sub = lastSeen == null ? progress.subscribeLast(100) : progress.subscribeAfter(lastSeen)) {
+  while (sub.isActive()) {
+    if (sub.next(Duration.ofSeconds(15)) instanceof NextResult.Value<JournalEntry<Progress>>(var entry)) {
+      emit(entry.id(), entry.data());
+    }
+  }
+}
+```
+
+The inactivity TTL also catches a worker that dies mid-job: if no progress is appended for 15
+minutes, the journal expires and every client sees `Expired` instead of waiting forever.
