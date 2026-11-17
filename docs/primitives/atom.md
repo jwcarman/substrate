@@ -133,7 +133,7 @@ try (BlockingSubscription<Snapshot<Session>> sub = session.subscribe()) {
 Or with callbacks:
 
 ```java
-Subscription sub = session.subscribe(cfg -> cfg
+Subscription sub = session.subscribe((SubscriberConfig<Snapshot<Session>> cfg) -> cfg
     .onNext(snapshot -> push(snapshot.value()))
     .onExpired(() -> closeStream("session expired"))
     .onDeleted(() -> closeStream("session ended")));

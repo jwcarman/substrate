@@ -62,8 +62,8 @@ asks the backend to delete expired records in batches.
 | DynamoDB | DynamoDB's TTL feature, which you must [enable on the tables](../backends/dynamodb.md#enable-ttl-on-every-table). |
 
 Each tick, a sweeper deletes up to `batch-size` records, and keeps going while batches come back
-full, up to 100 batches per tick. The first tick is delayed by a random part of the interval, so
-nodes started together don't sweep in step. On PostgreSQL, concurrent sweepers on different nodes
+full, up to 100 batches per tick. The first tick comes one interval plus a random amount of up to
+half an interval after startup, so nodes started together don't sweep in step. On PostgreSQL, concurrent sweepers on different nodes
 skip each other's rows rather than blocking.
 
 ```yaml

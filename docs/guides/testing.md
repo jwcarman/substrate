@@ -79,7 +79,7 @@ Awaitility instead of sleeping:
 
 ```java
 AtomicReference<Session> latest = new AtomicReference<>();
-atom.subscribe(snapshot -> latest.set(snapshot.value()));
+atom.subscribe((Snapshot<Session> snapshot) -> latest.set(snapshot.value()));
 atom.set(updated, Duration.ofMinutes(1));
 
 await().atMost(Duration.ofSeconds(2)).untilAtomic(latest, equalTo(updated));

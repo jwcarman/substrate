@@ -174,7 +174,7 @@ Pass a `Subscriber<T>` instead, and Substrate calls it from a virtual thread of 
 method returns a `Subscription` for cancelling:
 
 ```java
-Subscription sub = atom.subscribe(snapshot -> render(snapshot.value()));
+Subscription sub = atom.subscribe((Snapshot<Session> snapshot) -> render(snapshot.value()));
 // later
 sub.cancel();
 ```
@@ -183,12 +183,18 @@ sub.cancel();
 without writing a class, pass a customizer instead:
 
 ```java
-Subscription sub = atom.subscribe(cfg -> cfg
+Subscription sub = atom.subscribe((SubscriberConfig<Snapshot<Session>> cfg) -> cfg
     .onNext(snapshot -> render(snapshot.value()))
     .onExpired(() -> log.info("session expired"))
     .onDeleted(() -> log.info("session deleted"))
     .onError(cause -> log.error("subscription failed", cause)));
 ```
+
+!!! note "Give the lambda's parameter a type"
+    `subscribe` is overloaded for a `Subscriber<T>` and for a `Consumer<SubscriberConfig<T>>`, and
+    both are functional interfaces. A lambda with an untyped parameter matches both, and the call
+    does not compile ("reference to subscribe is ambiguous"). Declare the parameter's type, as
+    above, or pass an object that implements `Subscriber`.
 
 ### Outcomes
 

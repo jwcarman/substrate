@@ -78,7 +78,7 @@ that arrives after delivery still receives it, for as long as the mailbox lives.
 With callbacks, `onNext` runs once with the value, then `onCompleted`:
 
 ```java
-mailbox.subscribe(cfg -> cfg
+mailbox.subscribe((SubscriberConfig<Answer> cfg) -> cfg
     .onNext(this::proceed)
     .onExpired(() -> giveUp("mailbox expired"))
     .onDeleted(() -> giveUp("request cancelled")));

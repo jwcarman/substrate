@@ -89,7 +89,7 @@ the journal's key, the payload and the time it was appended. Each method also ha
 forms taking a `Subscriber` or a `SubscriberConfig` customizer:
 
 ```java
-Subscription sub = events.subscribeAfter(lastEventId, cfg -> cfg
+Subscription sub = events.subscribeAfter(lastEventId, (SubscriberConfig<JournalEntry<OrderEvent>> cfg) -> cfg
     .onNext(entry -> send(entry.id(), entry.data()))
     .onCompleted(this::sendDone)
     .onExpired(this::sendGone));

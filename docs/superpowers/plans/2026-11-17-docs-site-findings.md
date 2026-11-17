@@ -94,3 +94,10 @@ documents what the code does today.
 17. **AES-GCM without associated data.** `AesGcmPayloadTransformer` does not bind ciphertext to the
     key it is stored under (no AAD), so someone with write access to the backend can move or replay
     valid ciphertexts between primitives undetected. The encryption guide states this limit.
+18. **Lambda `subscribe` calls are ambiguous.** Every primitive overloads `subscribe` (and
+    `subscribeAfter`/`subscribeLast`) for `Subscriber<T>` and `Consumer<SubscriberConfig<T>>`, both
+    functional interfaces of one argument. Any implicitly typed lambda — `subscribe(s -> …)` or
+    `subscribe(cfg -> cfg.onNext(…))` — fails with "reference to subscribe is ambiguous" (checked with
+    javac against 0.10.0). The README's callback examples did not compile. The site uses explicitly
+    typed parameters, as the core tests do, and says why. A distinct name for the customizer form
+    (e.g. `subscribe(SubscriberConfig…)` → `subscribeWith`) would remove the trap.
