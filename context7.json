@@ -1,0 +1,20 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "Substrate (distributed primitives for Java)",
+  "description": "Substrate (org.jwcarman.substrate) gives Java 25 / Spring Boot 4 applications three distributed primitives: Atom (a leased AtomicReference with compare-and-set), Journal (an ordered, replayable stream) and Mailbox (a distributed CompletableFuture), backed by Redis, PostgreSQL, Hazelcast, NATS, MongoDB, DynamoDB, Cassandra, etcd, RabbitMQ or SNS, with one blocking-or-callback subscription model and optional AES-GCM encryption at rest.",
+  "folders": [
+    "docs"
+  ],
+  "excludeFolders": [
+    "docs/superpowers",
+    "docs/plans",
+    "docs/stylesheets"
+  ],
+  "rules": [
+    "Import org.jwcarman.substrate:substrate-bom and org.jwcarman.codec:codec-bom and add modules without versions; in Spring Boot, codec-spring-boot-starter plus a codec backend such as codec-jackson is required, or no AtomFactory, JournalFactory or MailboxFactory is registered.",
+    "Handle NextResult exhaustively: it has seven cases (Value, Timeout, Completed, Expired, Deleted, Errored, Cancelled).",
+    "Every TTL is checked against a ceiling (substrate.atom.max-ttl 24h, substrate.mailbox.max-ttl 30m, journal limits 24h/7d/30d); raise the property rather than working around the IllegalArgumentException.",
+    "Backends differ: only the in-memory and PostgreSQL journals enforce the full Journal lifecycle, NATS ignores per-call TTLs, and DynamoDB needs TTL enabled on its tables; check the backend's page before relying on expiry behaviour.",
+    "Check https://github.com/jwcarman/substrate/blob/main/CHANGELOG.md against the substrate version in use: entries under Unreleased are not in any release yet."
+  ]
+}

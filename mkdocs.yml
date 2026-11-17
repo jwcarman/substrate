@@ -91,11 +91,42 @@ plugins:
   - llmstxt:
       full_output: llms-full.txt
       markdown_description: |
-        Substrate gives Java distributed primitives (Atom, Journal and Mailbox) on the
-        infrastructure you already run.
+        Substrate gives Java 25 / Spring Boot 4 applications three distributed primitives (Atom, Journal
+        and Mailbox) on the infrastructure they already run. Maven coordinates: `org.jwcarman.substrate`;
+        import `substrate-bom` and `codec-bom`, then add `substrate-core`, `codec-spring-boot-starter`, a
+        codec backend such as `codec-jackson`, and one backend module such as `substrate-redis`. The
+        changelog says what each version has: https://github.com/jwcarman/substrate/blob/main/CHANGELOG.md.
       sections:
         Start here:
-          - index.md
+          - index.md: what Substrate is, the three primitives and the main backends
+          - guides/getting-started.md: the dependencies and a first Atom, Journal and Mailbox
+          - concepts/index.md: subscriptions, NextResult outcomes, lifecycles, TTL ceilings and notifications
+        Primitives:
+          - primitives/atom.md: the Atom API, leases, compare-and-set and coalescing subscriptions
+          - primitives/journal.md: the Journal API, entries, checkpoints, completion and how backends differ
+          - primitives/mailbox.md: the Mailbox API, one delivery and waiting for it
+        Backends:
+          - backends/index.md: the backend matrix, choosing and combining modules, and notifiers
+          - backends/in-memory.md: the built-in fallback for development, tests and single nodes
+          - backends/redis.md: substrate-redis, Lettuce single-node, streams and pub/sub
+          - backends/postgresql.md: substrate-postgresql, tables, sweeping and LISTEN/NOTIFY
+          - backends/hazelcast.md: substrate-hazelcast, maps, ring buffers and topics
+          - backends/nats.md: substrate-nats, JetStream buckets with per-bucket TTLs
+          - backends/mongodb.md: substrate-mongodb, collections and TTL indexes
+          - backends/dynamodb.md: substrate-dynamodb, tables and enabling DynamoDB TTL
+          - backends/cassandra.md: substrate-cassandra, Atom and Journal with lightweight transactions
+          - backends/etcd.md: substrate-etcd, Atom on leases and transactions
+          - backends/rabbitmq.md: substrate-rabbitmq, a stream-based Journal and a fanout notifier
+          - backends/sns.md: substrate-sns, a notifier over SNS and per-node SQS queues
+        Guides:
+          - guides/encryption.md: AES-GCM encryption at rest with substrate-crypto and key rotation
+          - guides/testing.md: unit tests on the in-memory backend, subscriptions and Testcontainers
+          - guides/operating.md: subscription costs, sweeping, failures, shutdown and logging
+          - guides/native.md: GraalVM native images and the hints you register
+        Reference:
+          - reference/configuration.md: every substrate.* property and its default
+          - reference/exceptions.md: every exception, which call throws it and when
+          - reference/design-principles.md: the choices behind Substrate
 
 nav:
   - Home: index.md
