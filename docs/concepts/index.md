@@ -129,6 +129,10 @@ Each primitive has a small state machine, and subscriptions report its end state
 
 `delete()` ends a journal in any state.
 
+PostgreSQL and the in-memory backend enforce this whole lifecycle; most other backends enforce
+only part of it. [How backends differ](../primitives/journal.md#how-backends-differ) has the
+details.
+
 **Mailbox** — *empty*, then *delivered*, then expired or deleted.
 
 - *Empty*: created; `deliver` hasn't succeeded yet. Subscribers wait.

@@ -153,6 +153,38 @@ which end with `Deleted`. A subscriber that misses the notification may instead 
 | Completed | throws `JournalCompletedException` | drain, then `Completed` | retention TTL, `delete` |
 | Expired or deleted | throws `JournalExpiredException` | end with `Expired` or `Deleted` | — |
 
+## How backends differ
+
+!!! warning "The full lifecycle is enforced only by PostgreSQL and the in-memory backend"
+    The behaviour described above — name collisions on `create`, the inactivity TTL, rejecting
+    `append` after `complete`, and ending subscriptions with `Expired` — is the Journal contract.
+    PostgreSQL and the in-memory backend implement all of it. The other backends store and replay
+    entries in order and support `complete` and `delete`, but enforce less of the lifecycle. If
+    your code relies on one of these behaviours, check this table for your backend.
+
+| Backend | `create` on a taken name | Inactivity TTL | `append` after `complete` | Entry TTL | Retention TTL | Expired or deleted journal |
+|---|---|---|---|---|---|---|
+| In-memory, [PostgreSQL](../backends/postgresql.md) | throws | enforced | throws | per entry | enforced | `Expired` |
+| [Redis](../backends/redis.md) | not checked | not enforced | accepted | resets the whole stream's expiry | expires the stream | reads as empty |
+| [Hazelcast](../backends/hazelcast.md) | not checked | not enforced | accepted | ignored; ring-buffer TTL and capacity apply | clears the completed flag only | reads as empty |
+| [NATS](../backends/nats.md) | not checked | not enforced | accepted | ignored; stream max age and size apply | ignored | reads as empty |
+| [MongoDB](../backends/mongodb.md) | not checked | not enforced | accepted | per entry | completion marker only | reads as empty |
+| [DynamoDB](../backends/dynamodb.md) | not checked | not enforced | accepted | stored but not enforced | completion marker only | reads as empty |
+| [Cassandra](../backends/cassandra.md) | not checked | not enforced | accepted | per entry | completion marker only | reads as empty |
+| [RabbitMQ](../backends/rabbitmq.md) | not checked | not enforced | accepted | ignored; stream max age and size apply | ignored | reads as empty |
+
+What the differences mean in practice on the backends other than PostgreSQL and in-memory:
+
+- A journal exists in storage only once something has been appended, so a `connect` handle used
+  before the first `append` throws `JournalNotFoundException`.
+- A journal never times out for inactivity. Producers that may die should `complete` or `delete`
+  explicitly, and consumers should bound how long they wait.
+- A subscriber on a deleted or expired journal keeps receiving `Timeout` rather than `Expired`,
+  unless the deletion notification reaches it (`Deleted`). Bound such loops by time or by your
+  own end-of-stream entry.
+- Calling `complete` once is the producer's responsibility; nothing stops a late `append`, but
+  subscribers that have already drained and completed will not see it.
+
 ## Methods
 
 | Method | Does |
