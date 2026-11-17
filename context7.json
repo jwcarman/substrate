@@ -13,7 +13,7 @@
     "docs/stylesheets"
   ],
   "rules": [
-    "Import org.jwcarman.substrate:substrate-bom and org.jwcarman.codec:codec-bom and add modules without versions; in Spring Boot, codec-spring-boot-starter plus a codec backend such as codec-jackson is required, or no AtomFactory, JournalFactory or MailboxFactory is registered.",
+    "Import substrate-bom and codec-bom and add modules without versions. In Spring Boot, codec-spring-boot-starter plus a codec backend such as codec-jackson is required, or no Atom, Journal or Mailbox factory is registered.",
     "Handle NextResult exhaustively: it has seven cases (Value, Timeout, Completed, Expired, Deleted, Errored, Cancelled).",
     "Every TTL is checked against a ceiling (substrate.atom.max-ttl 24h, substrate.mailbox.max-ttl 30m, journal limits 24h/7d/30d); raise the property rather than working around the IllegalArgumentException.",
     "Backends differ: only the in-memory and PostgreSQL journals enforce the full Journal lifecycle, NATS ignores per-call TTLs, and DynamoDB needs TTL enabled on its tables; check the backend's page before relying on expiry behaviour.",
