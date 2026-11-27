@@ -10,6 +10,31 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+### Breaking changes
+
+- `substrate-postgresql`: the schema now comes from a Liquibase changelog that
+  [migratory](https://jwcarman.github.io/migratory/) runs at startup, so later
+  releases can change it and roll your database forward instead of asking you
+  to drop tables. The `substrate.postgresql.<primitive>.auto-create-schema`
+  properties are removed, and the `V1__create_*.sql` scripts are no longer in
+  the jar. To upgrade:
+  1. Add `spring-boot-starter-liquibase` to your application. Spring Boot's own
+     Liquibase run then needs a changelog of your application's own: add one
+     (an empty `databaseChangeLog: []` will do), or set
+     `spring.liquibase.enabled=false`, which leaves migratory running.
+  2. Remove any `substrate.postgresql.*.auto-create-schema` settings. Spring
+     Boot ignores them now.
+  3. Existing databases need nothing else. The first start finds the tables the
+     old scripts created and records them as done, keeping your data.
+  4. To manage the schema yourself instead, set `migratory.enabled=false`, and
+     either include `classpath:org/jwcarman/substrate/postgresql/db/changelog.xml`
+     in your own changelog or create the schema with your own tool (for
+     example from `liquibase update-sql`). Liquibase isn't needed at runtime
+     in that case.
+
+  All three primitives' tables are created, even when one is turned off with
+  `substrate.postgresql.<primitive>.enabled=false`.
+
 ## [0.11.0] - 2026-11-27
 
 ### Breaking changes

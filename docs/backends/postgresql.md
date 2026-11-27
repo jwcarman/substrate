@@ -16,7 +16,8 @@ needs nothing else. It is also the backend that implements the whole
 
 - **A `DataSource`** for a PostgreSQL database — the one Spring Boot configures from
   `spring.datasource.*` — and the PostgreSQL JDBC driver.
-- **Permission to create tables**, unless you create them yourself (below).
+- **Liquibase**, through `spring-boot-starter-liquibase`, and permission to create tables, unless
+  you manage the schema yourself (below).
 - PostgreSQL 16 is what Substrate's tests run against.
 
 The notifier keeps one connection from the `DataSource` open for `LISTEN`, so size the pool for
@@ -24,7 +25,9 @@ one extra connection per node.
 
 ## Tables
 
-On startup each primitive creates its tables if they don't exist:
+Substrate's PostgreSQL tables come from a Liquibase changelog in the jar, which
+[migratory](https://jwcarman.github.io/migratory/) finds and runs at startup, before your
+application's own Liquibase changelog:
 
 | Primitive | Tables |
 |---|---|
@@ -32,9 +35,54 @@ On startup each primitive creates its tables if they don't exist:
 | Journal | `substrate_journal`, `substrate_journal_entries` |
 | Mailbox | `substrate_mailbox` |
 
-To manage the schema yourself, set `substrate.postgresql.<primitive>.auto-create-schema` to
-`false` and apply the scripts shipped in the jar under `db/substrate/postgresql/`
-(`V1__create_atom.sql`, `V1__create_journal.sql`, `V1__create_mailbox.sql`).
+When a release changes the schema, it ships the change as a new changeset, and the next start
+applies whatever your database is missing, even if you skipped releases. Changes only add tables,
+nullable columns and indexes, so instances still on the previous release keep working during a
+rolling deploy.
+
+All three primitives' tables are created, even when you turn one off with
+`substrate.postgresql.<primitive>.enabled=false`.
+
+### Setting it up
+
+Add Liquibase to your application:
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-liquibase</artifactId>
+</dependency>
+```
+
+Spring Boot's own Liquibase run then expects a changelog of your application's own. Add one (an
+empty `databaseChangeLog: []` will do), or set `spring.liquibase.enabled=false`, which leaves
+migratory running.
+
+| Your application... | What happens |
+|---|---|
+| adds `spring-boot-starter-liquibase` | migratory creates and rolls forward Substrate's tables before your own changelog runs |
+| sets `migratory.enabled=false`, without Liquibase | starts; you own the schema and create it with your own tool |
+| sets `migratory.enabled=false`, with Liquibase | starts; you include Substrate's changelog in your own (below) |
+| does neither | fails at startup with a message naming both fixes |
+
+### Managing the schema yourself
+
+Set `migratory.enabled=false` and include Substrate's changelog in yours:
+
+```yaml
+databaseChangeLog:
+  - include:
+      file: classpath:org/jwcarman/substrate/postgresql/db/changelog.xml
+```
+
+Liquibase records the changesets under the same paths either way, so you can switch between
+migratory and your own changelog without anything running twice. To create the schema with
+another tool, generate the SQL with `liquibase update-sql` against that changelog.
+
+### Without Spring Boot
+
+Run `classpath:org/jwcarman/substrate/postgresql/db/changelog.xml` with Liquibase, or generate SQL
+from it with `liquibase update-sql`.
 
 ## How it stores each primitive
 
@@ -66,14 +114,11 @@ Two consequences of sweeping:
 |---|---|---|
 | `substrate.postgresql.atom.enabled` | `true` | Serve Atom from PostgreSQL. |
 | `substrate.postgresql.atom.prefix` | `substrate:atom:` | Prefix of the stored key. |
-| `substrate.postgresql.atom.auto-create-schema` | `true` | Create the atom table at startup. |
 | `substrate.postgresql.journal.enabled` | `true` | Serve Journal from PostgreSQL. |
 | `substrate.postgresql.journal.prefix` | `substrate:journal:` | Prefix of the stored key. |
 | `substrate.postgresql.journal.max-len` | `100000` | Approximate maximum entries per journal. Trimming runs every 100 appends per node, so a journal can exceed it for a while. |
-| `substrate.postgresql.journal.auto-create-schema` | `true` | Create the journal tables at startup. |
 | `substrate.postgresql.mailbox.enabled` | `true` | Serve Mailbox from PostgreSQL. |
 | `substrate.postgresql.mailbox.prefix` | `substrate:mailbox:` | Prefix of the stored key. |
-| `substrate.postgresql.mailbox.auto-create-schema` | `true` | Create the mailbox table at startup. |
 | `substrate.postgresql.notifier.enabled` | `true` | Use `LISTEN`/`NOTIFY` as the notifier. |
 | `substrate.postgresql.notifier.channel` | `substrate_notify` | The notification channel. |
 
