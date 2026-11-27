@@ -28,9 +28,13 @@ occur between minor versions. The 1.0.0 release will mark API stability.
      old scripts created and records them as done, keeping your data.
   4. To manage the schema yourself instead, set `migratory.enabled=false`, and
      either include `classpath:org/jwcarman/substrate/postgresql/db/changelog.xml`
-     in your own changelog or create the schema with your own tool (for
-     example from `liquibase update-sql`). Liquibase isn't needed at runtime
-     in that case.
+     in your own Liquibase changelog, or create the schema with your own tool
+     (for example from SQL generated with `liquibase update-sql`), in which
+     case Liquibase isn't needed at runtime.
+
+  `PostgresProperties.AtomProperties`, `JournalProperties` and
+  `MailboxProperties` lost their `autoCreateSchema` component, so code that
+  constructs them directly must drop that argument.
 
   All three primitives' tables are created, even when one is turned off with
   `substrate.postgresql.<primitive>.enabled=false`.

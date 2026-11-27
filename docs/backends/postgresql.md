@@ -2,7 +2,7 @@
 
 `substrate-postgresql` stores all three primitives in PostgreSQL tables and carries
 notifications with `LISTEN` and `NOTIFY`. With it, an application that already has a database
-needs nothing else. It is also the backend that implements the whole
+needs only Liquibase besides (see [Tables](#tables)). It is also the backend that implements the whole
 [Journal lifecycle](../primitives/journal.md#how-backends-differ).
 
 ```xml

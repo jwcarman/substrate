@@ -106,6 +106,10 @@
         indexName="idx_substrate_journal_entries_expires_at">
       <column name="expires_at"/>
     </createIndex>
+    <!-- BIGSERIAL makes the column own its sequence; Liquibase has no change type for that -->
+    <sql dbms="postgresql">
+      ALTER SEQUENCE substrate_journal_entries_id_seq OWNED BY substrate_journal_entries.id
+    </sql>
   </changeSet>
 
   <changeSet id="substrate-postgresql-create-mailbox" author="substrate">

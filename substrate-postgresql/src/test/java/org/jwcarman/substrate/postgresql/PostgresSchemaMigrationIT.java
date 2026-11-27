@@ -132,6 +132,10 @@ class PostgresSchemaMigrationIT {
       assertThat(columns(fromChangelog)).isNotEmpty().isEqualTo(columns(fromScripts));
       assertThat(indexes(fromChangelog)).isNotEmpty().isEqualTo(indexes(fromScripts));
       assertThat(sequences(fromChangelog)).isNotEmpty().isEqualTo(sequences(fromScripts));
+      // BIGSERIAL makes the column own its sequence, so dropping the table drops the sequence too
+      assertThat(journalEntryIdSequence(fromChangelog))
+          .isEqualTo(journalEntryIdSequence(fromScripts))
+          .isEqualTo("public.substrate_journal_entries_id_seq");
     }
   }
 
@@ -269,6 +273,12 @@ class PostgresSchemaMigrationIT {
                 + " WHERE schemaname = 'public' AND tablename LIKE 'substrate\\_%'"
                 + " ORDER BY indexname",
             String.class);
+  }
+
+  private static String journalEntryIdSequence(String url) {
+    return jdbc(url)
+        .queryForObject(
+            "SELECT pg_get_serial_sequence('substrate_journal_entries', 'id')", String.class);
   }
 
   private static List<String> sequences(String url) {
