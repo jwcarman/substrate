@@ -19,6 +19,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -42,10 +43,19 @@ public class PostgresNotifierSpi implements NotifierSpi, SmartLifecycle {
 
   private static final Pattern VALID_CHANNEL = Pattern.compile("^[a-zA-Z_]\\w*$");
 
+  private static final Duration STOP_GRACE = Duration.ofSeconds(1);
+
+  /**
+   * How long the listener blocks in a single {@link PGConnection#getNotifications(int)} call, which
+   * bounds how long {@link #stop()} waits for it. It does not affect notification latency: the call
+   * returns as soon as a notification arrives. A poll that times out is a local socket read
+   * timeout, not a round trip to the server.
+   */
+  private static final int POLL_SLICE_MILLIS = 100;
+
   private final JdbcTemplate jdbcTemplate;
   private final DataSource dataSource;
   private final String channel;
-  private final int pollTimeoutMillis;
   private final List<Consumer<byte[]>> handlers = new CopyOnWriteArrayList<>();
 
   private final AtomicBoolean running = new AtomicBoolean(false);
@@ -53,8 +63,7 @@ public class PostgresNotifierSpi implements NotifierSpi, SmartLifecycle {
   private final AtomicReference<Thread> listenerThread = new AtomicReference<>();
   final AtomicReference<Connection> listenConnection = new AtomicReference<>();
 
-  public PostgresNotifierSpi(
-      JdbcTemplate jdbcTemplate, DataSource dataSource, String channel, int pollTimeoutMillis) {
+  public PostgresNotifierSpi(JdbcTemplate jdbcTemplate, DataSource dataSource, String channel) {
     if (!VALID_CHANNEL.matcher(channel).matches()) {
       throw new IllegalArgumentException(
           "Invalid PostgreSQL channel name: '" + channel + "'. Must match [a-zA-Z_][a-zA-Z0-9_]*");
@@ -62,7 +71,6 @@ public class PostgresNotifierSpi implements NotifierSpi, SmartLifecycle {
     this.jdbcTemplate = jdbcTemplate;
     this.dataSource = dataSource;
     this.channel = channel;
-    this.pollTimeoutMillis = pollTimeoutMillis;
   }
 
   @Override
@@ -91,14 +99,31 @@ public class PostgresNotifierSpi implements NotifierSpi, SmartLifecycle {
     listenerThread.set(Thread.ofVirtual().name("substrate-pg-listener").start(this::listenLoop));
   }
 
+  /**
+   * Stops listening. The listener thread notices within one poll slice ({@value #POLL_SLICE_MILLIS}
+   * ms) and releases its connection itself; it is only interrupted if it fails to exit within that
+   * window plus {@link #STOP_GRACE}. Interrupting a virtual thread blocked in a socket read closes
+   * the socket, so an unconditional interrupt would hand a dead connection back to the pool.
+   */
   @Override
   public void stop() {
     running.set(false);
     Thread thread = listenerThread.getAndSet(null);
     if (thread != null) {
-      thread.interrupt();
+      awaitListenerExit(thread);
     }
-    closeListenConnection();
+  }
+
+  private void awaitListenerExit(Thread thread) {
+    try {
+      if (!thread.join(Duration.ofMillis(POLL_SLICE_MILLIS).plus(STOP_GRACE))) {
+        log.warn("PostgreSQL listener did not stop in time; interrupting it");
+        thread.interrupt();
+      }
+    } catch (InterruptedException _) {
+      thread.interrupt();
+      Thread.currentThread().interrupt();
+    }
   }
 
   @Override
@@ -112,8 +137,9 @@ public class PostgresNotifierSpi implements NotifierSpi, SmartLifecycle {
 
   private void listenLoop() {
     while (running.get()) {
+      Connection conn = null;
       try {
-        Connection conn = dataSource.getConnection();
+        conn = dataSource.getConnection();
         listenConnection.set(conn);
         conn.setAutoCommit(true);
         PGConnection pgConnection = conn.unwrap(PGConnection.class);
@@ -129,19 +155,23 @@ public class PostgresNotifierSpi implements NotifierSpi, SmartLifecycle {
 
         pollNotifications(pgConnection);
       } catch (SQLException e) {
-        listening.set(false);
         if (running.get()) {
           log.warn("PostgreSQL LISTEN connection lost, reconnecting", e);
-          closeListenConnection();
-          sleepBeforeReconnect();
         }
+      } finally {
+        listening.set(false);
+        listenConnection.set(null);
+        releaseListenConnection(conn);
+      }
+      if (running.get()) {
+        sleepBeforeReconnect();
       }
     }
   }
 
   private void pollNotifications(PGConnection pgConnection) throws SQLException {
     while (running.get()) {
-      PGNotification[] notifications = pgConnection.getNotifications(pollTimeoutMillis);
+      PGNotification[] notifications = pgConnection.getNotifications(POLL_SLICE_MILLIS);
       if (notifications != null) {
         for (PGNotification notification : notifications) {
           dispatchNotification(notification.getParameter());
@@ -163,14 +193,40 @@ public class PostgresNotifierSpi implements NotifierSpi, SmartLifecycle {
     }
   }
 
-  private void closeListenConnection() {
-    Connection conn = listenConnection.getAndSet(null);
-    if (conn != null) {
-      try {
-        conn.close();
-      } catch (SQLException e) {
-        log.debug("Error closing LISTEN connection", e);
-      }
+  /**
+   * Returns the LISTEN connection to the pool in a state the next borrower can use. {@code UNLISTEN
+   * *} runs through the pool's connection proxy, so on a healthy connection it clears the session's
+   * subscriptions, and on a dead one the pool sees the resulting connection-failure SQLSTATE and
+   * evicts it. The failure of {@link PGConnection#getNotifications(int)} itself never reaches the
+   * pool, because it is called on the unwrapped driver connection.
+   */
+  private void releaseListenConnection(Connection conn) {
+    if (conn == null) {
+      return;
+    }
+    try (Statement stmt = conn.createStatement()) {
+      stmt.execute("UNLISTEN *");
+    } catch (SQLException e) {
+      log.debug("LISTEN connection is broken; aborting it", e);
+      abortQuietly(conn);
+    } finally {
+      closeQuietly(conn);
+    }
+  }
+
+  private static void abortQuietly(Connection conn) {
+    try {
+      conn.abort(Runnable::run);
+    } catch (SQLException e) {
+      log.debug("Error aborting LISTEN connection", e);
+    }
+  }
+
+  private static void closeQuietly(Connection conn) {
+    try {
+      conn.close();
+    } catch (SQLException e) {
+      log.debug("Error closing LISTEN connection", e);
     }
   }
 

@@ -43,10 +43,6 @@ public class PostgresNotifierAutoConfiguration {
   public PostgresNotifierSpi postgresNotifier(
       DataSource dataSource, PostgresProperties properties) {
     JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
-    return new PostgresNotifierSpi(
-        jdbcTemplate,
-        dataSource,
-        properties.notifier().channel(),
-        (int) properties.notifier().pollTimeout().toMillis());
+    return new PostgresNotifierSpi(jdbcTemplate, dataSource, properties.notifier().channel());
   }
 }

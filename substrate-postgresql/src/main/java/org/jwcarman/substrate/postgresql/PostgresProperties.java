@@ -15,7 +15,6 @@
  */
 package org.jwcarman.substrate.postgresql;
 
-import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "substrate.postgresql")
@@ -31,5 +30,5 @@ public record PostgresProperties(
 
   public record MailboxProperties(boolean enabled, String prefix, boolean autoCreateSchema) {}
 
-  public record NotifierProperties(boolean enabled, String channel, Duration pollTimeout) {}
+  public record NotifierProperties(boolean enabled, String channel) {}
 }

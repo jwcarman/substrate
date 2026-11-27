@@ -76,7 +76,6 @@ Two consequences of sweeping:
 | `substrate.postgresql.mailbox.auto-create-schema` | `true` | Create the mailbox table at startup. |
 | `substrate.postgresql.notifier.enabled` | `true` | Use `LISTEN`/`NOTIFY` as the notifier. |
 | `substrate.postgresql.notifier.channel` | `substrate_notify` | The notification channel. |
-| `substrate.postgresql.notifier.poll-timeout` | `30s` | How long the listening connection waits for notifications per poll. |
 
 ## Behaviour to know
 

@@ -33,23 +33,20 @@ class PostgresNotifierSpiTest {
 
   @Test
   void constructorRejectsInvalidChannelName() {
-    assertThatThrownBy(
-            () -> new PostgresNotifierSpi(jdbcTemplate, dataSource, "invalid channel!", 100))
+    assertThatThrownBy(() -> new PostgresNotifierSpi(jdbcTemplate, dataSource, "invalid channel!"))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("Invalid PostgreSQL channel name");
   }
 
   @Test
   void constructorAcceptsValidChannelName() {
-    PostgresNotifierSpi spi =
-        new PostgresNotifierSpi(jdbcTemplate, dataSource, "substrate_notify", 100);
+    PostgresNotifierSpi spi = new PostgresNotifierSpi(jdbcTemplate, dataSource, "substrate_notify");
     assertThat(spi).isNotNull();
   }
 
   @Test
   void dispatchNotificationIgnoresMalformedBase64() {
-    PostgresNotifierSpi spi =
-        new PostgresNotifierSpi(jdbcTemplate, dataSource, "substrate_notify", 100);
+    PostgresNotifierSpi spi = new PostgresNotifierSpi(jdbcTemplate, dataSource, "substrate_notify");
     var received = new CopyOnWriteArrayList<byte[]>();
     spi.subscribe(received::add);
 
@@ -60,8 +57,7 @@ class PostgresNotifierSpiTest {
 
   @Test
   void dispatchNotificationDispatchesToAllHandlers() {
-    PostgresNotifierSpi spi =
-        new PostgresNotifierSpi(jdbcTemplate, dataSource, "substrate_notify", 100);
+    PostgresNotifierSpi spi = new PostgresNotifierSpi(jdbcTemplate, dataSource, "substrate_notify");
     var received1 = new CopyOnWriteArrayList<byte[]>();
     var received2 = new CopyOnWriteArrayList<byte[]>();
     spi.subscribe(received1::add);
@@ -79,8 +75,7 @@ class PostgresNotifierSpiTest {
 
   @Test
   void subscribeReturnsCancellerThatRemovesHandler() {
-    PostgresNotifierSpi spi =
-        new PostgresNotifierSpi(jdbcTemplate, dataSource, "substrate_notify", 100);
+    PostgresNotifierSpi spi = new PostgresNotifierSpi(jdbcTemplate, dataSource, "substrate_notify");
     var received = new CopyOnWriteArrayList<byte[]>();
     var subscription = spi.subscribe(received::add);
 
@@ -97,23 +92,20 @@ class PostgresNotifierSpiTest {
 
   @Test
   void stopWhenNotStartedDoesNotThrow() {
-    PostgresNotifierSpi spi =
-        new PostgresNotifierSpi(jdbcTemplate, dataSource, "substrate_notify", 100);
+    PostgresNotifierSpi spi = new PostgresNotifierSpi(jdbcTemplate, dataSource, "substrate_notify");
     spi.stop();
     assertThat(spi.isRunning()).isFalse();
   }
 
   @Test
   void isListeningReturnsFalseBeforeStart() {
-    PostgresNotifierSpi spi =
-        new PostgresNotifierSpi(jdbcTemplate, dataSource, "substrate_notify", 100);
+    PostgresNotifierSpi spi = new PostgresNotifierSpi(jdbcTemplate, dataSource, "substrate_notify");
     assertThat(spi.isListening()).isFalse();
   }
 
   @Test
   void closeListenConnectionHandlesNullConnection() {
-    PostgresNotifierSpi spi =
-        new PostgresNotifierSpi(jdbcTemplate, dataSource, "substrate_notify", 100);
+    PostgresNotifierSpi spi = new PostgresNotifierSpi(jdbcTemplate, dataSource, "substrate_notify");
     spi.listenConnection.set(null);
     spi.stop();
     assertThat(spi.listenConnection.get()).isNull();

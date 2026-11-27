@@ -40,7 +40,7 @@ class PostgresNotifierSpiIT {
   void setUp() {
     dataSource = createDataSource();
     JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
-    notifier = new PostgresNotifierSpi(jdbcTemplate, dataSource, "substrate_notify", 500);
+    notifier = new PostgresNotifierSpi(jdbcTemplate, dataSource, "substrate_notify");
     notifier.start();
     await().atMost(Duration.ofSeconds(5)).until(notifier::isListening);
   }
@@ -109,8 +109,7 @@ class PostgresNotifierSpiIT {
   @Test
   void invalidChannelNameThrowsException() {
     JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
-    assertThatThrownBy(
-            () -> new PostgresNotifierSpi(jdbcTemplate, dataSource, "invalid:channel", 500))
+    assertThatThrownBy(() -> new PostgresNotifierSpi(jdbcTemplate, dataSource, "invalid:channel"))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("Invalid PostgreSQL channel name");
   }
