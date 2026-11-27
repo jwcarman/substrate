@@ -17,3 +17,6 @@ pom.xml.next
 pom.xml.tag
 pom.xml.backup
 bin/
+
+# flatten-maven-plugin output (substrate-bom)
+.flattened-pom.xml

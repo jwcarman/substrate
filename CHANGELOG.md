@@ -10,6 +10,25 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+### Added
+
+- Every module publishes a CycloneDX SBOM (`-cyclonedx.json` and
+  `-cyclonedx.xml`) to Maven Central beside its jar, signed like the jar.
+- Each release carries signed build provenance, a GitHub attestation of the
+  commit and workflow that built every jar and SBOM. The GitHub Release has
+  each module's jar, its GPG signature and the provenance bundle
+  (`substrate-X.Y.Z.intoto.jsonl`) attached. Check a downloaded jar with
+  `gh attestation verify <jar> --repo jwcarman/substrate`.
+
+### Changed
+
+- `substrate-bom` inherits from `substrate-parent` and is flattened on the way
+  out, as the BOMs of the other `org.jwcarman` libraries are. The published BOM
+  still has no parent and manages only substrate's own modules.
+- The `url` and `scm` of every published pom now point at the repository.
+  Modules used to inherit them with the module name appended, which gave
+  links that didn't exist.
+
 ## [0.12.0] - 2026-11-27
 
 ### Breaking changes

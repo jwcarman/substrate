@@ -9,11 +9,29 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      # write: attach the jars, their signatures and the provenance to the GitHub Release
+      contents: write
+      # build provenance: a signed attestation of which commit and workflow built each jar
+      id-token: write
+      attestations: write
     steps:
-      - uses: actions/checkout@v6
+      # Nothing publishes unless the tag is a plain version: Maven Central artifacts are immutable.
+      # The tag goes through env, not into run:, so a tag with shell metacharacters cannot inject
+      # commands.
+      - name: Check the tag is a plain version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if ! [[ "$RELEASE_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::release tag '$RELEASE_TAG' must be a version like 1.2.3, with no 'v' prefix"
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Maven Central Repository
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           java-version: '25'
           distribution: 'liberica'
@@ -23,11 +41,12 @@ jobs:
           gpg-private-key: ${{ secrets.GPG_SIGNING_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
 
-      # -DprocessAllModules is required: versions:set walks parent references, and
-      # substrate-bom deliberately has no parent (see the comment in its POM), so without
-      # this flag the BOM is skipped and deploys still carrying -SNAPSHOT.
+      # -DprocessAllModules is kept as a safeguard: every module, substrate-bom included, now has
+      # substrate-parent as its parent, so versions:set reaches them all either way.
       - name: Set version
-        run: mvn versions:set -DnewVersion=${{ github.event.release.tag_name }} -DprocessAllModules=true
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: mvn versions:set -DnewVersion="$RELEASE_TAG" -DprocessAllModules=true
 
       - name: Publish package
         run: mvn -P release --batch-mode deploy -DskipTests
@@ -35,3 +54,30 @@ jobs:
           MAVEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_SIGNING_KEY_PASSWORD }}
+
+      - name: Attest build provenance
+        id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            substrate-*/target/substrate-*.jar
+            substrate-*/target/substrate-*-cyclonedx.json
+
+      # The same signed files on the release page, where verifiers (and OpenSSF Scorecard) look for
+      # them: each module's jar, its GPG signature, and the provenance bundle for all of them.
+      - name: Attach signed jars and provenance to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          # the GPG plugin may write signatures beside the jar or under target/gpg, so search both
+          mapfile -t jars < <(find substrate-*/target -maxdepth 1 -name "substrate-*-${RELEASE_TAG}.jar")
+          mapfile -t sigs < <(find substrate-*/target -maxdepth 2 -name "substrate-*-${RELEASE_TAG}.jar.asc")
+          echo "jars: ${#jars[@]}, signatures: ${#sigs[@]}"
+          if [ "${#jars[@]}" -eq 0 ] || [ "${#jars[@]}" -ne "${#sigs[@]}" ]; then
+            echo "::error::expected one signature per jar"
+            exit 1
+          fi
+          cp "$BUNDLE" "substrate-$RELEASE_TAG.intoto.jsonl"
+          gh release upload "$RELEASE_TAG" --clobber "${jars[@]}" "${sigs[@]}" "substrate-$RELEASE_TAG.intoto.jsonl"
