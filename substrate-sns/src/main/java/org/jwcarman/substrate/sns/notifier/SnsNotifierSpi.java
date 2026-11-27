@@ -266,13 +266,12 @@ public class SnsNotifierSpi implements NotifierSpi, SmartLifecycle {
   private int findClosingQuote(String s, int from) {
     int i = from;
     while (i < s.length()) {
-      char c = s.charAt(i);
-      if (c == '\\') {
-        i += 2;
-      } else if (c == '"') {
-        return i;
-      } else {
-        i++;
+      switch (s.charAt(i)) {
+        case '\\' -> i += 2;
+        case '"' -> {
+          return i;
+        }
+        default -> i++;
       }
     }
     return -1;

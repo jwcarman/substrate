@@ -29,7 +29,7 @@ import org.jwcarman.substrate.nats.NatsKvSupport;
 
 public class NatsMailboxSpi extends AbstractMailboxSpi {
 
-  private static final byte[] CREATED_MARKER = new byte[] {0};
+  private static final byte[] CREATED_MARKER = {0};
 
   private final Connection connection;
   private final String bucketName;

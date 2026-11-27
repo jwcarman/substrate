@@ -36,7 +36,7 @@ class InMemoryNotifierTest {
     List<byte[]> received = new ArrayList<>();
     notifier.subscribe(received::add);
 
-    byte[] payload = new byte[] {1, 2, 3};
+    byte[] payload = {1, 2, 3};
     notifier.notify(payload);
 
     assertEquals(1, received.size());
@@ -66,8 +66,8 @@ class InMemoryNotifierTest {
     List<byte[]> payloads = new ArrayList<>();
     notifier.subscribe(payloads::add);
 
-    byte[] first = new byte[] {1};
-    byte[] second = new byte[] {2};
+    byte[] first = {1};
+    byte[] second = {2};
     notifier.notify(first);
     notifier.notify(second);
 

@@ -48,6 +48,7 @@ jobs:
         run: |
           case "$RELEASE_TAG" in
             *[!0-9.]*|"") echo "not a release version: '$RELEASE_TAG'"; exit 1 ;;
+            *) ;; # digits and dots only; the grep below checks the shape
           esac
           echo "$RELEASE_TAG" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "not a release version: '$RELEASE_TAG'"; exit 1; }
 

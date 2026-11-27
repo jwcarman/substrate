@@ -23,8 +23,8 @@ class RawAtomTest {
 
   @Test
   void equalsReturnsTrueForIdenticalContent() {
-    byte[] a = new byte[] {1, 2, 3};
-    byte[] b = new byte[] {1, 2, 3};
+    byte[] a = {1, 2, 3};
+    byte[] b = {1, 2, 3};
     assertThat(a).isNotSameAs(b);
 
     RawAtom first = new RawAtom(a, "token1");
@@ -41,7 +41,7 @@ class RawAtomTest {
 
   @Test
   void equalsReturnsFalseForDifferentToken() {
-    byte[] value = new byte[] {1, 2, 3};
+    byte[] value = {1, 2, 3};
     RawAtom first = new RawAtom(value.clone(), "token1");
     RawAtom second = new RawAtom(value.clone(), "token2");
     assertThat(first).isNotEqualTo(second);
@@ -49,8 +49,8 @@ class RawAtomTest {
 
   @Test
   void hashCodeMatchesForEqualRecords() {
-    byte[] a = new byte[] {10, 20, 30};
-    byte[] b = new byte[] {10, 20, 30};
+    byte[] a = {10, 20, 30};
+    byte[] b = {10, 20, 30};
     RawAtom first = new RawAtom(a, "t");
     RawAtom second = new RawAtom(b, "t");
     assertThat(first).hasSameHashCodeAs(second);

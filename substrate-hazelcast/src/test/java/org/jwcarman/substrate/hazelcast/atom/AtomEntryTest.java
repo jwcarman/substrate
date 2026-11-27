@@ -23,8 +23,8 @@ class AtomEntryTest {
 
   @Test
   void equalsReturnsTrueForIdenticalContent() {
-    byte[] a = new byte[] {1, 2, 3};
-    byte[] b = new byte[] {1, 2, 3};
+    byte[] a = {1, 2, 3};
+    byte[] b = {1, 2, 3};
     assertThat(a).isNotSameAs(b);
 
     AtomEntry first = new AtomEntry(a, "token1");
@@ -41,7 +41,7 @@ class AtomEntryTest {
 
   @Test
   void equalsReturnsFalseForDifferentToken() {
-    byte[] value = new byte[] {1, 2, 3};
+    byte[] value = {1, 2, 3};
     AtomEntry first = new AtomEntry(value.clone(), "token1");
     AtomEntry second = new AtomEntry(value.clone(), "token2");
     assertThat(first).isNotEqualTo(second);
@@ -49,8 +49,8 @@ class AtomEntryTest {
 
   @Test
   void hashCodeMatchesForEqualRecords() {
-    byte[] a = new byte[] {10, 20, 30};
-    byte[] b = new byte[] {10, 20, 30};
+    byte[] a = {10, 20, 30};
+    byte[] b = {10, 20, 30};
     AtomEntry first = new AtomEntry(a, "t");
     AtomEntry second = new AtomEntry(b, "t");
     assertThat(first).hasSameHashCodeAs(second);

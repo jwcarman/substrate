@@ -103,7 +103,7 @@ class HazelcastNotifierSpiIT extends AbstractHazelcastIT {
     List<byte[]> received = new CopyOnWriteArrayList<>();
     notifier.subscribe(received::add);
 
-    byte[] payload = new byte[] {0, 1, 2, (byte) 0xFF, (byte) 0xFE};
+    byte[] payload = {0, 1, 2, (byte) 0xFF, (byte) 0xFE};
     notifier.notify(payload);
 
     await()

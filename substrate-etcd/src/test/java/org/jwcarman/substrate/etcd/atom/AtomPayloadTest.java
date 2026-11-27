@@ -58,7 +58,7 @@ class AtomPayloadTest {
 
   @Test
   void roundTripHandlesBinaryValueWithZeroBytes() {
-    byte[] value = new byte[] {0, 1, 2, 3, 0, (byte) 255};
+    byte[] value = {0, 1, 2, 3, 0, (byte) 255};
     String token = "t";
 
     RawAtom decoded = AtomPayload.decode(AtomPayload.encode(value, token));
