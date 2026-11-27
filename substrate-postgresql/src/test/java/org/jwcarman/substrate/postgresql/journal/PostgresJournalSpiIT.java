@@ -31,10 +31,9 @@ import org.jwcarman.substrate.journal.JournalAlreadyExistsException;
 import org.jwcarman.substrate.journal.JournalCompletedException;
 import org.jwcarman.substrate.journal.JournalExpiredException;
 import org.jwcarman.substrate.postgresql.PostgresTestContainer;
-import org.springframework.core.io.ClassPathResource;
+import org.jwcarman.substrate.postgresql.PostgresTestSchema;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
-import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 
 class PostgresJournalSpiIT {
 
@@ -48,9 +47,7 @@ class PostgresJournalSpiIT {
     DataSource dataSource = createDataSource();
     jdbcTemplate = new JdbcTemplate(dataSource);
 
-    ResourceDatabasePopulator populator = new ResourceDatabasePopulator();
-    populator.addScript(new ClassPathResource("db/substrate/postgresql/V1__create_journal.sql"));
-    populator.execute(dataSource);
+    PostgresTestSchema.create(dataSource);
 
     jdbcTemplate.update("DELETE FROM substrate_journal_entries");
     jdbcTemplate.update("DELETE FROM substrate_journal");

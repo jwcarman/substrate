@@ -40,7 +40,6 @@ class PostgresMailboxAutoConfigurationTest {
                 PostgresAutoConfiguration.class,
                 PostgresMailboxAutoConfiguration.class,
                 SubstrateAutoConfiguration.class))
-        .withPropertyValues("substrate.postgresql.mailbox.auto-create-schema=false")
         .withUserConfiguration(MockDataSourceConfiguration.class)
         .run(
             context -> {
@@ -68,7 +67,6 @@ class PostgresMailboxAutoConfigurationTest {
                 PostgresAutoConfiguration.class,
                 PostgresMailboxAutoConfiguration.class,
                 SubstrateAutoConfiguration.class))
-        .withPropertyValues("substrate.postgresql.mailbox.auto-create-schema=false")
         .withUserConfiguration(MockDataSourceConfiguration.class)
         .run(
             context -> {

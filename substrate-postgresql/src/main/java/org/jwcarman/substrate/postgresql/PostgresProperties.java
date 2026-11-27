@@ -23,12 +23,11 @@ public record PostgresProperties(
     JournalProperties journal,
     MailboxProperties mailbox,
     NotifierProperties notifier) {
-  public record AtomProperties(boolean enabled, String prefix, boolean autoCreateSchema) {}
+  public record AtomProperties(boolean enabled, String prefix) {}
 
-  public record JournalProperties(
-      boolean enabled, String prefix, long maxLen, boolean autoCreateSchema) {}
+  public record JournalProperties(boolean enabled, String prefix, long maxLen) {}
 
-  public record MailboxProperties(boolean enabled, String prefix, boolean autoCreateSchema) {}
+  public record MailboxProperties(boolean enabled, String prefix) {}
 
   public record NotifierProperties(boolean enabled, String channel) {}
 }

@@ -24,10 +24,9 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
 import org.springframework.context.annotation.Bean;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 
 @AutoConfiguration(
     after = PostgresAutoConfiguration.class,
@@ -42,13 +41,8 @@ public class PostgresAtomAutoConfiguration {
 
   @Bean
   @ConditionalOnMissingBean(AtomSpi.class)
+  @DependsOnDatabaseInitialization
   public PostgresAtomSpi postgresAtom(DataSource dataSource, PostgresProperties properties) {
-    if (properties.atom().autoCreateSchema()) {
-      ResourceDatabasePopulator populator = new ResourceDatabasePopulator();
-      populator.addScript(new ClassPathResource("db/substrate/postgresql/V1__create_atom.sql"));
-      populator.execute(dataSource);
-    }
-
     JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
     return new PostgresAtomSpi(jdbcTemplate, properties.atom().prefix());
   }

@@ -31,9 +31,13 @@ import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.migratory.autoconfigure.MigratoryAutoConfiguration;
+import org.jwcarman.migratory.autoconfigure.MigratoryLiquibase;
 import org.jwcarman.substrate.postgresql.atom.PostgresAtomAutoConfiguration;
+import org.jwcarman.substrate.postgresql.atom.PostgresAtomSpi;
 import org.jwcarman.substrate.postgresql.journal.PostgresJournalAutoConfiguration;
+import org.jwcarman.substrate.postgresql.journal.PostgresJournalSpi;
 import org.jwcarman.substrate.postgresql.mailbox.PostgresMailboxAutoConfiguration;
+import org.jwcarman.substrate.postgresql.mailbox.PostgresMailboxSpi;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
 import org.springframework.boot.liquibase.autoconfigure.LiquibaseAutoConfiguration;
@@ -54,8 +58,8 @@ class PostgresSchemaMigrationIT {
 
   private static final List<String> CHANGESETS = List.of("atom-1", "journal-1", "mailbox-1");
 
-  /** Where the scripts substrate ran at startup before 0.12.0 live. */
-  private static final String V1_SCRIPTS = "db/substrate/postgresql/";
+  /** The scripts substrate ran at startup before 0.12.0, kept as fixtures. */
+  private static final String V1_SCRIPTS = "db/substrate/postgresql/legacy/";
 
   @Nested
   class On_an_empty_database {
@@ -124,6 +128,44 @@ class PostgresSchemaMigrationIT {
       assertThat(columns(fromChangelog)).isNotEmpty().isEqualTo(columns(fromScripts));
       assertThat(indexes(fromChangelog)).isNotEmpty().isEqualTo(indexes(fromScripts));
       assertThat(sequences(fromChangelog)).isNotEmpty().isEqualTo(sequences(fromScripts));
+    }
+  }
+
+  @Nested
+  class With_migratory_disabled {
+
+    @Test
+    void creates_no_tables() {
+      String url = freshDatabaseUrl();
+
+      runner(url)
+          .withPropertyValues("migratory.enabled=false")
+          .run(context -> assertThat(context).hasNotFailed());
+
+      assertThat(substrateTables(url)).isEmpty();
+    }
+  }
+
+  @Nested
+  class Bean_ordering {
+
+    @Test
+    void spi_beans_wait_for_database_initialization() {
+      runner(freshDatabaseUrl())
+          .run(
+              context -> {
+                String migratory = context.getBeanNamesForType(MigratoryLiquibase.class)[0];
+                for (Class<?> spi :
+                    List.of(
+                        PostgresAtomSpi.class,
+                        PostgresJournalSpi.class,
+                        PostgresMailboxSpi.class)) {
+                  String name = context.getBeanNamesForType(spi)[0];
+                  assertThat(context.getBeanFactory().getBeanDefinition(name).getDependsOn())
+                      .as(name)
+                      .contains(migratory);
+                }
+              });
     }
   }
 

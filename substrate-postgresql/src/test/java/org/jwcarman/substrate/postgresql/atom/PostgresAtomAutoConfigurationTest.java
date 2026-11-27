@@ -40,7 +40,6 @@ class PostgresAtomAutoConfigurationTest {
                 PostgresAutoConfiguration.class,
                 PostgresAtomAutoConfiguration.class,
                 SubstrateAutoConfiguration.class))
-        .withPropertyValues("substrate.postgresql.atom.auto-create-schema=false")
         .withUserConfiguration(MockDataSourceConfiguration.class)
         .run(
             context -> {
@@ -68,7 +67,6 @@ class PostgresAtomAutoConfigurationTest {
                 PostgresAutoConfiguration.class,
                 PostgresAtomAutoConfiguration.class,
                 SubstrateAutoConfiguration.class))
-        .withPropertyValues("substrate.postgresql.atom.auto-create-schema=false")
         .withUserConfiguration(MockDataSourceConfiguration.class)
         .run(
             context -> {

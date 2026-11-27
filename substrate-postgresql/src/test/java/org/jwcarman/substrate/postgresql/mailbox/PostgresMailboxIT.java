@@ -30,10 +30,9 @@ import org.junit.jupiter.api.Test;
 import org.jwcarman.substrate.mailbox.MailboxExpiredException;
 import org.jwcarman.substrate.mailbox.MailboxFullException;
 import org.jwcarman.substrate.postgresql.PostgresTestContainer;
-import org.springframework.core.io.ClassPathResource;
+import org.jwcarman.substrate.postgresql.PostgresTestSchema;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
-import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 
 class PostgresMailboxIT {
 
@@ -46,9 +45,7 @@ class PostgresMailboxIT {
     dataSource = createDataSource();
     jdbcTemplate = new JdbcTemplate(dataSource);
 
-    ResourceDatabasePopulator populator = new ResourceDatabasePopulator();
-    populator.addScript(new ClassPathResource("db/substrate/postgresql/V1__create_mailbox.sql"));
-    populator.execute(dataSource);
+    PostgresTestSchema.create(dataSource);
 
     jdbcTemplate.update("DELETE FROM substrate_mailbox");
 

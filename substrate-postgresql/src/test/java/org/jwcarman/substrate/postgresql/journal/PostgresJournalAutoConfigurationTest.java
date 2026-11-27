@@ -37,7 +37,6 @@ class PostgresJournalAutoConfigurationTest {
         .withConfiguration(
             AutoConfigurations.of(
                 PostgresAutoConfiguration.class, PostgresJournalAutoConfiguration.class))
-        .withPropertyValues("substrate.postgresql.journal.auto-create-schema=false")
         .withUserConfiguration(MockDataSourceConfiguration.class)
         .run(
             context -> {
@@ -65,7 +64,6 @@ class PostgresJournalAutoConfigurationTest {
                 PostgresAutoConfiguration.class,
                 PostgresJournalAutoConfiguration.class,
                 SubstrateAutoConfiguration.class))
-        .withPropertyValues("substrate.postgresql.journal.auto-create-schema=false")
         .withUserConfiguration(MockDataSourceConfiguration.class)
         .run(
             context -> {
