@@ -27,9 +27,9 @@ has run.
   `preConditions onFail="MARK_RAN"` table-existence guards. The `V1__create_*.sql` files move,
   unedited, from `src/main/resources` to `src/test/resources/db/substrate/postgresql/legacy/` as
   fixtures of what 0.9.0–0.11.0 created. (Ruling, Task 1: user's direction.)
-- The changelog is `db/substrate/postgresql/substrate-postgresql-changelog.xml`, and it never moves.
-- Declaration: `name=substrate-postgresql`, `changelog=classpath:db/substrate/postgresql/substrate-postgresql-changelog.xml`, with no `after` or `before`.
-- Changesets: `atom-1`, `journal-1`, `mailbox-1`, author `substrate`.
+- The changelog is `org/jwcarman/substrate/postgresql/db/changelog.xml`, and it never moves.
+- Declaration: `name=substrate-postgresql`, `changelog=classpath:org/jwcarman/substrate/postgresql/db/changelog.xml`, with no `after` or `before`.
+- Changesets: `substrate-postgresql-create-atom`, `-journal`, `-mailbox`, author `substrate`.
 - Cassandra and DynamoDB are untouched.
 - Native images need no substrate hints. migratory's `process-aot` step registers everything under
   the declared changelog's directory, so the SQL files must stay beside the changelog in
@@ -66,7 +66,7 @@ has run.
 - Modify: `substrate-postgresql/pom.xml`: add `migratory-autoconfigure` (compile) and
   `spring-boot-starter-liquibase` (test).
 - Create: `substrate-postgresql/src/main/resources/META-INF/migratory.properties`
-- Create: `substrate-postgresql/src/main/resources/db/substrate/postgresql/substrate-postgresql-changelog.xml`
+- Create: `substrate-postgresql/src/main/resources/org/jwcarman/substrate/postgresql/db/changelog.xml`
 - Test: `substrate-postgresql/src/test/java/org/jwcarman/substrate/postgresql/PostgresSchemaMigrationIT.java`
 
 **Interfaces:**
@@ -146,7 +146,7 @@ may already pass.
 
 - [ ] **Step 6: Write the changelog.** It's a standard `databaseChangeLog` with the
   `http://www.liquibase.org/xml/ns/dbchangelog` namespace and the `dbchangelog-latest.xsd` schema
-  location. Three changesets in this order: `atom-1`, `journal-1`, `mailbox-1`, author `substrate`.
+  location. Three changesets in this order: `substrate-postgresql-create-atom`, `-journal`, `-mailbox`, author `substrate`.
   Each holds one `<sqlFile path="V1__create_<primitive>.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>`.
   Put an XML comment at the top stating the rules: a released changeset is never edited; this file
   and the SQL files never move or get renamed; changes only add (new tables, nullable columns,
@@ -160,7 +160,7 @@ may already pass.
 - [ ] **Step 9: Commit**
 
 ```bash
-git add pom.xml substrate-postgresql/pom.xml substrate-postgresql/src/main/resources/META-INF/migratory.properties substrate-postgresql/src/main/resources/db/substrate/postgresql/substrate-postgresql-changelog.xml substrate-postgresql/src/test/java/org/jwcarman/substrate/postgresql/PostgresSchemaMigrationIT.java
+git add pom.xml substrate-postgresql/pom.xml substrate-postgresql/src/main/resources/META-INF/migratory.properties substrate-postgresql/src/main/resources/org/jwcarman/substrate/postgresql/db/changelog.xml substrate-postgresql/src/test/java/org/jwcarman/substrate/postgresql/PostgresSchemaMigrationIT.java
 git commit -m "feat(postgresql): declare the schema changelog to migratory"
 ```
 
@@ -243,7 +243,7 @@ git commit -m "feat(postgresql)!: tables come from migratory; auto-create-schema
   manage the schema yourself. Rewrite "Tables" to cover: migratory creating and rolling forward the
   tables before the application's own changelog; all three primitives' tables being created even
   when one is disabled; the spec's four-row "What an application gets" table; opting out with
-  `migratory.enabled=false` (include `classpath:db/substrate/postgresql/substrate-postgresql-changelog.xml`,
+  `migratory.enabled=false` (include `classpath:org/jwcarman/substrate/postgresql/db/changelog.xml`,
   or create the schema with your own tool); without Spring Boot (run the changelog with Liquibase,
   or generate SQL with `liquibase update-sql`). Delete the three
   `auto-create-schema` rows from the configuration table.

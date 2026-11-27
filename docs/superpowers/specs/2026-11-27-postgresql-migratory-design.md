@@ -69,11 +69,13 @@ user's database is missing, including across skipped releases.
 - **Declaration:** `substrate-postgresql/src/main/resources/META-INF/migratory.properties`:
   ```properties
   name=substrate-postgresql
-  changelog=classpath:db/substrate/postgresql/substrate-postgresql-changelog.xml
+  changelog=classpath:org/jwcarman/substrate/postgresql/db/changelog.xml
   ```
   No `after` or `before`: substrate references no other library's tables.
-- **Changelog:** `db/substrate/postgresql/substrate-postgresql-changelog.xml`, one changeset per
-  primitive (`atom-1`, `journal-1`, `mailbox-1`, author `substrate`), written as native Liquibase
+- **Changelog:** `org/jwcarman/substrate/postgresql/db/changelog.xml` is a master changelog that
+  only includes change files from `changes/`, in order, one file per change (the layout nessy uses).
+  The first, `changes/0001-create-tables.xml`, holds one changeset per
+  primitive (`substrate-postgresql-create-atom`, `-journal`, `-mailbox`, author `substrate`), written as native Liquibase
   XML change types (`createTable`, `createIndex`), not SQL files. (Revised during implementation,
   at the user's direction.) Each changeset reproduces exactly what the 0.9.0–0.11.0
   `V1__create_*.sql` scripts created, and carries a `preConditions onFail="MARK_RAN"` guard that
@@ -114,7 +116,7 @@ user's database is missing, including across skipped releases.
   2. Remove `substrate.postgresql.*.auto-create-schema` settings.
   3. Existing databases need nothing else: the first run records the existing tables.
   4. To manage the schema yourself instead, set `migratory.enabled=false`, and either include
-     `classpath:db/substrate/postgresql/substrate-postgresql-changelog.xml` in your own changelog, or
+     `classpath:org/jwcarman/substrate/postgresql/db/changelog.xml` in your own changelog, or
      create the schema with your own tool. Liquibase isn't needed at runtime in that case.
 - A line in the contributor docs, or the changelog's header comment, stating the changelog rules
   (never edit a released changeset, never move the file, changes only add).

@@ -56,7 +56,11 @@ import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class PostgresSchemaMigrationIT {
 
-  private static final List<String> CHANGESETS = List.of("atom-1", "journal-1", "mailbox-1");
+  private static final List<String> CHANGESETS =
+      List.of(
+          "substrate-postgresql-create-atom",
+          "substrate-postgresql-create-journal",
+          "substrate-postgresql-create-mailbox");
 
   /** The scripts substrate ran at startup before 0.12.0, kept as fixtures. */
   private static final String V1_SCRIPTS = "db/substrate/postgresql/legacy/";
@@ -296,7 +300,7 @@ class PostgresSchemaMigrationIT {
     }
     return jdbc.queryForList(
         "SELECT id FROM databasechangelog"
-            + " WHERE filename LIKE '%substrate-postgresql-changelog.xml'"
+            + " WHERE filename LIKE '%org/jwcarman/substrate/postgresql/db/changes/%'"
             + " ORDER BY orderexecuted",
         String.class);
   }

@@ -24,7 +24,7 @@ import org.springframework.core.io.DefaultResourceLoader;
 public final class PostgresTestSchema {
 
   public static final String CHANGELOG =
-      "classpath:db/substrate/postgresql/substrate-postgresql-changelog.xml";
+      "classpath:org/jwcarman/substrate/postgresql/db/changelog.xml";
 
   private PostgresTestSchema() {}
 
