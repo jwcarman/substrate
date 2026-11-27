@@ -10,6 +10,8 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-27
+
 ### Breaking changes
 
 - `substrate-postgresql`: the schema now comes from a Liquibase changelog that
@@ -957,6 +959,7 @@ abstractions:
 
 - **BOM** (`substrate-bom`) for version alignment across all modules
 
+[0.12.0]: https://github.com/jwcarman/substrate/releases/tag/0.12.0
 [0.11.0]: https://github.com/jwcarman/substrate/releases/tag/0.11.0
 [0.10.0]: https://github.com/jwcarman/substrate/releases/tag/0.10.0
 [0.9.0]: https://github.com/jwcarman/substrate/releases/tag/0.9.0

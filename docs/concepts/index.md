@@ -221,7 +221,7 @@ names all seven needs no `default`, and the compiler reports a missing one.
 
 !!! warning "Don't rely on interrupting `next`"
     If the thread blocked in `next` is interrupted, `next` returns with the interrupt flag
-    restored, but as of 0.11.0 the subscription's feeder keeps running, and a later `close()` or
+    restored, but as of 0.12.0 the subscription's feeder keeps running, and a later `close()` or
     `cancel()` does not stop it. Cancel a subscription with `cancel()` or `close()` instead of
     interrupting the thread that reads it; where a framework interrupts that thread (for
     example, on a client disconnect), cancel from the disconnect callback first.
