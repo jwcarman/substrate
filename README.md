@@ -42,7 +42,7 @@ over a callback, and handle every outcome as a case of a sealed `NextResult`.
         <dependency>
             <groupId>org.jwcarman.substrate</groupId>
             <artifactId>substrate-bom</artifactId>
-            <version>0.10.0</version>
+            <version>0.11.0</version>
             <type>pom</type>
             <scope>import</scope>
         </dependency>

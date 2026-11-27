@@ -10,6 +10,54 @@ occur between minor versions. The 1.0.0 release will mark API stability.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-27
+
+### Breaking changes
+
+- `substrate-postgresql`: the `substrate.postgresql.notifier.poll-timeout`
+  property is removed, and `PostgresNotifierSpi`'s constructor no longer takes
+  a `pollTimeoutMillis` argument. The timeout never affected notification
+  latency — `getNotifications` returns as soon as a notification arrives — it
+  only set how long the idle listener blocked, and so how long shutdown could
+  take. The listener now always blocks for 100ms at a time. If you set the
+  property, delete it; Spring Boot ignores it either way. If you construct the
+  notifier yourself, drop the last argument:
+
+  ```java
+  // before
+  new PostgresNotifierSpi(jdbcTemplate, dataSource, "substrate_notify", 30_000);
+  // after
+  new PostgresNotifierSpi(jdbcTemplate, dataSource, "substrate_notify");
+  ```
+
+### Fixed
+
+- `substrate-postgresql`: stopping the notifier no longer returns a closed
+  connection to the pool. `stop()` used to interrupt the listener thread, and
+  interrupting a virtual thread blocked in a socket read closes the socket, so
+  the next borrower from the pool (Spring Modulith's
+  `DefaultEventPublicationRegistry.destroy()`, in the reported case) failed
+  with SQLSTATE 08003, "This connection has been closed". `stop()` now lets the
+  listener exit on its own, which takes at most 100ms, and interrupts it only
+  if it does not.
+- `substrate-postgresql`: the notifier no longer puts a dead connection back in
+  the pool after the LISTEN connection is lost. Failures from
+  `getNotifications` bypass the pool's connection proxy, so the pool never
+  learned the connection was broken.
+- `substrate-postgresql`: connections the notifier returns to the pool are no
+  longer left subscribed to the notification channel. The listener runs
+  `UNLISTEN *` before releasing its connection.
+
+### Documentation
+
+- A documentation site at https://jwcarman.github.io/substrate/: getting
+  started, concepts, a page for each of Atom, Journal and Mailbox and for each
+  backend, guides to encryption, testing, operating and native images, and
+  configuration, exceptions and design-principles references. API docs are
+  published per release.
+- The README now points at the site. For AI coding assistants, the site serves
+  `llms.txt` and `llms-full.txt`, and the repository ships a `context7.json`.
+
 ## [0.10.0] - 2026-09-22
 
 ### Breaking changes
@@ -876,6 +924,7 @@ abstractions:
 
 - **BOM** (`substrate-bom`) for version alignment across all modules
 
+[0.11.0]: https://github.com/jwcarman/substrate/releases/tag/0.11.0
 [0.10.0]: https://github.com/jwcarman/substrate/releases/tag/0.10.0
 [0.9.0]: https://github.com/jwcarman/substrate/releases/tag/0.9.0
 [0.8.2]: https://github.com/jwcarman/substrate/releases/tag/0.8.2
