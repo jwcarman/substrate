@@ -39,6 +39,10 @@ occur between minor versions. The 1.0.0 release will mark API stability.
   All three primitives' tables are created, even when one is turned off with
   `substrate.postgresql.<primitive>.enabled=false`.
 
+  Coming from a release before 0.9.0, drop `substrate_journal_entries` and
+  `substrate_journal_completed` before upgrading, as 0.9.0's notes required;
+  otherwise startup fails with "relation ... already exists".
+
 ## [0.11.0] - 2026-11-27
 
 ### Breaking changes

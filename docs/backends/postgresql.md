@@ -18,6 +18,10 @@ needs only Liquibase besides (see [Tables](#tables)). It is also the backend tha
   `spring.datasource.*` — and the PostgreSQL JDBC driver.
 - **Liquibase**, through `spring-boot-starter-liquibase`, and permission to create tables, unless
   you manage the schema yourself (below).
+- **Liquibase pointed at the same database and schema the `DataSource` reads.** migratory runs
+  where Spring Boot's Liquibase would (`spring.liquibase.url`, `@LiquibaseDataSource`,
+  `spring.liquibase.default-schema`); if that is somewhere else, the tables end up where
+  Substrate doesn't look.
 - PostgreSQL 16 is what Substrate's tests run against.
 
 The notifier keeps one connection from the `DataSource` open for `LISTEN`, so size the pool for
