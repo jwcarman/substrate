@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  substrate-postgresql's schema, discovered and run by migratory (META-INF/migratory.properties).
+
+  Rules, which Liquibase and migratory cannot enforce:
+    - A released changeset is never edited. Liquibase records each changeset's checksum and fails
+      startup when it changes.
+    - This file never moves or gets renamed. Liquibase identifies a changeset by its id, author and
+      this file's path.
+    - Changes only add: new tables, new nullable columns, new indexes. During a rolling deploy an
+      older instance keeps running against the new schema.
+    - A new change is a new changeset at the end of this file.
+
+  The *-1 changesets create exactly what the V1__*.sql scripts that substrate 0.9.0-0.11.0 ran at
+  startup created (PostgresSchemaMigrationIT compares the two). Each is skipped and recorded as run
+  when its primitive's table already exists, so databases those releases built adopt this changelog
+  without a manual step.
+-->
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="atom-1" author="substrate">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="substrate_atom"/>
+            </not>
+        </preConditions>
+        <createTable tableName="substrate_atom">
+            <column name="key" type="TEXT">
+                <constraints primaryKey="true" primaryKeyName="substrate_atom_pkey"/>
+            </column>
+            <column name="value" type="BYTEA">
+                <constraints nullable="false"/>
+            </column>
+            <column name="token" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="expires_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex tableName="substrate_atom" indexName="idx_substrate_atom_expires_at">
+            <column name="expires_at"/>
+        </createIndex>
+    </changeSet>
+
+    <!--
+      substrate_journal is the journal-level lease. dies_at is the journal's current deadline: the
+      inactivity deadline while active (pushed forward by every append), the retention deadline
+      once completed. NULL means no lease, so the journal never expires.
+      substrate_journal_entries.expires_at is the entry's own TTL deadline. NULL means no TTL.
+    -->
+    <changeSet id="journal-1" author="substrate">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="substrate_journal"/>
+            </not>
+        </preConditions>
+        <createTable tableName="substrate_journal">
+            <column name="key" type="VARCHAR(512)">
+                <constraints primaryKey="true" primaryKeyName="substrate_journal_pkey"/>
+            </column>
+            <column name="inactivity_ttl_millis" type="BIGINT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="dies_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="completed" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex tableName="substrate_journal" indexName="idx_substrate_journal_dies_at">
+            <column name="dies_at"/>
+        </createIndex>
+        <!-- what BIGSERIAL created; Liquibase would turn a BIGSERIAL column into an identity column -->
+        <createSequence sequenceName="substrate_journal_entries_id_seq" dataType="bigint"
+                        startValue="1" incrementBy="1"/>
+        <createTable tableName="substrate_journal_entries">
+            <column name="id" type="BIGINT"
+                    defaultValueSequenceNext="substrate_journal_entries_id_seq">
+                <constraints primaryKey="true" primaryKeyName="substrate_journal_entries_pkey"/>
+            </column>
+            <column name="key" type="VARCHAR(512)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="data" type="BYTEA">
+                <constraints nullable="false"/>
+            </column>
+            <column name="timestamp" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="expires_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+        <createIndex tableName="substrate_journal_entries"
+                     indexName="idx_substrate_journal_entries_key_id">
+            <column name="key"/>
+            <column name="id"/>
+        </createIndex>
+        <createIndex tableName="substrate_journal_entries"
+                     indexName="idx_substrate_journal_entries_expires_at">
+            <column name="expires_at"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="mailbox-1" author="substrate">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="substrate_mailbox"/>
+            </not>
+        </preConditions>
+        <createTable tableName="substrate_mailbox">
+            <column name="key" type="VARCHAR(512)">
+                <constraints primaryKey="true" primaryKeyName="substrate_mailbox_pkey"/>
+            </column>
+            <column name="value" type="BYTEA"/>
+            <column name="expires_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+</databaseChangeLog>

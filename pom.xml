@@ -84,10 +84,16 @@
         <sonar.projectKey>jwcarman_substrate</sonar.projectKey>
         <sonar.coverage.exclusions>substrate-example/**</sonar.coverage.exclusions>
         <codec.version>0.10.0</codec.version>
+        <migratory.version>0.1.0</migratory.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>org.jwcarman.migratory</groupId>
+                <artifactId>migratory-autoconfigure</artifactId>
+                <version>${migratory.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.jwcarman.codec</groupId>
                 <artifactId>codec-core</artifactId>

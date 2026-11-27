@@ -73,11 +73,15 @@ user's database is missing, including across skipped releases.
   ```
   No `after` or `before`: substrate references no other library's tables.
 - **Changelog:** `db/substrate/postgresql/substrate-postgresql-changelog.xml`, one changeset per
-  primitive (`atom-1`, `journal-1`, `mailbox-1`, author `substrate`). Each runs today's
-  `V1__create_*.sql` through `sqlFile`, unchanged. Because those scripts are all `IF NOT EXISTS`, a
-  database that already has the tables gets them recorded as run, so nothing needs adopting by hand.
-  Future changes add `V2__…` SQL files and changesets referencing them. The SQL files keep their
-  names and contents forever.
+  primitive (`atom-1`, `journal-1`, `mailbox-1`, author `substrate`), written as native Liquibase
+  XML change types (`createTable`, `createIndex`), not SQL files. (Revised during implementation,
+  at the user's direction.) Each changeset reproduces exactly what the 0.9.0–0.11.0
+  `V1__create_*.sql` scripts created, and carries a `preConditions onFail="MARK_RAN"` guard that
+  skips it when its primitive's tables already exist. A database those scripts built gets the
+  changesets recorded as run, with nothing to adopt by hand. Future changes are new changesets.
+  The `V1__*.sql` scripts leave the jar. They move to test resources as fixtures of what earlier
+  releases created, and a test checks that a changelog-built database matches a fixture-built one
+  column for column and index for index.
 - **Removed:** the `auto-create-schema` properties (the `autoCreateSchema` record components and the
   defaults) and the `ResourceDatabasePopulator` calls in the three primitives' auto-configurations.
   A user who sets the property gets nothing (Spring Boot ignores it), and the upgrade notes say so.
@@ -89,14 +93,14 @@ user's database is missing, including across skipped releases.
   | The application... | Result |
   |---|---|
   | adds `spring-boot-starter-liquibase` | migratory creates and rolls forward substrate's tables before the application's own changelog runs |
-  | sets `migratory.enabled=false`, without Liquibase | starts; the application owns the schema, applying the jar's `V*__*.sql` files itself or with its own tool |
+  | sets `migratory.enabled=false`, without Liquibase | starts; the application owns the schema, creating it with its own tool (for example from SQL generated with `liquibase update-sql`) |
   | sets `migratory.enabled=false`, with Liquibase | starts; the application includes substrate's changelog in its own, and switching back reruns nothing because Liquibase records the same path |
   | does neither | fails startup with migratory's message naming both fixes, rather than failing later on missing tables |
 
   migratory skips its missing-Liquibase failure when `migratory.enabled` is false
   (`MigratoryAutoConfiguration`), which is what makes the second row work.
-- **Without Spring Boot:** apply the jar's `V*__*.sql` files in version order, or run the changelog
-  with their own Liquibase.
+- **Without Spring Boot:** run the changelog with Liquibase, or generate SQL from it with
+  `liquibase update-sql`.
 
 ## Documentation and upgrade notes (0.12.0)
 
@@ -110,8 +114,8 @@ user's database is missing, including across skipped releases.
   2. Remove `substrate.postgresql.*.auto-create-schema` settings.
   3. Existing databases need nothing else: the first run records the existing tables.
   4. To manage the schema yourself instead, set `migratory.enabled=false`, and either include
-     `classpath:db/substrate/postgresql/substrate-postgresql-changelog.xml` in your own changelog or
-     apply the `V*__*.sql` files in order. Liquibase isn't needed in that case.
+     `classpath:db/substrate/postgresql/substrate-postgresql-changelog.xml` in your own changelog, or
+     create the schema with your own tool. Liquibase isn't needed at runtime in that case.
 - A line in the contributor docs, or the changelog's header comment, stating the changelog rules
   (never edit a released changeset, never move the file, changes only add).
 

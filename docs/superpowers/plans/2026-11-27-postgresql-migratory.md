@@ -23,14 +23,17 @@ has run.
   optional. Never `migratory-spring-boot-starter`. Version is `${migratory.version}`, managed in the
   root `pom.xml`'s `dependencyManagement`.
 - `spring-boot-starter-liquibase` is **test** scope only in `substrate-postgresql`.
-- The three `V1__create_*.sql` files are not edited, renamed or moved, now or ever.
+- Changesets are native Liquibase XML change types (`createTable`, `createIndex`) with
+  `preConditions onFail="MARK_RAN"` table-existence guards. The `V1__create_*.sql` files move,
+  unedited, from `src/main/resources` to `src/test/resources/db/substrate/postgresql/legacy/` as
+  fixtures of what 0.9.0–0.11.0 created. (Ruling, Task 1: user's direction.)
 - The changelog is `db/substrate/postgresql/substrate-postgresql-changelog.xml`, and it never moves.
 - Declaration: `name=substrate-postgresql`, `changelog=classpath:db/substrate/postgresql/substrate-postgresql-changelog.xml`, with no `after` or `before`.
 - Changesets: `atom-1`, `journal-1`, `mailbox-1`, author `substrate`.
 - Cassandra and DynamoDB are untouched.
 - Native images need no substrate hints. migratory's `process-aot` step registers everything under
   the declared changelog's directory, so the SQL files must stay beside the changelog in
-  `db/substrate/postgresql/`.
+  `db/substrate/postgresql/`, which holds only the changelog now.
 - Repo rules: no warning suppression, no star imports, no fully-qualified names in code, JUnit 5
   snake_case method names with `@DisplayNameGeneration(ReplaceUnderscores.class)` and `@Nested`
   groups, spotless-formatted, license header on new Java files (copy from any existing file).
@@ -241,7 +244,8 @@ git commit -m "feat(postgresql)!: tables come from migratory; auto-create-schema
   tables before the application's own changelog; all three primitives' tables being created even
   when one is disabled; the spec's four-row "What an application gets" table; opting out with
   `migratory.enabled=false` (include `classpath:db/substrate/postgresql/substrate-postgresql-changelog.xml`,
-  or apply the `V*__*.sql` files in version order); without Spring Boot. Delete the three
+  or create the schema with your own tool); without Spring Boot (run the changelog with Liquibase,
+  or generate SQL with `liquibase update-sql`). Delete the three
   `auto-create-schema` rows from the configuration table.
 - Modify: `CHANGELOG.md` under `## [Unreleased]`: `### Breaking changes`, with the spec's four
   upgrade steps verbatim in meaning, including the empty `databaseChangeLog: []` example and the
